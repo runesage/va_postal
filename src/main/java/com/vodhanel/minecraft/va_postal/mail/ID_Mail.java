@@ -9,6 +9,7 @@ import com.vodhanel.minecraft.va_postal.config.C_Owner;
 import com.vodhanel.minecraft.va_postal.config.C_Postoffice;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import com.vodhanel.minecraft.va_postal.navigation.NpcLook;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -544,15 +545,12 @@ public class ID_Mail {
 
         if (shipper_found) {
             ItemStack in_hand = new ItemStack(Material.CHEST);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else if (mail_found) {
             ItemStack in_hand = new ItemStack(Material.BOOK);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else {
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
         }
     }
 
@@ -633,15 +631,12 @@ public class ID_Mail {
 
         if (shipper_found) {
             ItemStack in_hand = new ItemStack(Material.CHEST);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else if (mail_found) {
             ItemStack in_hand = new ItemStack(Material.BOOK);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else {
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
         }
     }
 
@@ -701,8 +696,7 @@ public class ID_Mail {
                         if (add_to_residence_chest(id, stamped_mail)) {
                             item_itr.set(null);
 
-                            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-                            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+                            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
                             mail_delivered = true;
                             C_Address.set_address_newmail(stown, this_address, true);
                         }
@@ -764,8 +758,7 @@ public class ID_Mail {
         }
 
 
-        VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
-        VA_postal.central_route_player.setItemOnCursor(null);
+        NpcLook.hold(VA_postal.central_route_npc, (ItemStack) null);
 
         ListIterator<ItemStack> local_item_itr = VA_postal.wtr_inventory_postoffice[id].iterator();
         boolean out_of_town_received = false;
@@ -790,11 +783,9 @@ public class ID_Mail {
                                 ChestManip.parcel_remove_origen_chest(ind_item);
                                 ItemStack chest_in_hand = new ItemStack(Material.CHEST);
 
-                                VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
-                                VA_postal.central_route_player.setItemOnCursor(chest_in_hand);
+                                NpcLook.hold(VA_postal.central_route_npc, chest_in_hand);
                             } else {
-                                VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
-                                VA_postal.central_route_player.setItemOnCursor(stamped_mail);
+                                NpcLook.hold(VA_postal.central_route_npc, stamped_mail);
                             }
                         } else {
                             ChestManip.add_to_central_chest(ind_item);

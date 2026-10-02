@@ -6,7 +6,6 @@ import com.vodhanel.minecraft.va_postal.config.*;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.astar.pathfinder.BlockExaminer;
 import net.citizensnpcs.api.npc.NPC;
-import net.citizensnpcs.api.trait.trait.Equipment;
 import net.citizensnpcs.api.trait.trait.MobType;
 import net.citizensnpcs.api.trait.trait.Owner;
 import net.citizensnpcs.trait.LookClose;
@@ -54,6 +53,7 @@ public class RouteMngr {
                 EntityType buk_entity_type = EntityType.PLAYER;
                 VA_postal.wtr_npc[id] = VA_postal.npcRegistry.createNPC(buk_entity_type, name);
                 not_saved(VA_postal.wtr_npc[id]);
+                NpcLook.skin(VA_postal.wtr_npc[id], true);
                 VA_postal.wtr_slocation_local_po_spawn[id] = slocation;
                 VA_postal.wtr_npc[id].spawn(location);
                 VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
@@ -74,6 +74,7 @@ public class RouteMngr {
                 EntityType buk_entity_type = EntityType.PLAYER;
                 VA_postal.central_route_npc = VA_postal.central_route_npc_reg.createNPC(buk_entity_type, name);
                 not_saved(VA_postal.central_route_npc);
+                NpcLook.skin(VA_postal.central_route_npc, false);
                 VA_postal.central_po_slocation_spawn = slocation;
                 VA_postal.central_route_npc.spawn(location);
                 VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
@@ -101,15 +102,7 @@ public class RouteMngr {
             VA_postal.central_route_npc.getOrAddTrait(Owner.class).setOwner(org.bukkit.Bukkit.getConsoleSender());
             VA_postal.central_route_npc.getOrAddTrait(MobType.class).setType(buk_entity_type);
             VA_postal.central_route_npc.getOrAddTrait(LookClose.class).lookClose(true);
-            Equipment trait = VA_postal.central_route_npc.getOrAddTrait(Equipment.class);
-            ItemStack uniform = uniform_part(1, false);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(1), uniform);
-            uniform = uniform_part(2, false);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(2), uniform);
-            uniform = uniform_part(3, false);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(3), uniform);
-            uniform = uniform_part(4, false);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(4), uniform);
+            NpcLook.uniform(VA_postal.central_route_npc, false);
         } else {
             if ((VA_postal.wtr_npc[id] == null) || (VA_postal.wtr_npc[id].getEntity() == null)) return;
 
@@ -127,19 +120,11 @@ public class RouteMngr {
             }
             VA_postal.wtr_inventory_npc[id].clear();
             VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
             VA_postal.wtr_npc[id].getOrAddTrait(Owner.class).setOwner(org.bukkit.Bukkit.getConsoleSender());
             VA_postal.wtr_npc[id].getOrAddTrait(MobType.class).setType(buk_entity_type);
             VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true);
-            Equipment trait = VA_postal.wtr_npc[id].getOrAddTrait(Equipment.class);
-            ItemStack uniform = uniform_part(1, true);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(1), uniform);
-            uniform = uniform_part(2, true);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(2), uniform);
-            uniform = uniform_part(3, true);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(3), uniform);
-            uniform = uniform_part(4, true);
-            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(4), uniform);
+            NpcLook.uniform(VA_postal.wtr_npc[id], true);
         }
     }
 
@@ -497,40 +482,6 @@ public class RouteMngr {
         cal_stability += 1;
         cal_cosecutive += 1;
         cal_history_pos = 0;
-    }
-
-    /** Armor tiers in legacy item-ID order: IDs 298-317 are tier * 4 + slot. */
-    private static final String[] ARMOR_TIERS = {"LEATHER", "CHAINMAIL", "IRON", "DIAMOND", "GOLDEN"};
-    private static final String[] ARMOR_SLOTS = {"HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"};
-
-    /**
-     * Uniform piece for a slot (1 helmet .. 4 boots). The config keeps the original v4 numeric item
-     * IDs (298-317), which are mapped to modern materials; anything else means no piece.
-     */
-    private static synchronized ItemStack uniform_part(int slot, boolean local) {
-        if (slot < 1 || slot > 4) {
-            return null;
-        }
-        int legacy_id = GetConfig.uniform_part_config(slot, local);
-        int offset = legacy_id - 298;
-        if (offset < 0 || offset >= ARMOR_TIERS.length * 4 || offset % 4 != slot - 1) {
-            return null;
-        }
-        Material material = Material.matchMaterial(ARMOR_TIERS[offset / 4] + "_" + ARMOR_SLOTS[slot - 1]);
-        return material == null ? null : new ItemStack(material, 1);
-    }
-
-    private static Equipment.EquipmentSlot equipment_slot(int slot) {
-        switch (slot) {
-            case 1:
-                return Equipment.EquipmentSlot.HELMET;
-            case 2:
-                return Equipment.EquipmentSlot.CHESTPLATE;
-            case 3:
-                return Equipment.EquipmentSlot.LEGGINGS;
-            default:
-                return Equipment.EquipmentSlot.BOOTS;
-        }
     }
 
     public static synchronized void set_range_and_speed(int id) {

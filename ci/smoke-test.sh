@@ -61,6 +61,14 @@ run_server "$WORK_DIR/phase1.log" \
 CONFIG="$SERVER/plugins/Postal/config.yml"
 sed -i "0,/^  Use: 'false'/s//  Use: 'true'/" "$CONFIG"
 seed_config "$CONFIG"
+# The leather uniform is off by default; turn it on here so the dyed-armor path runs too.
+python3 - "$CONFIG" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+s, n = re.subn(r"(\n( +)Uniform:\n(?:\2 +.*\n)*?\2 +Enabled: )'false'", r"\1'true'", s)
+assert n == 1, "uniform toggle not found in config"
+open(p, 'w').write(s)
+PY
 
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
@@ -93,6 +101,7 @@ check "phase2: three deliveries (log created, then updated twice)" \
 check "phase2: existing postal log updated" grep -q "Postal log exists" "$WORK_DIR/phase2.log"
 check "phase2: postman never stuck on a completed waypoint" no_match "wtr_waypoint_completed is true" "$WORK_DIR/phase2.log"
 check "phase2: round trip recorded for Home" grep -qE "Home +Server +Seconds: [1-9]" "$WORK_DIR/phase2.log"
+check "phase2: NPC skins and uniform configured cleanly" no_match "Unknown uniform item|needs a texture and signature" "$WORK_DIR/phase2.log"
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
 # Postal recreates its NPCs on every start; Citizens must not save them (saved copies came back as idle
 # duplicates on each restart).

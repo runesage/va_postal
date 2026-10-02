@@ -21,6 +21,7 @@ import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
 
@@ -139,7 +140,7 @@ public class ID_WTR {
 
 
         VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-        VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+        NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
 
 
         ID_Mail.set_postoffice_chest_inv(id);
