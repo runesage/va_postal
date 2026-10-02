@@ -193,11 +193,14 @@ public class BukkitListener implements Listener {
                 }
 
                 if ((action == Action.LEFT_CLICK_BLOCK) && (MailSecurity.allowed_to_break_shipment(event.getClickedBlock(), player))) {
-                    event.getClickedBlock().setType(Material.AIR);
                     Block block = SignManip.sign2chest_block(event.getClickedBlock());
-                    block.setType(Material.AIR);
+                    event.getClickedBlock().setType(Material.AIR);
+                    if (block != null) {
+                        block.setType(Material.AIR);
+                    }
                     player.setItemOnCursor(null);
                 }
+                return;
             }
         } else {
             Block sign_block = ChestManip.chest2sign_block(event.getClickedBlock());

@@ -73,7 +73,8 @@ public class ID_WTR {
 
                 } else if (C_Owner.is_address_owner_defined(spostoffice, saddress)) {
                     Player tname = C_Owner.get_owner_address(spostoffice, saddress);
-                    if (tname == addr_owner.getValue()) {
+                    Player towny_owner = addr_owner.getValue();
+                    if (towny_owner != null && (tname == null || !tname.getUniqueId().equals(towny_owner.getUniqueId()))) {
                         C_Owner.set_owner_address(spostoffice, saddress, addr_owner.getValue());
                         Util.cinform("Towny override: New owner: " + df(spostoffice) + ", " + df(saddress));
                     }
@@ -325,8 +326,8 @@ public class ID_WTR {
             Location target = VA_postal.wtr_waypoint[id];
 
 
-            int nx = (int) npc_loc.getX();
-            int nz = (int) npc_loc.getZ();
+            int nx = npc_loc.getBlockX();
+            int nz = npc_loc.getBlockZ();
             int tx = (int) Math.floor(target.getX());
             int tz = (int) Math.floor(target.getZ());
 
@@ -405,7 +406,7 @@ public class ID_WTR {
             return;
         }
         if (!VA_postal.wtr_door_nav_enter[id]) {
-            //open_door(id, true, false);
+            open_door(id, true, false);
             VA_postal.wtr_door_nav_enter[id] = true;
             return;
         }
@@ -735,8 +736,8 @@ public class ID_WTR {
 
     private static Location scan_for_door_enroute(int id, String start_waypoint, String target_waypoint) {
         Util.dinform("called scan_for_door_enroute");
-        if (start_waypoint == null) {
-            throw new NullPointerException("START WAYPOINT IS NULL");
+        if (start_waypoint == null || target_waypoint == null) {
+            return null;
         }
         //Util.dinform("scan_for_door_enroute: " + id + " " + start_waypoint + " " + target_waypoint);
         start_waypoint = Util.put_point_on_ground(start_waypoint, false);
@@ -970,7 +971,7 @@ public class ID_WTR {
     private static boolean is_door_hit(Location base) {
         //Util.dinform("is_door_hit: " + AnsiColor.GREEN + "base " + AnsiColor.WHITE + "= [" + AnsiColor.YELLOW + base + AnsiColor.WHITE + "]");
         Material m = base.getBlock().getType();
-        if (m.name().toLowerCase().contains("door")) {
+        if (is_route_door(m)) {
             Util.dinform(AnsiColor.L_GREEN + "FOUND DOOR");
             return true;
         }

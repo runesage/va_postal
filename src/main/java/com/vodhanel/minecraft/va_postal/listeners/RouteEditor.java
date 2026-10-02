@@ -713,6 +713,10 @@ public class RouteEditor implements Listener {
             Util.pinform(player, "&e&oExiting the route editor.......");
             restore_quickbar(player);
             VA_postal.plistener_player = null;
+            try {
+                VA_Timers.routeRditor_start(false, player);
+            } catch (IllegalPluginAccessException ignored) {
+            }
             return;
         }
         String slocation = C_Route.get_last_waypoint_location(stown, saddress);
