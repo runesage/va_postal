@@ -2669,7 +2669,9 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
-        if ("CONSOLE".equals(sender.getName())) {
+        // Anything that isn't a player (console, RCON, command blocks, other plugins) gets the console
+        // commands; only players reach the player-only commands below.
+        if (!(sender instanceof Player)) {
             if (cmd.getName().equalsIgnoreCase("postal")) result = postal_con(true, sender, cmd.getName(), args);
 
             if (cmd.getName().equalsIgnoreCase("alist")) result = alist_con(true, sender, cmd.getName(), args);
