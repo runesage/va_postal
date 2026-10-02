@@ -261,7 +261,7 @@ public class Cmd_static {
         }
 
         ItemStack stamped = BookManip.stamp_parcel_statement(player, stack, true);
-        player.setItemOnCursor(stamped);
+        player.getInventory().setItemInMainHand(stamped);
         return true;
     }
 
@@ -435,14 +435,14 @@ public class Cmd_static {
         if ((inventory != null) &&
                 (title.equals(Util.df("[shipping label]")))) {
 
-            ItemStack holding = player.getItemOnCursor();
+            ItemStack holding = player.getInventory().getItemInMainHand();
             if (!holding.getType().isAir()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), player.getItemOnCursor());
+                player.getWorld().dropItemNaturally(player.getLocation(), player.getInventory().getItemInMainHand());
                 Util.pinform(player, "&9The item you were holding has been dropped.");
             }
         }
 
-        player.setItemOnCursor(new_stack);
+        player.getInventory().setItemInMainHand(new_stack);
         if (VA_postal.economy_configured)
             if (inventory == null) if (!re_address) P_Economy.charge_postage(player, stown);
             else Util.pinform(player, "&6There is no charge for re-addressing.");
@@ -482,7 +482,7 @@ public class Cmd_static {
 
         Book new_book = new Book("[Distribution]", s_expiration, existing_pages);
         ItemStack dist_stack = new_book.generateItemStack();
-        player.setItemOnCursor(null);
+        player.getInventory().setItemInMainHand(null);
 
 
         String[] town_list = C_Arrays.town_list();
@@ -683,8 +683,7 @@ public class Cmd_static {
             cost = P_Economy.charge_addr_purchase(player, subject, stown, saddress);
             if (cost > 0.0D) if (player == null) Util.con_type(subject + " charged " + ef(cost));
             else Util.pinform(player, subject + " charged " + ef(cost));
-        }
-        if (subject != null) {
+        } else if (subject != null) {
             C_Owner.set_owner_address(stown, saddress, subject);
             if (player == null) Util.con_type(Util.df(stown) + ", " + Util.df(saddress) + " now owned by " + subject);
             else Util.pinform(player, Util.df(stown) + ", " + Util.df(saddress) + " now owned by " + subject);
