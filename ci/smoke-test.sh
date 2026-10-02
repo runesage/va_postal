@@ -64,7 +64,7 @@ seed_config "$CONFIG"
 
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
-    "postal debug" "postal start" "sleep:110" "tlist" "alist Testville" "npc list" "postal stop" "sleep:5"
+    "postal debug" "postal start" "sleep:270" "tlist" "alist Testville" "npc list" "postal stop" "sleep:5"
 
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
@@ -86,6 +86,12 @@ check "phase2: economy hooked" grep -q "for economy\." "$WORK_DIR/phase2.log"
 check "phase2: dispatcher started" grep -q "VA_Postal started" "$WORK_DIR/phase2.log"
 check "phase2: Central office account created" test -e "$SERVER/plugins/Essentials/userdata/$CENTRAL_ACCOUNT.yml"
 check "phase2: postman walked the route to the address" grep -q "Arrived at address" "$WORK_DIR/phase2.log"
+# Three deliveries: the first creates Home's postal log, the next two update it (the second update reads
+# a page Minecraft has trimmed of blank lines, which used to crash and send the postman into a loop).
+check "phase2: three deliveries (log created, then updated twice)" \
+    test "$(grep -c "Arrived at address" "$WORK_DIR/phase2.log")" -ge 3
+check "phase2: existing postal log updated" grep -q "Postal log exists" "$WORK_DIR/phase2.log"
+check "phase2: postman never stuck on a completed waypoint" no_match "wtr_waypoint_completed is true" "$WORK_DIR/phase2.log"
 check "phase2: round trip recorded for Home" grep -qE "Home +Server +Seconds: [1-9]" "$WORK_DIR/phase2.log"
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
 
