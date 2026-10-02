@@ -94,6 +94,10 @@ check "phase2: existing postal log updated" grep -q "Postal log exists" "$WORK_D
 check "phase2: postman never stuck on a completed waypoint" no_match "wtr_waypoint_completed is true" "$WORK_DIR/phase2.log"
 check "phase2: round trip recorded for Home" grep -qE "Home +Server +Seconds: [1-9]" "$WORK_DIR/phase2.log"
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
+# Postal recreates its NPCs on every start; Citizens must not save them (saved copies came back as idle
+# duplicates on each restart).
+check "phase2: no PostMan/PostMaster saved by Citizens" \
+    test "$(grep -c "name: '&cPost" "$SERVER/plugins/Citizens/saves.yml" 2>/dev/null || true)" -eq 0
 
 echo
 echo "---- Postal output (phase 2) ----"

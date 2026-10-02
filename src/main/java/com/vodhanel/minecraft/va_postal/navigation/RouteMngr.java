@@ -53,6 +53,7 @@ public class RouteMngr {
                     }
                 EntityType buk_entity_type = EntityType.PLAYER;
                 VA_postal.wtr_npc[id] = VA_postal.npcRegistry.createNPC(buk_entity_type, name);
+                not_saved(VA_postal.wtr_npc[id]);
                 VA_postal.wtr_slocation_local_po_spawn[id] = slocation;
                 VA_postal.wtr_npc[id].spawn(location);
                 VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
@@ -72,6 +73,7 @@ public class RouteMngr {
                 VA_postal.central_route_npc_reg = CitizensAPI.getNPCRegistry();
                 EntityType buk_entity_type = EntityType.PLAYER;
                 VA_postal.central_route_npc = VA_postal.central_route_npc_reg.createNPC(buk_entity_type, name);
+                not_saved(VA_postal.central_route_npc);
                 VA_postal.central_po_slocation_spawn = slocation;
                 VA_postal.central_route_npc.spawn(location);
                 VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
@@ -148,21 +150,67 @@ public class RouteMngr {
         else VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true);
     }
 
-    public static synchronized void npc_delete_all(boolean quiet) {
+    /**
+     * Postal recreates its NPCs on every start, so Citizens must not save them: saved copies were reloaded
+     * as idle duplicates on the next start and piled up with every restart.
+     */
+    private static void not_saved(NPC npc) {
+        if (npc != null) {
+            npc.data().set(NPC.Metadata.SHOULD_SAVE, false);
+        }
+    }
 
-        for (int i = 0; i < VA_postal.wtr_count; i++) if (VA_postal.wtr_npc[i] != null) delete_npc(i);
+    /** True if this is a PostMan/PostMaster, comparing raw ("&cPost&9Man") and colour-stripped names. */
+    private static boolean is_postal_npc(NPC npc, String postman, String pmaster) {
+        String raw = npc.getRawName();
+        if (postman.equals(raw) || pmaster.equals(raw)) {
+            return true;
+        }
+        String name = org.bukkit.ChatColor.stripColor(npc.getName());
+        return name != null && (name.equals(strip(postman)) || name.equals(strip(pmaster)));
+    }
 
+    private static String strip(String name) {
+        return org.bukkit.ChatColor.stripColor(org.bukkit.ChatColor.translateAlternateColorCodes('&', name));
+    }
+
+    /**
+     * Destroys every PostMan/PostMaster in the Citizens registry, including leftovers that older builds let
+     * Citizens save (those are loaded after Postal enables, so this also runs when the dispatcher starts).
+     */
+    public static synchronized void remove_postal_npcs() {
         String postman = GetConfig.get_local_pman_name();
         String pmaster = GetConfig.get_central_pman_name();
-        for (NPC npc : VA_postal.npcRegistry.sorted())
+        java.util.List<NPC> doomed = new java.util.ArrayList<>();
+        for (NPC npc : VA_postal.npcRegistry.sorted()) {
             try {
-                if (npc != null) {
-                    if (npc.getName().equals(postman)) npc.destroy();
-                    if (npc.getName().equals(pmaster)) npc.destroy();
+                if (npc != null && is_postal_npc(npc, postman, pmaster)) {
+                    doomed.add(npc);
                 }
             } catch (Exception e) {
                 Util.dinform("ERROR IN DELETING ALL NPCS: " + e.getMessage());
             }
+        }
+        for (NPC npc : doomed) {
+            npc.destroy();
+        }
+        if (!doomed.isEmpty()) {
+            Util.dinform("Removed " + doomed.size() + " PostMan/PostMaster NPC(s)");
+        }
+    }
+
+    public static synchronized void npc_delete_all(boolean quiet) {
+
+        if (VA_postal.wtr_npc != null) {
+            for (int i = 0; i < VA_postal.wtr_count; i++) if (VA_postal.wtr_npc[i] != null) delete_npc(i);
+        }
+        if (VA_postal.central_route_npc != null) {
+            try {
+                VA_postal.central_route_npc.destroy();
+            } catch (Exception ignored) {
+            }
+        }
+        remove_postal_npcs();
         VA_postal.central_route_npc = null;
         VA_postal.central_route_player = null;
         VA_postal.wtr_npc = null;
