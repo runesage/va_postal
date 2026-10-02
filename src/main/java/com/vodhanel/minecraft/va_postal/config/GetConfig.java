@@ -436,8 +436,9 @@ public class GetConfig {
             int result = 3;
             result += Integer.parseInt(str);
             if ((result < 3) || (result > 10)) {
+                result = 3;
             }
-            return 3;
+            return result;
         } catch (Exception e) {
         }
 

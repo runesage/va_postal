@@ -91,8 +91,7 @@ public class C_Owner {
 
     public static synchronized Player get_owner_local_po(String stown) {
         try {
-            String spath = GetConfig.path_format("postoffice.local." + stown + ".owner.uuid");
-            return Util.UUID2Player(VA_postal.plugin.getConfig().getString(spath));
+            return Util.UUID2Player(owner_uuid("postoffice.local." + stown + ".owner"));
         } catch (Exception ignored) {
             return null;
         }
@@ -100,7 +99,7 @@ public class C_Owner {
 
     /** Owner UUID of a local post office, or null for none/server. Works whether or not the owner is online. */
     public static synchronized UUID get_owner_local_po_id(String stown) {
-        return parse_owner(GetConfig.path_format("postoffice.local." + stown + ".owner.uuid"));
+        return parse_owner(owner_uuid("postoffice.local." + stown + ".owner"));
     }
 
     public static synchronized void del_owner_local_po(String stown) {
@@ -134,8 +133,7 @@ public class C_Owner {
 
     public static synchronized Player get_owner_address(String stown, String saddress) {
         try {
-            String spath = GetConfig.path_format("address." + stown + "." + saddress + ".owner.uuid");
-            return Util.UUID2Player(VA_postal.plugin.getConfig().getString(spath));
+            return Util.UUID2Player(owner_uuid("address." + stown + "." + saddress + ".owner"));
         } catch (Exception e) {
             return null;
         }
@@ -144,12 +142,40 @@ public class C_Owner {
 
     /** Owner UUID of an address, or null for none/server. Works whether or not the owner is online. */
     public static synchronized UUID get_owner_address_id(String stown, String saddress) {
-        return parse_owner(GetConfig.path_format("address." + stown + "." + saddress + ".owner.uuid"));
+        return parse_owner(owner_uuid("address." + stown + "." + saddress + ".owner"));
     }
 
-    private static UUID parse_owner(String spath) {
+    /**
+     * The owner UUID stored under {@code owner_path}.uuid. v4 configs stored the owner's name under
+     * {@code owner_path}.name instead; that is converted to a UUID the first time it's read (from the
+     * server's known players only, so it never blocks on a web lookup) and saved.
+     */
+    private static String owner_uuid(String owner_path) {
+        String uuid_path = GetConfig.path_format(owner_path + ".uuid");
+        String sid = VA_postal.plugin.getConfig().getString(uuid_path);
+        if (sid != null) {
+            return sid;
+        }
+        String name = VA_postal.plugin.getConfig().getString(GetConfig.path_format(owner_path + ".name"));
+        if (name == null || name.trim().isEmpty()) {
+            return null;
+        }
+        if ("server".equalsIgnoreCase(name.trim())) {
+            return VA_postal.SERVER_ID.toString();
+        }
+        org.bukkit.OfflinePlayer known = org.bukkit.Bukkit.getOfflinePlayerIfCached(name.trim());
+        if (known == null) {
+            Util.cinform(AnsiColor.RED + "[Postal] Unknown v4 owner '" + name + "' at " + owner_path + "; leaving it unowned");
+            return null;
+        }
+        VA_postal.plugin.getConfig().set(uuid_path, known.getUniqueId().toString());
+        VA_postal.plugin.saveConfig();
+        Util.cinform("[Postal] Migrated v4 owner '" + name + "' at " + owner_path + " to " + known.getUniqueId());
+        return known.getUniqueId().toString();
+    }
+
+    private static UUID parse_owner(String sid) {
         try {
-            String sid = VA_postal.plugin.getConfig().getString(spath);
             if (sid == null) {
                 return null;
             }
