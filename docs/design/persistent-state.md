@@ -141,9 +141,16 @@ POSTED ──▶ AT_ORIGIN_BRANCH ──▶ AT_CENTRAL ──┬─▶ AT_DEST_B
 - **`IN_NETWORK`** is the only cross-server step. The origin server's Central sets it, and the destination
   server's dispatcher claims it with a CAS update (`WHERE state='IN_NETWORK' AND dest_server=?`). On a single
   server the transition is never taken, so the same code runs with no branches.
-- **Parcels never enter `IN_NETWORK`.** Item bytes are only safe within one server and one DataVersion, which
-  matches the plan's "no physical item transfer across servers". A parcel addressed to another server is refused
-  at `/package` time, with a clear message.
+- **Items never cross servers (a hard rule, decided).** Only `LETTER` records can enter `IN_NETWORK`. A letter
+  crosses as text, and the destination builds a fresh book from it. Parcels, COD and anything carrying items stay
+  on their origin server. The rule is enforced at every layer, not just in the UI:
+  1. `/package` and `/addr` refuse a destination on another server.
+  2. `MailService` refuses to route any non-letter to `IN_NETWORK`.
+  3. The store's claim query only matches `kind = 'LETTER'`.
+  4. A database `CHECK` constraint, `state <> 'IN_NETWORK' OR kind = 'LETTER'`, rejects it even if code is wrong.
+  5. The letter payload format (`LETTER_V1`) has no item fields at all.
+
+  Tests assert each layer independently.
 - **`MISSING`** comes from reconciliation (§7): the record says the mail is in chest X, but X no longer holds it.
   The insurance fund pays out from `MISSING` (plan §3). An admin can `RECOVERED`-rebuild the mail from its
   payload instead.
@@ -156,10 +163,9 @@ Reconciliation runs at startup, on chunk load for chunks that hold postal chests
    `mail_id`. If the book is missing, decide by the latest event:
    - a move was in flight: finish it, re-materialising from the payload if needed;
    - nothing was in flight: mark the record `MISSING`, because the chest was griefed.
-2. **For each postal book found in a chest with no matching record (or with no `mail_id`)**, it's a legacy v4
-   or fork book, or a forgery:
-   - legacy books are imported once (a best-effort parse of the old pages) during the migration;
-   - after that, untracked books are left in place and flagged, never routed.
+2. **For each postal-looking book found in a chest with no matching record (or with no `mail_id`)**, it was
+   forged or hand-made, because every real piece of mail is created with a record. It's left in place, flagged
+   to admins, and never routed.
 3. **For each `route_run` with no live postman**, return its mail to `AT_DEST_BRANCH` and requeue the run.
 
 Because every move is "transition, world, commit", step 1 can always tell an interrupted move from a theft.
@@ -199,17 +205,16 @@ Network:
 **Drivers:** HikariCP, the SQLite JDBC driver and the MariaDB driver load through Paper's `libraries:` in
 `plugin.yml`, downloaded from Maven Central at startup, so they aren't shaded into the jar.
 
-## 10. Migration from v4 and fork worlds
+## 10. No migration: a new mod
 
-The first start with the store enabled runs a one-time import:
-
-1. Scan every configured office and address chest for postal books.
-2. For each book, create a record from its stamped pages (best effort), assign a `mail_id` and write it to the
-   PDC.
-3. Parcels in transit get their lossy contents imported as-is, and the record is marked `import_lossy`.
-
-The import is idempotent: books that already have a `mail_id` are skipped. A dry-run command reports what it
-would import.
+There is no import or upgrade path from v4.01 or fork worlds (decided). Postal is treated as a new mod: the
+schema starts at version 1 with no import tooling. Old postal books in a world are ordinary books. As a
+follow-up, the v4-compatibility shims added during the port can be removed:
+- the `owner.name` → UUID conversion;
+- pre-1.13 material names on parcels;
+- legacy armor and highlight IDs in config;
+- legacy chest-direction bytes on labels;
+- the v4 note in `docs/economy.md`.
 
 ## 11. Testing
 
@@ -229,21 +234,24 @@ would import.
 
 | Phase | Scope | Unlocks |
 |---|---|---|
-| **P1** | `MailStore`/SQLite, schema and migrations, `mail_id` PDC, ledger-first moves for **letters**, reconciliation, `route_run` resume, legacy import | Restart-safe and crash-safe letters; the foundation for everything else |
+| **P1** | `MailStore`/SQLite, schema and migrations, `mail_id` PDC, ledger-first moves for **letters**, reconciliation, `route_run` resume, removal of the v4-compatibility shims | Restart-safe and crash-safe letters; the foundation for everything else |
 | **P2** | Parcels on full `ItemStack` payloads, COD and postage settled against records, `MISSING` → claim hooks | Fixes parcel item loss; the insurance fund can be built |
 | **P3** | `directory_*` tables, MySQL backend and parity CI, `server-id` | Network-ready storage while still running one server |
 | **P4** | `ProxyBus`, the Velocity relay plugin, `IN_NETWORK` claiming, a two-server CI | Cross-server letters |
 
 P1–P3 change nothing for players on a single server beyond reliability. P4 is only switched on by config.
 
-## 13. Decisions to confirm
+## 13. Decisions
 
-1. **SQLite as the single-server default.** Flat files would mean a second implementation and a rewrite for
-   MySQL; SQLite shares the SQL.
-2. **Letters cross servers; parcels don't.** Item bytes aren't portable across servers and versions. This is
-   the plan's "no physical item transfer", applied strictly.
-3. **Routes stay in `config.yml`.** Only the directory (offices and addresses) is shared.
-4. **Plugin-messaging bus first, Redis optional later.** Polling guarantees correctness either way.
-5. **Driver loading through Paper's `libraries:`**, rather than shading into the jar.
-6. **The legacy import parses old pages best-effort and marks lossy parcels.** The alternative is a clean
-   start that leaves old books where they are.
+All are decided as of October 2026.
+
+1. **SQLite is the single-server default.** MySQL/MariaDB is used for networks, with the same schema and
+   queries.
+2. **Letters can cross servers; items and parcels never can.** This is a hard rule, enforced at every layer
+   (§6).
+3. **Routes stay in each server's `config.yml`.** Only the directory (offices and addresses) is shared.
+4. **Velocity plugin messaging for notifications**, through a small stateless relay plugin on the proxy. Polling
+   the store guarantees correctness, and Redis can be added later behind the same `NotificationBus`.
+5. **Database drivers load through Paper's `libraries:`** in `plugin.yml` (downloaded from Maven Central on
+   first start), not shaded into the jar.
+6. **A new mod, with no migration** from v4.01 or fork worlds (§10).

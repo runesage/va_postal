@@ -13,6 +13,9 @@
 > - **Next:** persistent state, designed in `docs/design/persistent-state.md`. It has to support single-server
 >   and Velocity builds without a rewrite.
 > - **Decisions:**
+>   - Postal is treated as a new mod, with no migration from v4.01 or fork worlds
+>   - persistent state: SQLite for a single server, MySQL/MariaDB for networks; routes stay per server; Velocity
+>     plugin-messaging notifications; drivers loaded through Paper `libraries:` (see the design doc §13)
 >   - in-transit mail survives restarts and NPC deaths; the insurance fund covers grief only
 >   - items never cross servers; the shared DB is the source of truth and the proxy carries only notifications
 >   - no code is shared with the bank plugin; Postal exposes a generic "deliver this item" call
