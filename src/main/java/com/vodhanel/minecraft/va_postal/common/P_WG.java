@@ -1,0 +1,27 @@
+package com.vodhanel.minecraft.va_postal.common;
+
+import com.vodhanel.minecraft.va_postal.VA_postal;
+import com.vodhanel.minecraft.va_postal.commands.Cmdexecutor;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
+
+public class P_WG {
+    VA_postal plugin;
+
+    public P_WG(VA_postal instance) {
+        this.plugin = instance;
+    }
+
+    public static boolean ok_to_build_wg(Player player) {
+        if (VA_postal.wg_configured) {
+            if (Cmdexecutor.hasPermission(player, "postal.accept.bypass")) {
+                return true;
+            }
+
+            Location location = player.getLocation();
+            return VA_postal.worldguard.canBuild(player, location);
+        } else {
+            return true;
+        }
+    }
+}
