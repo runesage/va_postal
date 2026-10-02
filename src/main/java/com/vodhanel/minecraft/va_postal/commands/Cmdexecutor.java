@@ -2647,7 +2647,7 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public static String ef(double value) {
-        if (VA_postal.economy_configured) return VA_postal.econ.format(value);
+        if (VA_postal.economy_configured) return P_Economy.ef(value);
         return "-1";
     }
 

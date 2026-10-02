@@ -237,6 +237,18 @@ public class Book {
         return null;
     }
 
+    /** UUID embedded as the author on page 1, or null. Unlike extractEmbeddedAuthor, works for offline authors. */
+    public java.util.UUID extractEmbeddedAuthorId() {
+        String[] parts = getPage(1).split("\n");
+        if (parts.length > 14) {
+            try {
+                return java.util.UUID.fromString(parts[14].trim());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
+    }
+
     public Player extractEmbeddedOwner() {
         return extractEmbeddedAuthor();
     }

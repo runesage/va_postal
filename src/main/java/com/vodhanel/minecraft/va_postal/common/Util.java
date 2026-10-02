@@ -1381,7 +1381,7 @@ public class Util {
     }
 
     public static Player UUID2Player(UUID UUID) {
-        if (UUID == VA_postal.SERVER_ID)
+        if (VA_postal.SERVER_ID.equals(UUID))
             return VA_postal.SERVER;
         else
             return VA_postal.plugin.getServer().getPlayer(UUID);

@@ -6,42 +6,25 @@
 
     <groupId>com.vodhanel.minecraft</groupId>
     <artifactId>va_postal</artifactId>
-    <version>4.0</version>
+    <version>5.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Postal</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Paper 1.21.11 is the last API line on Java 21; plugins built against it also load on 26.x servers. -->
+        <maven.compiler.release>21</maven.compiler.release>
+        <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
     </properties>
 
     <build>
         <defaultGoal>clean package</defaultGoal>
         <plugins>
             <plugin>
-                <version>3.6.1</version>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.0.0</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <minimizeJar>true</minimizeJar>
-                        </configuration>
-                    </execution>
-                </executions>
+                <version>3.13.0</version>
             </plugin>
         </plugins>
         <resources>
@@ -54,66 +37,106 @@
 
     <repositories>
         <repository>
-            <id>spigotmc-repo</id>
-            <url>https://hub.spigotmc.org/nexus/content/groups/public/</url>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
-
         <repository>
-            <id>everything</id>
-            <url>http://repo.citizensnpcs.co</url>
+            <id>citizens</id>
+            <url>https://maven.citizensnpcs.co/repo</url>
         </repository>
-
         <repository>
-            <id>vault-repo</id>
-            <url>http://nexus.hc.to/content/repositories/pub_releases</url>
+            <id>codemc</id>
+            <url>https://repo.codemc.io/repository/maven-public/</url>
         </repository>
-
         <repository>
-            <id>sk89q-repo</id>
-            <url>http://maven.sk89q.com/repo/</url>
+            <id>enginehub</id>
+            <url>https://maven.enginehub.org/repo/</url>
+        </repository>
+        <repository>
+            <id>dynmap</id>
+            <url>https://repo.mikeprimm.com/</url>
         </repository>
     </repositories>
 
     <dependencies>
         <dependency>
-            <groupId>org.bukkit</groupId>
-            <artifactId>bukkit</artifactId>
-            <version>1.10-R0.1-SNAPSHOT</version>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>${paper.version}</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>net.citizensnpcs</groupId>
-            <artifactId>citizens</artifactId>
-            <version>2.0.18-SNAPSHOT</version>
+            <artifactId>citizens-main</artifactId>
+            <version>2.0.44-SNAPSHOT</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- VaultUnlocked API: ships both the legacy net.milkbowl.vault.economy API (plain Vault)
+             and net.milkbowl.vault2.economy (non-player accounts). vault2 classes are only touched
+             when VaultUnlocked is actually installed. -->
+        <dependency>
+            <groupId>net.milkbowl.vault</groupId>
+            <artifactId>VaultUnlockedAPI</artifactId>
+            <version>2.15</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
-            <groupId>net.milkbowl.vault</groupId>
-            <artifactId>VaultAPI</artifactId>
-            <version>1.6</version>
+            <groupId>com.sk89q.worldguard</groupId>
+            <artifactId>worldguard-bukkit</artifactId>
+            <version>7.0.14</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>us.dynmap</groupId>
+            <artifactId>DynmapCoreAPI</artifactId>
+            <version>3.7-beta-6</version>
             <scope>provided</scope>
         </dependency>
 
+        <!-- Vendored Towny jar the fork was written against. Towny publishes to repo.glaremasters.io
+             (not reachable from CI yet) and its JitPack build is empty; swap this out in the integrations pass. -->
         <dependency>
             <groupId>com.palmergames.bukkit</groupId>
             <artifactId>towny</artifactId>
-            <version>1.0</version>
-            <type>jar</type>
+            <version>legacy</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/lib/towny.jar</systemPath>
+            <systemPath>${project.basedir}/lib/Towny.jar</systemPath>
         </dependency>
 
         <dependency>
-            <groupId>com.sk89q</groupId>
-            <artifactId>worldguard</artifactId>
-            <version>6.1</version>
-        </dependency>
-        <dependency>
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>
-            <version>RELEASE</version>
+            <version>24.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.3</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

@@ -10,6 +10,7 @@ import com.vodhanel.minecraft.va_postal.mail.Book;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
 import com.vodhanel.minecraft.va_postal.mail.SignManip;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -237,11 +238,19 @@ public class Cmd_static {
         }
 
         if (price > 0.0D) {
-            Player sender = cod_sender(stack);
-            if (sender != null) {
-                P_Economy.charge_player(player, price);
-                P_Economy.pay_player(sender, price);
-            } else Util.cinform("[Postal] Unable charge for COD.");
+            java.util.UUID sender = new Book(stack).extractEmbeddedAuthorId();
+            if (sender == null) {
+                Util.cinform("[Postal] Unable charge for COD.");
+                Util.pinform(player, "&7&oUnable to collect COD for this parcel.");
+                block.setType(org.bukkit.Material.AIR);
+                return false;
+            }
+            if (!P_Economy.charge_player(player, price)) {
+                Util.pinform(player, "&7&oUnable to collect COD payment.");
+                block.setType(org.bukkit.Material.AIR);
+                return false;
+            }
+            P_Economy.pay_player(Bukkit.getOfflinePlayer(sender), price);
         }
 
         Inventory inventory = BookManip.parcel_fill_chest(block, stack);
@@ -703,7 +712,7 @@ public class Cmd_static {
     }
 
     public static String ef(double value) {
-        if (VA_postal.economy_configured) return VA_postal.econ.format(value);
+        if (VA_postal.economy_configured) return P_Economy.ef(value);
         return "-1";
     }
 
