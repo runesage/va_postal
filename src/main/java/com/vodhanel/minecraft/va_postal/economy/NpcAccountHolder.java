@@ -1,40 +1,36 @@
-package com.vodhanel.minecraft.va_postal.common;
+package com.vodhanel.minecraft.va_postal.economy;
 
-import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 
 import java.lang.reflect.Proxy;
 import java.util.UUID;
 
 /**
- * The "Server" pseudo-player used as the owner of anything no real player owns.
+ * An {@link OfflinePlayer} that only carries a UUID and a name, used to hand office accounts to the
+ * legacy Vault API (which only takes players). This is what Towny does for town accounts.
  * <p>
- * Only identity is meaningful: the UUID, and "Server" as every name. Every other Player method
- * answers null/false/0. Built as a dynamic proxy so it doesn't have to track every method Paper adds
- * to {@link Player}.
+ * Built as a dynamic proxy so it doesn't break every time Paper adds a method to OfflinePlayer.
+ * Anything beyond identity answers "offline, never seen, nothing set".
  */
-public final class ServerPlayer {
-    private static final String NAME = "Server";
-
-    private ServerPlayer() {
+final class NpcAccountHolder {
+    private NpcAccountHolder() {
     }
 
-    public static Player create(UUID id) {
-        return (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
-                (proxy, method, args) -> {
+    static OfflinePlayer of(UUID id, String name) {
+        return (OfflinePlayer) Proxy.newProxyInstance(OfflinePlayer.class.getClassLoader(),
+                new Class<?>[]{OfflinePlayer.class}, (proxy, method, args) -> {
                     switch (method.getName()) {
                         case "getUniqueId":
                             return id;
                         case "getName":
-                        case "getDisplayName":
-                        case "getPlayerListName":
-                        case "getCustomName":
-                            return NAME;
+                            return name;
                         case "equals":
-                            return proxy == args[0];
+                            return args[0] instanceof OfflinePlayer
+                                    && id.equals(((OfflinePlayer) args[0]).getUniqueId());
                         case "hashCode":
                             return id.hashCode();
                         case "toString":
-                            return NAME;
+                            return "PostalAccount{" + name + "," + id + "}";
                         default:
                             return default_value(method.getReturnType());
                     }

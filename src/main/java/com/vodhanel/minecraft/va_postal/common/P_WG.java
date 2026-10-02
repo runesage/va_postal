@@ -1,5 +1,9 @@
 package com.vodhanel.minecraft.va_postal.common;
 
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
+import com.sk89q.worldguard.LocalPlayer;
+import com.sk89q.worldguard.WorldGuard;
+import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.commands.Cmdexecutor;
 import org.bukkit.Location;
@@ -19,7 +23,13 @@ public class P_WG {
             }
             Location location = player.getLocation();
 
-            return VA_postal.worldguard.canBuild(player, location);
+            // WorldGuard 7 replaced canBuild() with region queries.
+            LocalPlayer local = WorldGuardPlugin.inst().wrapPlayer(player);
+            if (WorldGuard.getInstance().getPlatform().getSessionManager().hasBypass(local, local.getWorld())) {
+                return true;
+            }
+            return WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery()
+                    .testBuild(BukkitAdapter.adapt(location), local);
         }
 
         return true;

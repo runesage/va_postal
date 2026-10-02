@@ -4,10 +4,22 @@ import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.config.C_Arrays;
 import com.vodhanel.minecraft.va_postal.config.C_Economy;
 import com.vodhanel.minecraft.va_postal.config.C_Owner;
-import net.milkbowl.vault.economy.EconomyResponse;
+import com.vodhanel.minecraft.va_postal.economy.PostalEconomy;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
+import java.util.UUID;
+
+/**
+ * Postal's business rules for money: who pays what, and how it is split between Central and the
+ * local offices. All account access goes through {@link PostalEconomy}; Central and every local
+ * office are real accounts in the server economy, not Vault banks.
+ */
 public class P_Economy {
+    /** Seconds between distributions of Central's surplus to the local offices. */
+    private static final int DISTRIBUTION_INTERVAL = 1200;
+
     public static int last_central_dist = 0;
     VA_postal plugin;
 
@@ -19,111 +31,177 @@ public class P_Economy {
         last_central_dist = Util.time_stamp();
     }
 
+    /**
+     * Every {@link #DISTRIBUTION_INTERVAL} seconds, Central keeps one post office purchase price in
+     * reserve (to fund ownership refunds) and splits the rest evenly between the local offices.
+     */
     public static void ping_economy_schedule() {
-        if (VA_postal.economy_configured) {
-            int daily_interval = 1200;
-            int current_interval = Util.time_stamp() - last_central_dist;
-            if (current_interval > daily_interval) {
-                if (!does_central_exist()) {
-                    create_central();
-                }
+        if (!VA_postal.economy_configured) {
+            return;
+        }
+        if (Util.time_stamp() - last_central_dist <= DISTRIBUTION_INTERVAL) {
+            return;
+        }
+        last_central_dist = Util.time_stamp();
+        verify_central();
 
-                double retension = C_Economy.po_purchase_price();
-                double central_balance = central_balance();
-                if (central_balance <= retension) {
-                    return;
-                }
-                String[] town_list = C_Arrays.town_list();
-                if ((town_list == null) || (town_list.length <= 0)) {
-                    return;
-                }
+        double retension = C_Economy.po_purchase_price();
+        double central_balance = central_balance();
+        if (central_balance <= retension) {
+            return;
+        }
+        String[] town_list = C_Arrays.town_list();
+        if ((town_list == null) || (town_list.length <= 0)) {
+            return;
+        }
 
-                double sblit_bal = central_balance - retension;
-                double po_share = sblit_bal / town_list.length;
-                double transfered = 0.0D;
-                Util.cinform("\033[0;37m[Postal] ============================================");
-                Util.cinform("\033[0;33m[Postal] Daily distribution of central proceeds......");
-                Util.cinform("\033[0;33m[Postal] Beginning central balance ------ \033[0;37m" + fixed_len_rt(ef(central_balance), 10));
-                Util.cinform("\033[0;33m[Postal] Local post office share -------- \033[0;37m" + fixed_len_rt(ef(po_share), 10));
-                Util.cinform("\033[0;33m[Postal] New local balances:");
-                for (String aTown_list : town_list) {
-                    if ((does_the_bank_exist(aTown_list)) &&
-                            (deposit_to_local(aTown_list, po_share))) {
-                        transfered += po_share;
-                        String new_bal = fixed_len_rt(ef(local_balance(aTown_list)), 10);
-                        String f_postoffice = fixed_len(Util.df(aTown_list), 16, " ");
-                        Util.cinform("\033[0;33m[Postal]    " + f_postoffice + "  " + AnsiColor.WHITE + new_bal);
-                    }
-                }
-
-
-                withdraw_from_central(transfered);
-                double remaining = central_balance - transfered;
-                Util.cinform("\033[0;33m[Postal] Ending  central  balance  ------ \033[0;37m" + fixed_len_rt(ef(remaining), 10));
-                Util.cinform("\033[0;37m[Postal] ============================================");
+        double po_share = (central_balance - retension) / town_list.length;
+        double transfered = 0.0D;
+        Util.cinform("\033[0;37m[Postal] ============================================");
+        Util.cinform("\033[0;33m[Postal] Daily distribution of central proceeds......");
+        Util.cinform("\033[0;33m[Postal] Beginning central balance ------ \033[0;37m" + fixed_len_rt(ef(central_balance), 10));
+        Util.cinform("\033[0;33m[Postal] Local post office share -------- \033[0;37m" + fixed_len_rt(ef(po_share), 10));
+        Util.cinform("\033[0;33m[Postal] New local balances:");
+        for (String stown : town_list) {
+            if (does_the_bank_exist(stown) && PostalEconomy.central_to_office(stown, po_share)) {
+                transfered += po_share;
+                String new_bal = fixed_len_rt(ef(local_balance(stown)), 10);
+                String f_postoffice = fixed_len(Util.df(stown), 16, " ");
+                Util.cinform("\033[0;33m[Postal]    " + f_postoffice + "  " + AnsiColor.WHITE + new_bal);
             }
         }
+        Util.cinform("\033[0;33m[Postal] Ending  central  balance  ------ \033[0;37m" + fixed_len_rt(ef(central_balance - transfered), 10));
+        Util.cinform("\033[0;37m[Postal] ============================================");
     }
 
-    public static void create_bank(String sbank, Player sowner) {
-        if (!does_the_bank_exist(sbank)) {
-            VA_postal.econ.createBank(Util.df(sbank), sowner);
-            Util.cinform("\033[0;33m[Postal] Created bank: " + Util.df(sbank) + " owned by " + sowner);
+    // ---- Office accounts -------------------------------------------------------------------
+
+    public static void create_bank(String sbank) {
+        if (!PostalEconomy.ensure_office(sbank)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem creating economy account for " + Util.df(sbank));
         }
     }
 
     public static void create_central() {
-        if (!does_the_bank_exist("Central")) {
-            //noinspection deprecation
-            VA_postal.econ.createBank("Central", "Server");
-            Util.cinform("\033[0;33m[Postal] Created Central bank");
-        }
-    }
-
-    public static void delete_bank(String sbank) {
-        if (does_the_bank_exist(sbank)) {
-            VA_postal.econ.deleteBank(Util.df(sbank));
+        if (!PostalEconomy.ensure_central()) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem creating economy account for Central");
         }
     }
 
     public static boolean does_the_bank_exist(String sbank) {
-        for (String bank : VA_postal.econ.getBanks()) {
-            if (bank.equalsIgnoreCase(sbank)) {
-                return true;
+        return PostalEconomy.does_office_exist(sbank);
+    }
+
+    public static boolean does_central_have_amount(double amount) {
+        return PostalEconomy.central_has(amount);
+    }
+
+    public static boolean does_local_have_amount(String local_po, double amount) {
+        return PostalEconomy.office_has(local_po, amount);
+    }
+
+    public static double central_balance() {
+        return PostalEconomy.central_balance();
+    }
+
+    public static double local_balance(String local_po) {
+        return PostalEconomy.office_balance(local_po);
+    }
+
+    public static void deposit_to_central(double amount) {
+        if (!PostalEconomy.deposit_central(amount)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing " + ef(amount) + " to Central");
+        }
+    }
+
+    public static boolean deposit_to_local(String local_po, double amount) {
+        if (local_po == null) {
+            deposit_to_central(amount);
+            return false;
+        }
+        if (!PostalEconomy.deposit_office(local_po, amount)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing " + ef(amount) + " to " + Util.df(local_po));
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean withdraw_from_central(double amount) {
+        if (!PostalEconomy.withdraw_central(amount)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem withdrawing " + ef(amount) + " from Central");
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean withdraw_from_local(String local_po, double amount) {
+        if (!PostalEconomy.withdraw_office(local_po, amount)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem withdrawing " + ef(amount) + " from " + Util.df(local_po));
+            return false;
+        }
+        return true;
+    }
+
+    public static void verify_bank(String stown) {
+        if (!VA_postal.economy_configured) {
+            return;
+        }
+        if (!does_the_bank_exist(stown)) {
+            create_bank(stown);
+            // Central funds the refund an owner gets when the office changes hands; back it on creation.
+            if (C_Owner.get_owner_local_po_id(stown) != null) {
+                deposit_to_central(C_Economy.po_purchase_price());
             }
         }
-        return false;
     }
 
-    public static boolean does_central_exist() {
-        for (String bank : VA_postal.econ.getBanks()) {
-            if (bank.equalsIgnoreCase("Central")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean does_player_have_account(Player player) {
-        return VA_postal.econ.hasAccount(player);
-    }
-
-    public static void create_player_account(Player player) {
-        if (!VA_postal.econ.createPlayerAccount(player)) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem creating account for " + Util.df(player.getDisplayName()));
+    public static void verify_central() {
+        if (VA_postal.economy_configured) {
+            create_central();
         }
     }
 
+    // ---- Player accounts -------------------------------------------------------------------
+
+    public static boolean does_player_have_account(OfflinePlayer player) {
+        return PostalEconomy.has_player_account(player);
+    }
+
+    public static void create_player_account(OfflinePlayer player) {
+        if (!PostalEconomy.ensure_player(player)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem creating account for " + name(player));
+        }
+    }
+
+    public static boolean does_player_have_amount(OfflinePlayer player, double amount) {
+        return PostalEconomy.player_has(player, amount);
+    }
+
+    public static double player_balance(OfflinePlayer player) {
+        return PostalEconomy.player_balance(player);
+    }
+
+    public static boolean deposit_to_player(OfflinePlayer player, double amount) {
+        if (!PostalEconomy.deposit_player(player, amount)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing " + ef(amount) + " to " + name(player));
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean withdraw_from_player(OfflinePlayer player, double amount) {
+        if (!PostalEconomy.withdraw_player(player, amount)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem withdrawing " + ef(amount) + " from " + name(player));
+            return false;
+        }
+        return true;
+    }
+
+    // ---- Ownership -------------------------------------------------------------------------
+
+    /** True if {@code player} owns the office; with no owner set, only the server "owns" it. */
     public static boolean is_the_bank_owner(String sbank, Player player) {
-        Player owner;
-        if (C_Owner.is_local_po_owner_defined(sbank)) {
-            owner = C_Owner.get_owner_local_po(sbank);
-            if (owner == player) {
-                return true;
-            }
-        } else if (player.getUniqueId() == VA_postal.SERVER_ID)
-            return true;
-        return false;
+        return same_owner(C_Owner.get_owner_local_po_id(sbank), owner_id(player));
     }
 
     public static Player get_bank_owner(String sbank) {
@@ -133,205 +211,78 @@ public class P_Economy {
         return VA_postal.SERVER;
     }
 
-    public static boolean does_central_have_amount(double amount) {
-        EconomyResponse cen = VA_postal.econ.bankHas("Central", amount);
-        return cen.transactionSuccess();
-    }
-
-    public static boolean does_local_have_amount(String local_po, double amount) {
-        EconomyResponse loc = VA_postal.econ.bankHas(Util.df(local_po), amount);
-        return loc.transactionSuccess();
-    }
-
-    public static boolean does_player_have_amount(Player player, double amount) {
-        if (VA_postal.econ.hasAccount(player)) {
-            if (VA_postal.econ.has(player, amount)) {
-                return true;
-            }
-        } else {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem verifying player amount from " + Util.df(player.getDisplayName()));
+    /** UUID of an owner, with the server (or nobody) represented as null. */
+    private static UUID owner_id(Player owner) {
+        if (owner == null || VA_postal.SERVER_ID.equals(owner.getUniqueId())) {
+            return null;
         }
-        return false;
+        return owner.getUniqueId();
     }
 
-    public static double central_balance() {
-        double result = 0.0D;
-        EconomyResponse cen = VA_postal.econ.bankBalance("Central");
-        if (!cen.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem obtaining Central balance");
-        } else {
-            result = cen.balance;
-        }
-        return result;
+    private static boolean same_owner(UUID a, UUID b) {
+        return a == null ? b == null : a.equals(b);
     }
 
-    public static double local_balance(String local_po) {
-        double result = 0.0D;
-        EconomyResponse loc = VA_postal.econ.bankBalance(Util.df(local_po));
-        if (!loc.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem obtaining balance from " + Util.df(local_po));
-        } else {
-            result = loc.balance;
-        }
-        return result;
-    }
-
-    public static double player_balance(Player player) {
-        if (VA_postal.econ.hasAccount(player)) {
-            return VA_postal.econ.getBalance(player);
-        }
-        Util.cinform(AnsiColor.RED + "[Postal] Problem obtaining player balance from " + player);
-
-        return 0.0D;
-    }
-
-    public static void deposit_to_central(double amount) {
-        EconomyResponse cen = VA_postal.econ.bankDeposit("Central", amount);
-        if (!cen.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing to Central");
-        }
-    }
-
-    public static boolean deposit_to_local(String local_po, double amount) {
-        EconomyResponse loc = VA_postal.econ.bankDeposit(Util.df(local_po), amount);
-        if (!loc.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing to " + Util.df(local_po));
-            return false;
-        }
-        return true;
-    }
-
-    public static boolean deposit_to_player(Player player, double amount) {
-        EconomyResponse ply = VA_postal.econ.depositPlayer(player, amount);
-        if (!ply.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing to " + player);
-            return false;
-        }
-        return true;
-    }
-
-    public static void withdraw_from_central(double amount) {
-        EconomyResponse cen = VA_postal.econ.bankWithdraw("Central", amount);
-        if (!cen.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing to Central");
-        }
-    }
-
-    public static void withdraw_from_local(String local_po, double amount) {
-        EconomyResponse loc = VA_postal.econ.bankWithdraw(Util.df(local_po), amount);
-        if (!loc.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem depositing to " + Util.df(local_po));
-        }
-    }
-
-    public static boolean withdraw_from_player(Player player, double amount) {
-        EconomyResponse ply = VA_postal.econ.withdrawPlayer(player, amount);
-        if (!ply.transactionSuccess()) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem withdrawing from " + player);
-            return false;
-        }
-        return true;
-    }
-
-    public static void verify_bank(String stown) {
-        if (VA_postal.economy_configured) {
-            Player owner = VA_postal.SERVER;
-            if (C_Owner.is_local_po_owner_defined(stown)) {
-                owner = C_Owner.get_owner_local_po(stown);
-            }
-            if (!does_the_bank_exist(stown)) {
-                create_bank(stown, owner);
-
-                if (owner != VA_postal.SERVER) {
-                    double price = C_Economy.po_purchase_price();
-                    deposit_to_central(price);
-                }
-            } else {
-                synchronize_bank_owner(null, stown, owner);
-            }
-        }
-    }
-
-    public static void verify_central() {
-        if ((VA_postal.economy_configured) &&
-                (!does_central_exist())) {
-            create_central();
-        }
-    }
-
+    // ---- Prices ----------------------------------------------------------------------------
 
     public static double has_price_of_postage(Player player, String dest_po) {
-        if (VA_postal.economy_configured) {
-            String loc_po = get_local(player);
-            boolean local = false;
-            if (loc_po.equalsIgnoreCase(dest_po)) {
-                local = true;
-            }
-            if (does_player_have_account(player)) {
-                double price = C_Economy.postage_price(local);
-                if (does_player_have_amount(player, price)) {
-                    return price;
-                }
-            }
-        } else {
+        if (!VA_postal.economy_configured) {
             return 0.0D;
         }
-        return -1.0D;
+        double price = C_Economy.postage_price(dest_po.equalsIgnoreCase(get_local(player)));
+        return does_player_have_amount(player, price) ? price : -1.0D;
     }
-
 
     public static double has_price_of_shipping(Player player, String dest_po) {
-        if (VA_postal.economy_configured) {
-            String loc_po = get_local(player);
-            boolean local = false;
-            if (loc_po.equalsIgnoreCase(dest_po)) {
-                local = true;
-            }
-            if (does_player_have_account(player)) {
-                double price = C_Economy.ship_price(local);
-                if (does_player_have_amount(player, price)) {
-                    return price;
-                }
-            }
-        } else {
+        if (!VA_postal.economy_configured) {
             return 0.0D;
         }
-        return -1.0D;
+        double price = C_Economy.ship_price(dest_po.equalsIgnoreCase(get_local(player)));
+        return does_player_have_amount(player, price) ? price : -1.0D;
     }
-
 
     public static double has_price_of_cod(Player player) {
-        if (VA_postal.economy_configured) {
-            if (does_player_have_account(player)) {
-                double price = C_Economy.cod_surchg();
-                if (does_player_have_amount(player, price)) {
-                    return price;
-                }
-            }
-        } else {
+        if (!VA_postal.economy_configured) {
             return 0.0D;
         }
-        return -1.0D;
+        double price = C_Economy.cod_surchg();
+        return does_player_have_amount(player, price) ? price : -1.0D;
     }
 
-
     public static double has_price_of_distr(Player player, String modifier, String stown) {
-        if (VA_postal.economy_configured) {
-            int dist_count = dist_count(modifier, stown);
-            if (dist_count == -1) {
-                return -10.0D;
-            }
-            if (does_player_have_account(player)) {
-                double piece = C_Economy.distr_price();
-                double price = piece * dist_count;
-                if (does_player_have_amount(player, price)) {
-                    return price;
-                }
-            }
-        } else {
+        if (!VA_postal.economy_configured) {
             return 0.0D;
         }
-        return -1.0D;
+        int dist_count = dist_count(modifier, stown);
+        if (dist_count == -1) {
+            return -10.0D;
+        }
+        double price = C_Economy.distr_price() * dist_count;
+        return does_player_have_amount(player, price) ? price : -1.0D;
+    }
+
+    public static double has_price_of_postoffice(Player player) {
+        if (!VA_postal.economy_configured) {
+            return 0.0D;
+        }
+        double price = C_Economy.po_purchase_price();
+        return does_player_have_amount(player, price) ? price : -1.0D;
+    }
+
+    public static double has_price_of_address(Player player) {
+        if (!VA_postal.economy_configured) {
+            return 0.0D;
+        }
+        double price = C_Economy.addr_purchase_price();
+        return does_player_have_amount(player, price) ? price : -1.0D;
+    }
+
+    public static boolean can_central_buy_po() {
+        return central_balance() > C_Economy.po_purchase_price();
+    }
+
+    public static boolean can_central_buy_addr() {
+        return central_balance() > C_Economy.addr_purchase_price();
     }
 
     public static int dist_count(String modifier, String srch_stown) {
@@ -348,102 +299,137 @@ public class P_Economy {
             return -1;
         }
         for (String stown : town_list) {
+            if (!"all_towns".equalsIgnoreCase(srch_stown) && !stown.equalsIgnoreCase(srch_stown)) {
+                continue;
+            }
             String[] addr_list = C_Arrays.addresses_list(stown);
-            if (addr_list != null) {
-
-                for (String saddress : addr_list) {
-                    String sowner = "server";
-                    if (("all_addresses".equalsIgnoreCase(modifier)) ||
-                            (C_Owner.is_address_owner_defined(stown, saddress))) {
-
-
-                        if (("all_towns".equalsIgnoreCase(srch_stown)) ||
-                                (stown.equalsIgnoreCase(srch_stown))) {
-
-
-                            count++;
-                        }
-                    }
+            if (addr_list == null) {
+                continue;
+            }
+            for (String saddress : addr_list) {
+                if ("all_addresses".equalsIgnoreCase(modifier) || C_Owner.is_address_owner_defined(stown, saddress)) {
+                    count++;
                 }
             }
         }
         return count;
     }
 
+    // ---- Charges ---------------------------------------------------------------------------
+
     public static void charge_distr(Player player, String modifier, String stown) {
-        if (VA_postal.economy_configured) {
-            if (does_player_have_account(player)) {
-                int dist_count = dist_count(modifier, stown);
-                if (dist_count == -1) {
-                    return;
-                }
-
-                double piece = C_Economy.distr_price();
-                double price = piece * dist_count;
-
-                if (withdraw_from_player(player, price)) {
-                    Util.pinform(player, "&6Thank you for your payment.");
-                    deposit_to_central(price);
-                } else {
-                    Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + player + " for postage.");
-                }
-            }
+        if (!VA_postal.economy_configured) {
+            return;
         }
-    }
-
-    public static boolean can_central_buy_po() {
-        double price = C_Economy.po_purchase_price();
-        return central_balance() > price;
-    }
-
-    public static boolean can_central_buy_addr() {
-        double price = C_Economy.addr_purchase_price();
-        return central_balance() > price;
-    }
-
-    public static double has_price_of_postoffice(Player player) {
-        if (VA_postal.economy_configured) {
-            if (does_player_have_account(player)) {
-                double price = C_Economy.po_purchase_price();
-                if (does_player_have_amount(player, price)) {
-                    return price;
-                }
-            }
+        int dist_count = dist_count(modifier, stown);
+        if (dist_count == -1) {
+            return;
+        }
+        double price = C_Economy.distr_price() * dist_count;
+        if (withdraw_from_player(player, price)) {
+            Util.pinform(player, "&6Thank you for your payment.");
+            deposit_to_central(price);
         } else {
-            return 0.0D;
+            Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(player) + " for distribution.");
         }
-        return -1.0D;
     }
 
+    /** Letter postage: split between Central and the sending office, plus the destination office if different. */
+    public static void charge_postage(Player player, String dest_po) {
+        if (VA_postal.economy_configured) {
+            charge_and_split(player, dest_po, false);
+        }
+    }
+
+    /** Parcel shipping: same split as postage, at shipping prices. */
+    public static void charge_shipping(Player player, String dest_po) {
+        if (VA_postal.economy_configured) {
+            charge_and_split(player, dest_po, true);
+        }
+    }
+
+    private static void charge_and_split(Player player, String dest_po, boolean shipment) {
+        String loc_po = get_local(player);
+        if (loc_po == null) {
+            loc_po = dest_po;
+        }
+        boolean local = loc_po.equalsIgnoreCase(dest_po);
+        double price = shipment ? C_Economy.ship_price(local) : C_Economy.postage_price(local);
+
+        if (!withdraw_from_player(player, price)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(player) + (shipment ? " for shipping." : " for postage."));
+            return;
+        }
+        Util.pinform(player, "&6Thank you for your payment.");
+        if (local) {
+            double dist = price / 2.0D;
+            deposit_to_central(price - dist);
+            deposit_to_local(loc_po, dist);
+        } else {
+            double dist = price / 3.0D;
+            deposit_to_central(price - 2.0D * dist);
+            deposit_to_local(loc_po, dist);
+            deposit_to_local(dest_po, dist);
+        }
+    }
+
+    public static void charge_cod_surcharge(Player player) {
+        if (!VA_postal.economy_configured) {
+            return;
+        }
+        double price = C_Economy.cod_surchg();
+        if (withdraw_from_player(player, price)) {
+            Util.pinform(player, "&6Thank you for your payment.");
+            double dist = price / 2.0D;
+            deposit_to_central(price - dist);
+            deposit_to_local(get_local(player), dist);
+        }
+    }
+
+    /** Charges a player directly (used for COD). Returns true only if the money was actually taken. */
+    public static boolean charge_player(Player player, double amount) {
+        if (!VA_postal.economy_configured) {
+            return false;
+        }
+        if (withdraw_from_player(player, amount)) {
+            Util.pinform(player, "&6Thank you for your payment.");
+            return true;
+        }
+        return false;
+    }
+
+    public static void pay_player(OfflinePlayer player, double amount) {
+        if (VA_postal.economy_configured) {
+            create_player_account(player);
+            deposit_to_player(player, amount);
+        }
+    }
+
+    /**
+     * Charges {@code subject} the post office purchase price and makes them the owner. The price
+     * goes to Central, which holds it to refund the subject if ownership later changes.
+     */
     public static double charge_po_purchase(Player player, Player subject, String dest_po) {
-        if (subject == null || subject == VA_postal.SERVER) {
+        UUID subject_id = owner_id(subject);
+        if (subject_id == null) {
             synchronize_bank_owner(player, dest_po, VA_postal.SERVER);
             return 0.0D;
         }
-        if ((C_Owner.is_local_po_owner_defined(dest_po)) &&
-                (subject == (C_Owner.get_owner_local_po(dest_po)))) {
+        if (subject_id.equals(C_Owner.get_owner_local_po_id(dest_po))) {
             synchronize_bank_owner(player, dest_po, subject);
-            if (player == null) {
-                Util.cinform("[Postal] player " + subject + " already owns post office " + Util.df(dest_po));
-            } else {
-                Util.pinform(player, "[Postal] player " + subject + " already owns post office " + Util.df(dest_po));
-            }
+            inform(player, "[Postal] player " + name(subject) + " already owns post office " + Util.df(dest_po));
             return 0.0D;
         }
 
-        if (does_player_have_account(player)) {
-            double price = C_Economy.po_purchase_price();
-
-            if (withdraw_from_player(player, price)) {
-                Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from player " + player);
-                deposit_to_central(price);
-                Util.cinform("\033[0;32m[Postal] Deposited " + ef(price) + " to Central bank");
-                synchronize_bank_owner(player, dest_po, subject);
-                return price;
-            }
-            Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + subject + " for PO purchase.");
+        double price = C_Economy.po_purchase_price();
+        if (withdraw_from_player(subject, price)) {
+            Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from player " + name(subject));
+            deposit_to_central(price);
+            Util.cinform("\033[0;32m[Postal] Deposited " + ef(price) + " to Central");
+            synchronize_bank_owner(player, dest_po, subject);
+            return price;
         }
-
+        Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(subject) + " for PO purchase.");
         return 0.0D;
     }
 
@@ -451,152 +437,100 @@ public class P_Economy {
         if ((stown == null) || (owner == null)) {
             return;
         }
-        Player existing_owner = VA_postal.SERVER;
-        if (C_Owner.is_local_po_owner_defined(stown)) {
-            existing_owner = C_Owner.get_owner_local_po(stown);
-        }
+        UUID new_owner = owner_id(owner);
+        UUID existing_owner = C_Owner.get_owner_local_po_id(stown);
 
-        if (existing_owner == owner) {
-            sync_econ_bank_owner(stown, owner);
+        sync_econ_bank_owner(stown, existing_owner, new_owner);
+        if (same_owner(existing_owner, new_owner)) {
             return;
         }
-
-        if (owner == VA_postal.SERVER) {
-            sync_econ_bank_owner(stown, owner);
+        if (new_owner == null) {
             C_Owner.del_owner_local_po(stown);
-            if (player == null) {
-                Util.con_type("Owner removed from: " + Util.df(stown));
-            } else {
-                Util.pinform(player, "Owner removed from: " + Util.df(stown));
+            inform(player, "Owner removed from: " + Util.df(stown));
+        } else {
+            C_Owner.set_owner_local_po(stown, owner);
+            inform(player, Util.df(stown) + " is now owned by " + name(owner));
+        }
+    }
+
+    /**
+     * Settles the office account when ownership changes: a player owner gets the office balance and
+     * their purchase price back (from Central's reserve); a server-owned office's balance goes to
+     * Central. The office account then starts from zero for the new owner.
+     */
+    private static void sync_econ_bank_owner(String stown, UUID existing_owner, UUID new_owner) {
+        if (!VA_postal.economy_configured) {
+            return;
+        }
+        if (!does_the_bank_exist(stown)) {
+            create_bank(stown);
+            return;
+        }
+        if (same_owner(existing_owner, new_owner)) {
+            return;
+        }
+
+        double existing_balance = Math.max(0.0D, local_balance(stown));
+        if (existing_owner == null) {
+            if (existing_balance > 0.0D && PostalEconomy.office_to_central(stown, existing_balance)) {
+                Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central for distribution");
             }
             return;
         }
-        if (C_Owner.is_local_po_owner_defined(stown)) {
-            if (!is_the_bank_owner(stown, owner)) {
-                sync_econ_bank_owner(stown, owner);
-                C_Owner.set_owner_local_po(stown, owner);
-                if (player == null) {
-                    Util.con_type(Util.df(stown) + " is now owned by " + owner.getDisplayName());
+
+        OfflinePlayer previous = Bukkit.getOfflinePlayer(existing_owner);
+        create_player_account(previous);
+        if (existing_balance > 0.0D && withdraw_from_local(stown, existing_balance)) {
+            if (deposit_to_player(previous, existing_balance)) {
+                Util.cinform("\033[0;33m[Postal] Balance of " + ef(existing_balance) + " from " + Util.df(stown) + " paid to " + name(previous));
+            } else {
+                deposit_to_central(existing_balance);
+                Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central for distribution");
+            }
+        }
+
+        double price = C_Economy.po_purchase_price();
+        if (price > 0.0D) {
+            if (withdraw_from_central(price)) {
+                if (deposit_to_player(previous, price)) {
+                    Util.cinform("\033[0;32m[Postal] Purchase price of " + ef(price) + " refunded to " + name(previous));
                 } else {
-                    Util.pinform(player, Util.df(stown) + " is now owned by " + owner.getDisplayName());
+                    deposit_to_central(price);
                 }
             } else {
-                sync_econ_bank_owner(stown, owner);
-            }
-        } else {
-            sync_econ_bank_owner(stown, owner);
-            C_Owner.set_owner_local_po(stown, owner);
-            if (player == null) {
-                Util.con_type(Util.df(stown) + " is now owned by " + owner.getDisplayName());
-            } else {
-                Util.pinform(player, Util.df(stown) + " is now owned by " + owner.getDisplayName());
+                Util.cinform(AnsiColor.RED + "[Postal] Central cannot cover the " + ef(price) + " refund to " + name(previous));
             }
         }
     }
 
-    public static void sync_econ_bank_owner(String stown, Player owner) {
-        if (does_the_bank_exist(stown)) {
-            if (!is_the_bank_owner(stown, owner)) {
-                Player existing_owner = VA_postal.SERVER;
-                if (C_Owner.is_local_po_owner_defined(stown)) {
-                    existing_owner = C_Owner.get_owner_local_po(stown);
-                }
-                double existing_balance;
-                existing_balance = local_balance(stown);
-
-                if (existing_owner != VA_postal.SERVER) {
-                    double price = C_Economy.po_purchase_price();
-
-                    if (!does_player_have_account(existing_owner)) {
-                        create_player_account(existing_owner);
-                    }
-
-                    if (!deposit_to_player(existing_owner, existing_balance + price)) {
-
-                        if (!does_central_exist()) {
-                            create_central();
-                        }
-                        if (existing_balance > 0.0D) {
-                            deposit_to_central(existing_balance);
-                        }
-                        Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central bank for distribution");
-                    } else {
-                        withdraw_from_central(price);
-                        if (existing_balance > 0.0D) {
-                            Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(existing_balance) + " from local post office " + Util.df(stown));
-                        }
-                        Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from Central bank");
-                        Util.cinform("\033[0;32m[Postal] Price and balance of " + ef(existing_balance + price) + " returned to player " + existing_owner);
-                    }
-                } else {
-                    if (!does_central_exist()) {
-                        create_central();
-                    }
-
-                    if (existing_balance > 0.0D) {
-                        deposit_to_central(existing_balance);
-                        Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central bank for distribution");
-                    }
-                }
-
-                delete_bank(stown);
-                create_bank(stown, owner);
-            }
-
-        } else {
-            create_bank(stown, owner);
-        }
-    }
-
-
-    public static double has_price_of_address(Player player) {
-        if (VA_postal.economy_configured) {
-            if (does_player_have_account(player)) {
-                double price = C_Economy.addr_purchase_price();
-                if (does_player_have_amount(player, price)) {
-                    return price;
-                }
-            }
-        } else {
-            return 0.0D;
-        }
-        return -1.0D;
-    }
-
+    /**
+     * Charges {@code subject} the address price and makes them the owner. Half goes to Central,
+     * half to the address's local office; both halves are refunded if the address changes hands.
+     */
     public static double charge_addr_purchase(Player player, Player subject, String dest_po, String dest_addr) {
-        if (subject == null) {
-            subject = VA_postal.SERVER;
-            synchronize_addr_owner(player, dest_po, dest_addr, subject);
+        UUID subject_id = owner_id(subject);
+        if (subject_id == null) {
+            synchronize_addr_owner(player, dest_po, dest_addr, VA_postal.SERVER);
             return 0.0D;
         }
-        if ((C_Owner.is_address_owner_defined(dest_po, dest_addr)) &&
-                (subject == (C_Owner.get_owner_address(dest_po, dest_addr)))) {
+        if (subject_id.equals(C_Owner.get_owner_address_id(dest_po, dest_addr))) {
             synchronize_addr_owner(player, dest_po, dest_addr, subject);
-            if (player == null) {
-                Util.cinform("[Postal] player " + subject + " already owns " + Util.df(dest_po) + ", " + Util.df(dest_addr));
-            } else {
-                Util.pinform(player, "[Postal] player " + subject + " already owns " + Util.df(dest_po) + ", " + Util.df(dest_addr));
-            }
+            inform(player, "[Postal] player " + name(subject) + " already owns " + Util.df(dest_po) + ", " + Util.df(dest_addr));
             return 0.0D;
         }
 
-        if (does_player_have_account(subject)) {
-            double price = C_Economy.addr_purchase_price();
-
-            if (withdraw_from_player(subject, price)) {
-                Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from player " + subject);
-
-                double dist = price / 2.0D;
-                deposit_to_central(dist);
-                Util.cinform("\033[0;32m[Postal] Deposited " + ef(dist) + " to Central bank");
-                deposit_to_local(dest_po, dist);
-                Util.cinform("\033[0;32m[Postal] Deposited " + ef(dist) + " to local " + Util.df(dest_po));
-                synchronize_addr_owner(player, dest_po, dest_addr, subject);
-                return price;
-            }
-            Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + subject + " for address purchase.");
+        double price = C_Economy.addr_purchase_price();
+        if (withdraw_from_player(subject, price)) {
+            Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from player " + name(subject));
+            double dist = price / 2.0D;
+            deposit_to_central(price - dist);
+            Util.cinform("\033[0;32m[Postal] Deposited " + ef(price - dist) + " to Central");
+            deposit_to_local(dest_po, dist);
+            Util.cinform("\033[0;32m[Postal] Deposited " + ef(dist) + " to local " + Util.df(dest_po));
+            synchronize_addr_owner(player, dest_po, dest_addr, subject);
+            return price;
         }
-
+        Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(subject) + " for address purchase.");
         return 0.0D;
     }
 
@@ -604,198 +538,85 @@ public class P_Economy {
         if ((stown == null) || (saddr == null)) {
             return;
         }
-        if (owner == null) {
-            owner = VA_postal.SERVER;
-        }
-        Player existing_owner = VA_postal.SERVER;
-        if (C_Owner.is_address_owner_defined(stown, saddr)) {
-            existing_owner = C_Owner.get_owner_address(stown, saddr);
-        }
-
-        if (existing_owner == owner) {
-            sync_econ_addr_owner(stown, saddr, owner);
+        UUID new_owner = owner_id(owner);
+        UUID existing_owner = C_Owner.get_owner_address_id(stown, saddr);
+        if (same_owner(existing_owner, new_owner)) {
             return;
         }
 
-        if (owner == VA_postal.SERVER) {
-            sync_econ_addr_owner(stown, saddr, owner);
+        refund_addr_owner(stown, existing_owner);
+        if (new_owner == null) {
             C_Owner.del_owner_address(stown, saddr);
-            if (player == null) {
-                Util.con_type("Owner removed from: " + Util.df(stown) + ", " + Util.df(saddr));
-            } else {
-                Util.pinform(player, "Owner removed from: " + Util.df(stown) + ", " + Util.df(saddr));
-            }
+            inform(player, "Owner removed from: " + Util.df(stown) + ", " + Util.df(saddr));
+        } else {
+            C_Owner.set_owner_address(stown, saddr, owner);
+            inform(player, Util.df(stown) + ", " + Util.df(saddr) + " now owned by " + name(owner));
+        }
+    }
+
+    /** Refunds the previous address owner's purchase price, half from Central and half from the local office. */
+    private static void refund_addr_owner(String stown, UUID existing_owner) {
+        if (!VA_postal.economy_configured || existing_owner == null) {
             return;
         }
-        if (C_Owner.is_address_owner_defined(stown, saddr)) {
-            sync_econ_addr_owner(stown, saddr, owner);
-            C_Owner.set_owner_address(stown, saddr, owner);
-            if (player == null) {
-                Util.con_type(Util.df(stown) + ", " + Util.df(saddr) + " now owned by " + owner);
-            } else {
-                Util.pinform(player, Util.df(stown) + ", " + Util.df(saddr) + " now owned by " + owner);
-            }
+        double price = C_Economy.addr_purchase_price();
+        if (price <= 0.0D) {
+            return;
+        }
+        double dist = price / 2.0D;
+        if (!withdraw_from_central(price - dist)) {
+            Util.cinform(AnsiColor.RED + "[Postal] Central cannot cover the address refund for " + Util.df(stown));
+            return;
+        }
+        if (!withdraw_from_local(stown, dist)) {
+            deposit_to_central(price - dist);
+            Util.cinform(AnsiColor.RED + "[Postal] " + Util.df(stown) + " cannot cover its half of the address refund");
+            return;
+        }
+        OfflinePlayer previous = Bukkit.getOfflinePlayer(existing_owner);
+        create_player_account(previous);
+        if (deposit_to_player(previous, price)) {
+            Util.cinform("\033[0;32m[Postal] Address price of " + ef(price) + " refunded to " + name(previous));
         } else {
-            sync_econ_addr_owner(stown, saddr, owner);
-            C_Owner.set_owner_address(stown, saddr, owner);
-            if (player == null) {
-                Util.con_type(Util.df(stown) + ", " + Util.df(saddr) + " now owned by " + owner);
-            } else {
-                Util.pinform(player, Util.df(stown) + ", " + Util.df(saddr) + " now owned by " + owner);
-            }
+            deposit_to_central(price - dist);
+            deposit_to_local(stown, dist);
         }
     }
 
-    public static void sync_econ_addr_owner(String stown, String saddr, Player owner) {
-        Player cur_addr_owner = VA_postal.SERVER;
-        if (C_Owner.is_address_owner_defined(stown, saddr)) {
-            cur_addr_owner = C_Owner.get_owner_address(stown, saddr);
-        }
-        if (cur_addr_owner != owner) {
-            double price = C_Economy.addr_purchase_price();
+    // ---- Helpers ---------------------------------------------------------------------------
 
-            if (cur_addr_owner != VA_postal.SERVER) {
-                if (!does_player_have_account(cur_addr_owner)) {
-                    create_player_account(cur_addr_owner);
-                }
-                if (deposit_to_player(cur_addr_owner, price)) {
-                    double dist = price / 2.0D;
-                    withdraw_from_central(dist);
-                    Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(dist) + " from Central bank");
-                    withdraw_from_local(stown, dist);
-                    Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(dist) + " from local " + Util.df(stown));
-                    Util.cinform("\033[0;32m[Postal] Balance of " + ef(price) + " returned to player " + cur_addr_owner);
-                }
-            }
-        }
-    }
-
-    public static void charge_postage(Player player, String dest_po) {
-        if (VA_postal.economy_configured) {
-            boolean local = false;
-
-            String loc_po = get_local(player);
-            if (loc_po == null) {
-                loc_po = dest_po;
-            }
-            if (does_player_have_account(player)) {
-                double price;
-
-                if (loc_po.equalsIgnoreCase(dest_po)) {
-                    local = true;
-                    price = C_Economy.postage_price(true);
-                } else {
-                    price = C_Economy.postage_price(false);
-                }
-
-                if (withdraw_from_player(player, price)) {
-                    Util.pinform(player, "&6Thank you for your payment.");
-
-                    if (local) {
-                        double dist = price / 2.0D;
-                        deposit_to_central(dist);
-                        deposit_to_local(Util.df(loc_po), dist);
-                    } else {
-                        double dist = price / 3.0D;
-                        deposit_to_central(dist);
-                        deposit_to_local(Util.df(loc_po), dist);
-                        deposit_to_local(Util.df(dest_po), dist);
-                    }
-                } else {
-                    Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + player + " for postage.");
-                }
-            }
-        }
-    }
-
-    public static void charge_shipping(Player player, String dest_po) {
-        if (VA_postal.economy_configured) {
-            boolean local = false;
-
-            String loc_po = get_local(player);
-            if (loc_po == null) {
-                loc_po = dest_po;
-            }
-            if (does_player_have_account(player)) {
-                double price;
-
-                if (loc_po.equalsIgnoreCase(dest_po)) {
-                    local = true;
-                    price = C_Economy.ship_price(true);
-                } else {
-                    price = C_Economy.ship_price(false);
-                }
-
-                if (withdraw_from_player(player, price)) {
-                    Util.pinform(player, "&6Thank you for your payment.");
-
-                    if (local) {
-                        double dist = price / 2.0D;
-                        deposit_to_central(dist);
-                        deposit_to_local(Util.df(loc_po), dist);
-                    } else {
-                        double dist = price / 3.0D;
-                        deposit_to_central(dist);
-                        deposit_to_local(Util.df(loc_po), dist);
-                        deposit_to_local(Util.df(dest_po), dist);
-                    }
-                }
-            }
-        }
-    }
-
-    public static void charge_player(Player player, double amount) {
-        if (VA_postal.economy_configured) {
-            if (does_player_have_account(player)) {
-                if (withdraw_from_player(player, amount)) {
-                    Util.pinform(player, "&6Thank you for your payment.");
-                }
-            }
-        }
-    }
-
-    public static void pay_player(Player player, double amount) {
-        if (VA_postal.economy_configured) {
-            if (!does_player_have_account(player)) {
-                create_player_account(player);
-            }
-            deposit_to_player(player, amount);
-        }
-    }
-
-    public static void charge_cod_surcharge(Player player) {
-        if (VA_postal.economy_configured) {
-            if (does_player_have_account(player)) {
-                double price = C_Economy.cod_surchg();
-                String loc_po = get_local(player);
-
-                if (withdraw_from_player(player, price)) {
-                    Util.pinform(player, "&6Thank you for your payment.");
-
-                    double dist = price / 2.0D;
-                    deposit_to_central(dist);
-                    deposit_to_local(Util.df(loc_po), dist);
-                }
-            }
-        }
-    }
-
+    /** Nearest local post office to the player, or null if none could be determined. */
     public static String get_local(Player player) {
         String[] list = C_Arrays.geo_po_list_sorted(player);
-
-        String loc_po = "";
-        if ((list != null) && (list.length > 1)) {
+        if ((list != null) && (list.length > 0)) {
             String[] parts = list[0].split(",");
-            return parts[1].trim();
-        } else {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem splitting local PO geo list to calculate postage. ");
+            if (parts.length > 1) {
+                return parts[1].trim();
+            }
         }
+        Util.cinform(AnsiColor.RED + "[Postal] Problem splitting local PO geo list to calculate postage. ");
         return null;
+    }
+
+    private static String name(OfflinePlayer player) {
+        if (player == null) {
+            return "Server";
+        }
+        String name = player.getName();
+        return name != null ? name : player.getUniqueId().toString();
+    }
+
+    private static void inform(Player player, String message) {
+        if (player == null) {
+            Util.con_type(message);
+        } else {
+            Util.pinform(player, message);
+        }
     }
 
     public static String ef(double value) {
         if (VA_postal.economy_configured) {
-            return VA_postal.econ.format(value);
+            return PostalEconomy.format(value);
         }
         return "-1";
     }

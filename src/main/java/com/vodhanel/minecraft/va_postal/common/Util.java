@@ -1354,7 +1354,7 @@ public class Util {
         location.subtract(0.0D, 1.0D, 0.0D);
         Block btype = w.getBlockAt(location);
 
-        while (btype.getType() == Material.AIR) {
+        while (btype.getType().isAir() && location.getBlockY() > w.getMinHeight()) {
             location.subtract(0.0D, 1.0D, 0.0D);
             btype = w.getBlockAt(location);
             result++;
@@ -1381,7 +1381,7 @@ public class Util {
     }
 
     public static Player UUID2Player(UUID UUID) {
-        if (UUID == VA_postal.SERVER_ID)
+        if (VA_postal.SERVER_ID.equals(UUID))
             return VA_postal.SERVER;
         else
             return VA_postal.plugin.getServer().getPlayer(UUID);

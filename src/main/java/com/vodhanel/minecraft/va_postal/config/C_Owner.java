@@ -5,6 +5,8 @@ import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import org.bukkit.entity.Player;
 
+import java.util.UUID;
+
 public class C_Owner {
     VA_postal plugin;
 
@@ -96,6 +98,11 @@ public class C_Owner {
         }
     }
 
+    /** Owner UUID of a local post office, or null for none/server. Works whether or not the owner is online. */
+    public static synchronized UUID get_owner_local_po_id(String stown) {
+        return parse_owner(GetConfig.path_format("postoffice.local." + stown + ".owner.uuid"));
+    }
+
     public static synchronized void del_owner_local_po(String stown) {
         try {
             String spath = GetConfig.path_format("postoffice.local." + stown + ".owner");
@@ -133,6 +140,24 @@ public class C_Owner {
             return null;
         }
 
+    }
+
+    /** Owner UUID of an address, or null for none/server. Works whether or not the owner is online. */
+    public static synchronized UUID get_owner_address_id(String stown, String saddress) {
+        return parse_owner(GetConfig.path_format("address." + stown + "." + saddress + ".owner.uuid"));
+    }
+
+    private static UUID parse_owner(String spath) {
+        try {
+            String sid = VA_postal.plugin.getConfig().getString(spath);
+            if (sid == null) {
+                return null;
+            }
+            UUID id = UUID.fromString(sid.trim());
+            return VA_postal.SERVER_ID.equals(id) ? null : id;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     public static synchronized void del_owner_address(String stown, String saddress) {

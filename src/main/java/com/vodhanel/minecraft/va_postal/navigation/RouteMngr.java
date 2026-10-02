@@ -11,6 +11,7 @@ import net.citizensnpcs.api.trait.trait.MobType;
 import net.citizensnpcs.api.trait.trait.Owner;
 import net.citizensnpcs.trait.LookClose;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -95,18 +96,18 @@ public class RouteMngr {
                 VA_postal.central_route_npc.spawn(target);
             }
 
-            VA_postal.central_route_npc.getTrait(Owner.class).setOwner("server");
-            VA_postal.central_route_npc.getTrait(MobType.class).setType(buk_entity_type);
-            VA_postal.central_route_npc.getTrait(LookClose.class).lookClose(true);
-            Equipment trait = VA_postal.central_route_npc.getTrait(Equipment.class);
+            VA_postal.central_route_npc.getOrAddTrait(Owner.class).setOwner(org.bukkit.Bukkit.getConsoleSender());
+            VA_postal.central_route_npc.getOrAddTrait(MobType.class).setType(buk_entity_type);
+            VA_postal.central_route_npc.getOrAddTrait(LookClose.class).lookClose(true);
+            Equipment trait = VA_postal.central_route_npc.getOrAddTrait(Equipment.class);
             ItemStack uniform = uniform_part(1, false);
-            if ((uniform != null) && (trait != null)) trait.set(1, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(1), uniform);
             uniform = uniform_part(2, false);
-            if ((uniform != null) && (trait != null)) trait.set(2, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(2), uniform);
             uniform = uniform_part(3, false);
-            if ((uniform != null) && (trait != null)) trait.set(3, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(3), uniform);
             uniform = uniform_part(4, false);
-            if ((uniform != null) && (trait != null)) trait.set(4, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(4), uniform);
         } else {
             if ((VA_postal.wtr_npc[id] == null) || (VA_postal.wtr_npc[id].getEntity() == null)) return;
 
@@ -125,26 +126,26 @@ public class RouteMngr {
             VA_postal.wtr_inventory_npc[id].clear();
             VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
             VA_postal.wtr_npc_player[id].setItemOnCursor(null);
-            VA_postal.wtr_npc[id].getTrait(Owner.class).setOwner("server");
-            VA_postal.wtr_npc[id].getTrait(MobType.class).setType(buk_entity_type);
-            VA_postal.wtr_npc[id].getTrait(LookClose.class).lookClose(true);
-            Equipment trait = VA_postal.wtr_npc[id].getTrait(Equipment.class);
+            VA_postal.wtr_npc[id].getOrAddTrait(Owner.class).setOwner(org.bukkit.Bukkit.getConsoleSender());
+            VA_postal.wtr_npc[id].getOrAddTrait(MobType.class).setType(buk_entity_type);
+            VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true);
+            Equipment trait = VA_postal.wtr_npc[id].getOrAddTrait(Equipment.class);
             ItemStack uniform = uniform_part(1, true);
-            if ((uniform != null) && (trait != null)) trait.set(1, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(1), uniform);
             uniform = uniform_part(2, true);
-            if ((uniform != null) && (trait != null)) trait.set(2, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(2), uniform);
             uniform = uniform_part(3, true);
-            if ((uniform != null) && (trait != null)) trait.set(3, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(3), uniform);
             uniform = uniform_part(4, true);
-            if ((uniform != null) && (trait != null)) trait.set(4, uniform);
+            if ((uniform != null) && (trait != null)) trait.set(equipment_slot(4), uniform);
         }
     }
 
     public static synchronized void lookclose_on_route(int id, boolean route_start) {
         if (route_start)
-            if (VA_postal.lookclose_on_route) VA_postal.wtr_npc[id].getTrait(LookClose.class).lookClose(true);
-            else VA_postal.wtr_npc[id].getTrait(LookClose.class).lookClose(false);
-        else VA_postal.wtr_npc[id].getTrait(LookClose.class).lookClose(true);
+            if (VA_postal.lookclose_on_route) VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true);
+            else VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(false);
+        else VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true);
     }
 
     public static synchronized void npc_delete_all(boolean quiet) {
@@ -223,7 +224,7 @@ public class RouteMngr {
         VA_postal.wtr_arriving[id] = false;
         VA_postal.wtr_arrived[id] = false;
         VA_postal.wtr_forward[id] = true;
-        VA_postal.wtr_controller[id] = VA_postal.wtr_npc[VA_postal.wtr_id].getDefaultGoalController();
+        VA_postal.wtr_controller[id] = VA_postal.wtr_npc[VA_postal.wtr_id].getDefaultBehaviorController();
 
         VA_postal.wtr_swaypoint_next[id] = C_Route.get_waypoint_location(local_po, address, 1);
         VA_postal.wtr_waypoint_next[id] = Util.str2location(VA_postal.wtr_swaypoint_next[id]);
@@ -450,100 +451,38 @@ public class RouteMngr {
         cal_history_pos = 0;
     }
 
+    /** Armor tiers in legacy item-ID order: IDs 298-317 are tier * 4 + slot. */
+    private static final String[] ARMOR_TIERS = {"LEATHER", "CHAINMAIL", "IRON", "DIAMOND", "GOLDEN"};
+    private static final String[] ARMOR_SLOTS = {"HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS"};
+
+    /**
+     * Uniform piece for a slot (1 helmet .. 4 boots). The config keeps the original v4 numeric item
+     * IDs (298-317), which are mapped to modern materials; anything else means no piece.
+     */
     private static synchronized ItemStack uniform_part(int slot, boolean local) {
-        ItemStack stack;
+        if (slot < 1 || slot > 4) {
+            return null;
+        }
+        int legacy_id = GetConfig.uniform_part_config(slot, local);
+        int offset = legacy_id - 298;
+        if (offset < 0 || offset >= ARMOR_TIERS.length * 4 || offset % 4 != slot - 1) {
+            return null;
+        }
+        Material material = Material.matchMaterial(ARMOR_TIERS[offset / 4] + "_" + ARMOR_SLOTS[slot - 1]);
+        return material == null ? null : new ItemStack(material, 1);
+    }
 
-
+    private static Equipment.EquipmentSlot equipment_slot(int slot) {
         switch (slot) {
             case 1:
-                int helmet = GetConfig.uniform_part_config(slot, local);
-                switch (helmet) {
-                    case 298:
-                        stack = new ItemStack(helmet, 1);
-                        return stack;
-                    case 302:
-                        stack = new ItemStack(helmet, 1);
-                        return stack;
-                    case 306:
-                        stack = new ItemStack(helmet, 1);
-                        return stack;
-                    case 310:
-                        stack = new ItemStack(helmet, 1);
-                        return stack;
-                    case 314:
-                        stack = new ItemStack(helmet, 1);
-                        return stack;
-                }
-                return null;
-
-
+                return Equipment.EquipmentSlot.HELMET;
             case 2:
-                int chestplate = GetConfig.uniform_part_config(slot, local);
-                switch (chestplate) {
-                    case 299:
-                        stack = new ItemStack(chestplate, 1);
-                        return stack;
-                    case 303:
-                        stack = new ItemStack(chestplate, 1);
-                        return stack;
-                    case 307:
-                        stack = new ItemStack(chestplate, 1);
-                        return stack;
-                    case 311:
-                        stack = new ItemStack(chestplate, 1);
-                        return stack;
-                    case 315:
-                        stack = new ItemStack(chestplate, 1);
-                        return stack;
-                }
-                return null;
-
-
+                return Equipment.EquipmentSlot.CHESTPLATE;
             case 3:
-                int leggings = GetConfig.uniform_part_config(slot, local);
-                switch (leggings) {
-                    case 300:
-                        stack = new ItemStack(leggings, 1);
-                        return stack;
-                    case 304:
-                        stack = new ItemStack(leggings, 1);
-                        return stack;
-                    case 308:
-                        stack = new ItemStack(leggings, 1);
-                        return stack;
-                    case 312:
-                        stack = new ItemStack(leggings, 1);
-                        return stack;
-                    case 316:
-                        stack = new ItemStack(leggings, 1);
-                        return stack;
-                }
-                return null;
-
-
-            case 4:
-                int boots = GetConfig.uniform_part_config(slot, local);
-                switch (boots) {
-                    case 301:
-                        stack = new ItemStack(boots, 1);
-                        return stack;
-                    case 305:
-                        stack = new ItemStack(boots, 1);
-                        return stack;
-                    case 309:
-                        stack = new ItemStack(boots, 1);
-                        return stack;
-                    case 313:
-                        stack = new ItemStack(boots, 1);
-                        return stack;
-                    case 317:
-                        stack = new ItemStack(boots, 1);
-                        return stack;
-                }
-                return null;
+                return Equipment.EquipmentSlot.LEGGINGS;
+            default:
+                return Equipment.EquipmentSlot.BOOTS;
         }
-
-        return null;
     }
 
     public static synchronized void set_range_and_speed(int id) {

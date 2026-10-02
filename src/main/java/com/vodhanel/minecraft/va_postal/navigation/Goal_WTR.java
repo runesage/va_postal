@@ -3,15 +3,23 @@ package com.vodhanel.minecraft.va_postal.navigation;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.Util;
-import net.citizensnpcs.api.ai.Goal;
-import net.citizensnpcs.api.ai.GoalSelector;
+import net.citizensnpcs.api.ai.tree.Behavior;
+import net.citizensnpcs.api.ai.tree.BehaviorStatus;
 import net.citizensnpcs.api.ai.event.NavigationCompleteEvent;
 import net.citizensnpcs.api.ai.event.NavigationEvent;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 
-public class Goal_WTR implements Goal {
+/**
+ * Per-postman route behavior, run every tick by the NPC's Citizens behavior controller.
+ * <p>
+ * Ported from the removed Citizens Goal API: the old GoalSelector is gone, so the behavior registers
+ * itself in {@code wtr_goalselector} while active and {@link #finishAndRemove()} takes the place of
+ * {@code GoalSelector.finishAndRemove()}.
+ */
+public class Goal_WTR implements Behavior {
     private int id;
+    private boolean finished = false;
 
     public Goal_WTR(int p_id) {
         id = p_id;
@@ -19,6 +27,20 @@ public class Goal_WTR implements Goal {
 
     public void reset() {
         ID_WTR.safe_re_target(id);
+    }
+
+    /** Arms the behavior for a fresh run after it was (re)added to the controller. */
+    public void rearm() {
+        finished = false;
+    }
+
+    /**
+     * Ends this run; the controller removes and resets the behavior on its next tick. Like the old
+     * GoalSelector, {@code wtr_goalselector} keeps pointing here: route code checks it right after
+     * finishing a waypoint, before the behavior is re-added for the next one.
+     */
+    public void finishAndRemove() {
+        finished = true;
     }
 
     @EventHandler
@@ -43,13 +65,21 @@ public class Goal_WTR implements Goal {
     }
 
 
-    public void run(GoalSelector selector) {
+    public BehaviorStatus run() {
+        if (finished) {
+            return BehaviorStatus.RESET_AND_REMOVE;
+        }
+        tick();
+        return finished ? BehaviorStatus.RESET_AND_REMOVE : BehaviorStatus.RUNNING;
+    }
+
+    private void tick() {
 
         //Util.dinform("------");
         //Util.dinform("Called run for " + id);
 
 
-        VA_postal.wtr_goalselector[id] = selector;
+        VA_postal.wtr_goalselector[id] = this;
 /*
         Util.dinform(AnsiColor.MAGENTA + id + " " + VA_postal.wtr_nav[id] + " "
                 + AnsiColor.YELLOW + VA_postal.wtr_nav[id].getTargetAsLocation() + " ");
@@ -117,8 +147,11 @@ public class Goal_WTR implements Goal {
         ID_WTR.safe_re_target(id);
     }
 
-    public boolean shouldExecute(GoalSelector selector) {
-        VA_postal.wtr_goalselector[id] = selector;
+    public boolean shouldExecute() {
+        if (finished) {
+            return false;
+        }
+        VA_postal.wtr_goalselector[id] = this;
         return ID_WTR.npc_should_run(id);
     }
 }

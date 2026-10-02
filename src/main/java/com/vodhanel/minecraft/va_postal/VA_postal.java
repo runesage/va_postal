@@ -3,6 +3,7 @@ package com.vodhanel.minecraft.va_postal;
 import com.palmergames.bukkit.towny.Towny;
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.vodhanel.minecraft.va_postal.commands.Cmdexecutor;
+import com.vodhanel.minecraft.va_postal.economy.PostalEconomy;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.Config;
 import com.vodhanel.minecraft.va_postal.config.GetConfig;
@@ -13,12 +14,10 @@ import com.vodhanel.minecraft.va_postal.navigation.Goal_WTR;
 import com.vodhanel.minecraft.va_postal.navigation.RouteMngr;
 import com.vodhanel.minecraft.va_postal.navigation.Stuck_NPC;
 import net.citizensnpcs.api.CitizensAPI;
-import net.citizensnpcs.api.ai.GoalController;
-import net.citizensnpcs.api.ai.GoalSelector;
+import net.citizensnpcs.api.ai.BehaviorController;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.api.npc.NPCRegistry;
-import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -95,8 +94,8 @@ public class VA_postal extends JavaPlugin {
     public static Stuck_NPC[] wtr_Stuck_npc;
     public static Goal_WTR[] wtr_goal;
     public static Navigator[] wtr_nav;
-    public static GoalSelector[] wtr_goalselector;
-    public static GoalController[] wtr_controller;
+    public static Goal_WTR[] wtr_goalselector;
+    public static BehaviorController[] wtr_controller;
     public static String[] wtr_swaypoint;
     public static String[] wtr_swaypoint_last;
     public static String[] wtr_swaypoint_next;
@@ -185,7 +184,6 @@ public class VA_postal extends JavaPlugin {
     public static int allowed_geo_proximity = 15;
     public static int allowed_reditor_afk = 180;
     public static boolean economy_configured = false;
-    public static Economy econ = null;
     public static Plugin dynmap;
     public static boolean dynmap_configured = false;
     public static boolean dynmap_active = false;
@@ -248,6 +246,7 @@ public class VA_postal extends JavaPlugin {
 
     public static synchronized void SHUTDOWN() {
         VA_Dispatcher.dispatcher_running = false;
+        release_chunk_tickets();
         if (Postal_Started) {
             Postal_Started = false;
             if (!needs_configuration) {
@@ -263,6 +262,19 @@ public class VA_postal extends JavaPlugin {
             }
             if (plistener_player != null)
                 RouteEditor.Exit_routeEditor(plistener_player);
+        }
+    }
+
+    /** Lets go of every chunk Postal kept loaded for routes. */
+    public static void release_chunk_tickets() {
+        if (plugin == null) {
+            return;
+        }
+        for (org.bukkit.World world : Bukkit.getWorlds()) {
+            world.removePluginChunkTickets(plugin);
+        }
+        if (BukkitListener.temp_chunk_list != null) {
+            BukkitListener.temp_chunk_list.clear();
         }
     }
 
@@ -286,7 +298,7 @@ public class VA_postal extends JavaPlugin {
             return;
         }
 
-        SERVER = new ServerPlayer(SERVER_ID);
+        SERVER = ServerPlayer.create(SERVER_ID);
 
         plugin = this;
         admin_overide = false;
@@ -365,6 +377,7 @@ public class VA_postal extends JavaPlugin {
 
     public void onDisable() {
         SHUTDOWN();
+        PostalEconomy.shutdown();
     }
 
     private synchronized void setupPermissions() {
@@ -377,50 +390,26 @@ public class VA_postal extends JavaPlugin {
         }
         RegisteredServiceProvider<Permission> rsp;
         rsp = getServer().getServicesManager().getRegistration(Permission.class);
+        if (rsp == null || rsp.getProvider() == null) {
+            // Vault is installed but no permissions plugin registered with it.
+            perms = null;
+            Util.cinform("[Postal] No Vault permissions provider, using Bukkit for permissions.");
+            return;
+        }
         perms = rsp.getProvider();
         Util.cinform("[Postal] Using Vault for permissions hook.");
     }
 
     private synchronized void setupEconomy() {
-        economy_configured = GetConfig.economy_use();
-        if (economy_configured) {
-            economy_configured = false;
-            try {
-                Class.forName("net.milkbowl.vault.economy.Economy");
-            } catch (ClassNotFoundException e) {
-                perms = null;
-                Util.cinform("[Postal] Could not find Vault class for economy.");
-                return;
-            }
-            if (getServer().getPluginManager().getPlugin("Vault") == null) {
-                Util.cinform("[Postal] Could not find Vault plugin for economy.");
-                return;
-            }
-            RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
-            if (rsp == null) {
-                Util.cinform("[Postal] Could not register Vault for economy.");
-                return;
-            }
-            econ = rsp.getProvider();
-            if (econ == null) {
-                Util.cinform("[Postal] No economy service provider via Vault.");
-                return;
-            }
-            if (econ.hasBankSupport()) {
-                String e_name = Util.df(econ.getName());
-                Util.cinform("[Postal] Bank equiped economy verified via Vault.");
-                Util.cinform("[Postal] Using " + e_name + " for economy.");
-                economy_configured = true;
-                P_Economy.init_economy();
-                return;
-            }
-            Util.cinform("\033[0;33m[Postal] Vault enabled economy detected, but Postal");
-            Util.cinform("\033[0;33m[Postal] requires bank support. Disabling economy.");
+        economy_configured = false;
+        if (!GetConfig.economy_use()) {
+            Util.cinform("[Postal] Economy disabled in config.yml");
             return;
         }
-
-
-        Util.cinform("[Postal] Economy disabled in config.yml");
+        economy_configured = PostalEconomy.setup(this);
+        if (economy_configured) {
+            P_Economy.init_economy();
+        }
     }
 
     private synchronized void setupScoreboard() {

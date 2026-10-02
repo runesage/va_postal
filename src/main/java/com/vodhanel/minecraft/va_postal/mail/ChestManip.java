@@ -1,6 +1,7 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
+import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.config.C_Postoffice;
@@ -69,20 +70,7 @@ public class ChestManip {
         if (block == null) {
             return null;
         }
-        BlockFace dir = ((org.bukkit.material.Chest) block.getState().getData()).getFacing();
-        Location chest_front = block.getLocation();
-
-        if (dir == BlockFace.NORTH) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == BlockFace.SOUTH) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == BlockFace.WEST) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == BlockFace.EAST) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block s_block = w.getBlockAt(chest_front);
+        Block s_block = BlockFacing.front(block);
         if ((s_block.getState() instanceof Sign)) {
             return s_block;
         }
@@ -169,7 +157,7 @@ public class ChestManip {
         }
         int stack_height = 0;
 
-        while (test_block.getType() != Material.AIR) {
+        while (!test_block.getType().isAir()) {
             location.add(0.0D, 1.0D, 0.0D);
             test_block = w.getBlockAt(location);
             stack_height++;
@@ -179,7 +167,7 @@ public class ChestManip {
         }
 
         if (stack_height <= 4) {
-            while (test_block.getType() == Material.AIR) {
+            while (test_block.getType().isAir() && location.getBlockY() > w.getMinHeight()) {
                 location.subtract(0.0D, 1.0D, 0.0D);
                 test_block = w.getBlockAt(location);
             }
@@ -187,10 +175,10 @@ public class ChestManip {
             location.add(0.0D, 1.0D, 0.0D);
             test_block = w.getBlockAt(location);
 
-            if (test_block.getType() == Material.AIR) {
+            if (test_block.getType().isAir()) {
                 try {
                     test_block.setType(Material.CHEST);
-                    ((org.bukkit.material.Chest) test_block.getState().getData()).setFacingDirection(dir);
+                    BlockFacing.set_facing(test_block, dir);
                     return test_block;
                 } catch (Exception e) {
                     return null;
@@ -237,7 +225,7 @@ public class ChestManip {
         }
         int stack_height = 0;
 
-        while (test_block.getType() != Material.AIR) {
+        while (!test_block.getType().isAir()) {
             location.add(0.0D, 1.0D, 0.0D);
             test_block = w.getBlockAt(location);
             stack_height++;
@@ -246,7 +234,7 @@ public class ChestManip {
             }
         }
         if (stack_height <= 4) {
-            while (test_block.getType() == Material.AIR) {
+            while (test_block.getType().isAir() && location.getBlockY() > w.getMinHeight()) {
                 location.subtract(0.0D, 1.0D, 0.0D);
                 test_block = w.getBlockAt(location);
             }
@@ -254,10 +242,10 @@ public class ChestManip {
             location.add(0.0D, 1.0D, 0.0D);
             test_block = w.getBlockAt(location);
 
-            if (test_block.getType() == Material.AIR) {
+            if (test_block.getType().isAir()) {
                 try {
                     test_block.setType(Material.CHEST);
-                    ((org.bukkit.material.Chest) test_block.getState().getData()).setFacingDirection(Util.int2BF(dir));
+                    BlockFacing.set_facing(test_block, Util.int2BF(dir));
                     return test_block;
                 } catch (Exception e) {
                     return null;
@@ -357,19 +345,7 @@ public class ChestManip {
         if (block == null) {
             return "null";
         }
-        BlockFace dir = ((org.bukkit.material.Chest) block.getState().getData()).getFacing();
-        Location chest_front = block.getLocation();
-
-        if (dir == Util.int2BF(2)) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == Util.int2BF(3)) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == Util.int2BF(4)) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == Util.int2BF(5)) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        return Util.location2str(chest_front);
+        return Util.location2str(BlockFacing.front(block).getLocation());
     }
 
 
@@ -468,7 +444,7 @@ public class ChestManip {
             for (int x = -1; x <= 1; x++) {
                 for (int y = -1; y <= 1; y++) {
                     Block a = c.getRelative(o[0], x).getRelative(o[1], y);
-                    if (a.getType() == Material.WALL_SIGN) {
+                    if (BlockFacing.is_wall_sign(a)) {
                         return true;
                     }
                 }

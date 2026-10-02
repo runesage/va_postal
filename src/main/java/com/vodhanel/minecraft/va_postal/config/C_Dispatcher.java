@@ -755,7 +755,8 @@ public class C_Dispatcher {
         VA_postal.chunks_requested = 0;
         for (int x = min_x; x <= max_x; x++) {
             for (int z = min_z; z <= max_z; z++) {
-                if (world.getChunkAt(x, z).load()) {
+                // A plugin ticket loads the chunk and keeps it loaded (chunk unloads can't be cancelled any more).
+                if (world.addPluginChunkTicket(x, z, VA_postal.plugin) || world.isChunkLoaded(x, z)) {
                     VA_postal.chunks_loaded += 1;
                 }
                 VA_postal.chunks_requested += 1;

@@ -1,8 +1,9 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
+import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
@@ -134,19 +135,7 @@ public class SignManip {
         if (block == null) {
             return null;
         }
-        int dir = block.getData();
-        Location sign_back = block.getLocation();
-        if (dir == 3) {
-            sign_back.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 2) {
-            sign_back.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 5) {
-            sign_back.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 4) {
-            sign_back.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = sign_back.getWorld();
-        Block c_block = w.getBlockAt(sign_back);
+        Block c_block = BlockFacing.behind(block);
         if ((c_block.getState() instanceof Chest)) {
             return c_block;
         }
@@ -191,20 +180,7 @@ public class SignManip {
         if (!(block.getState() instanceof Chest)) {
             return false;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block block_sign = w.getBlockAt(chest_front);
+        Block block_sign = BlockFacing.front(block);
         if (!(block_sign.getState() instanceof Sign)) {
             return false;
         }
@@ -244,24 +220,8 @@ public class SignManip {
         if (!(block.getState() instanceof Chest)) {
             return;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block block_sign = w.getBlockAt(chest_front);
-        try {
-            block_sign.setTypeId(68);
-            block_sign.setData(dir);
-        } catch (Exception e) {
+        Block block_sign = BlockFacing.front(block);
+        if (block_sign == block || !BlockFacing.place_wall_sign(block_sign, BlockFacing.facing(block))) {
             return;
         }
         if ((block_sign.getState() instanceof Sign)) {
@@ -281,20 +241,7 @@ public class SignManip {
         if (!(block.getState() instanceof Chest)) {
             return;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block block_sign = w.getBlockAt(chest_front);
+        Block block_sign = BlockFacing.front(block);
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
             if (line1 != null) {
@@ -323,23 +270,9 @@ public class SignManip {
         if (!(block.getState() instanceof Chest)) {
             return;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block block_sign = w.getBlockAt(chest_front);
-        try {
-            block_sign.setTypeId(0);
-        } catch (Exception e) {
+        Block block_sign = BlockFacing.front(block);
+        if (block_sign != block && BlockFacing.is_wall_sign(block_sign)) {
+            block_sign.setType(Material.AIR);
         }
     }
 
@@ -350,21 +283,8 @@ public class SignManip {
         if (!(block.getState() instanceof Chest)) {
             return false;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block block_sign = w.getBlockAt(chest_front);
-        return block_sign.getTypeId() == 68;
+        Block block_sign = BlockFacing.front(block);
+        return BlockFacing.is_wall_sign(block_sign);
     }
 
     public static synchronized boolean text_exists_sign_id_chest(Block block, String stext, int line, boolean global) {
@@ -375,20 +295,7 @@ public class SignManip {
         if (!(block.getState() instanceof Chest)) {
             return false;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        World w = chest_front.getWorld();
-        Block block_sign = w.getBlockAt(chest_front);
+        Block block_sign = BlockFacing.front(block);
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
             if (((global) || (line == 1)) &&

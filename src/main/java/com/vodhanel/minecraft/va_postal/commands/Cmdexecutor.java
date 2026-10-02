@@ -1,6 +1,6 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
-import com.darkblade12.particleeffect.ParticleEffect;
+import org.bukkit.Particle;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
@@ -157,7 +157,7 @@ public class Cmdexecutor implements CommandExecutor {
             }
             Float result;
             try {
-                result = new Float(args[1]);
+                result = Float.valueOf(args[1]);
             } catch (NumberFormatException numberFormatException) {
                 Util.pinform(player, "&7&cProblem with the number you used.");
                 return true;
@@ -270,7 +270,7 @@ public class Cmdexecutor implements CommandExecutor {
             String[] xyz2 = args[2].split(",");
             Location one = new Location(player.getWorld(), Double.parseDouble(xyz1[0]), Double.parseDouble(xyz1[1]), Double.parseDouble(xyz1[2]));
             Location two = new Location(player.getWorld(), Double.parseDouble(xyz2[0]), Double.parseDouble(xyz2[1]), Double.parseDouble(xyz2[2]));
-            Particles.displayLine(one, two, player, ParticleEffect.PORTAL);
+            Particles.displayLine(one, two, player, Particle.PORTAL);
             return true;
         }
 
@@ -328,7 +328,7 @@ public class Cmdexecutor implements CommandExecutor {
             }
             Float result;
             try {
-                result = new Float(args[1]);
+                result = Float.valueOf(args[1]);
             } catch (NumberFormatException numberFormatException) {
                 Util.con_type("Must be a floating point number.");
                 return true;
@@ -470,7 +470,7 @@ public class Cmdexecutor implements CommandExecutor {
             }
             int result;
             try {
-                result = new Integer(args[1]);
+                result = Integer.valueOf(args[1]);
             } catch (NumberFormatException numberFormatException) {
                 Util.con_type("Must be 0, 1 or 2");
                 return true;
@@ -1276,7 +1276,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oUsage: &f&r/addr <PostOffice> <Address> [player] &7&oto address book in your hand");
             return true;
         }
-        ItemStack stack = player.getItemInHand();
+        ItemStack stack = player.getInventory().getItemInMainHand();
         if ((stack == null) || (stack.getType() != Material.WRITTEN_BOOK)) {
             Util.pinform(player, "&7&oYou must have a signed book in your hand.");
             return true;
@@ -2647,7 +2647,7 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public static String ef(double value) {
-        if (VA_postal.economy_configured) return VA_postal.econ.format(value);
+        if (VA_postal.economy_configured) return P_Economy.ef(value);
         return "-1";
     }
 

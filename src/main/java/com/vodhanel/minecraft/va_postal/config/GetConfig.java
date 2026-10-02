@@ -158,14 +158,18 @@ public class GetConfig {
         return "true".equalsIgnoreCase(str);
     }
 
-    public static synchronized int wpnt_hilite_id() {
+    /**
+     * Block shown to the route editor at each waypoint. Takes a material name; v4 configs hold the
+     * numeric ID 152 (redstone block), and any number falls back to that.
+     */
+    public static synchronized org.bukkit.block.data.BlockData wpnt_hilite_id() {
         String spath = path_format("settings.wpnt_hilite_id");
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            return Integer.parseInt(str);
-        } catch (Exception e) {
+        String str = VA_postal.plugin.getConfig().getString(spath);
+        org.bukkit.Material material = str == null ? null : org.bukkit.Material.matchMaterial(str.trim());
+        if (material == null || !material.isBlock()) {
+            material = org.bukkit.Material.REDSTONE_BLOCK;
         }
-        return 152;
+        return material.createBlockData();
     }
 
     public static synchronized String get_central_pman_name() {

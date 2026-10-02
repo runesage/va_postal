@@ -231,8 +231,20 @@ public class Book {
 
     public Player extractEmbeddedAuthor() {
         String[] parts = getPage(1).split("\n");
-        if (parts.length > 13) {
+        if (parts.length > 14) {
             return Util.UUID2Player(parts[14].trim());
+        }
+        return null;
+    }
+
+    /** UUID embedded as the author on page 1, or null. Unlike extractEmbeddedAuthor, works for offline authors. */
+    public java.util.UUID extractEmbeddedAuthorId() {
+        String[] parts = getPage(1).split("\n");
+        if (parts.length > 14) {
+            try {
+                return java.util.UUID.fromString(parts[14].trim());
+            } catch (IllegalArgumentException ignored) {
+            }
         }
         return null;
     }
@@ -243,7 +255,7 @@ public class Book {
 
     public Player extractEmbeddedReceipient() {
         String[] parts = getPage(1).split("\n");
-        if (parts.length > 14) {
+        if (parts.length > 15) {
             return Util.UUID2Player(parts[15].trim());
         }
         return null;
