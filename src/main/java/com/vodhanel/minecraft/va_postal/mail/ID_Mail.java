@@ -404,12 +404,12 @@ public class ID_Mail {
         ArrayList<String> input_lines = new ArrayList<>(Arrays.asList(log_book.getPage(1).split("\n")));
         String[] final_lines = Book.makeFirstLogPage(sworld, slocation_mod, saddr, sowner, owner).split("\n");
 
-        for (int i = 5; i < 14; i++) {
-            if ((i - 1 < final_lines.length) && (input_lines.get(i - 1) != null)) {
-                final_lines[i] = input_lines.get(i - 1).trim();
-            } else {
-                final_lines[i] = "";
-            }
+        // Lines 5-12 are the visit history: shift the previous page's lines 4-11 (last visit + history) down
+        // one. Bounded by the old page, which Minecraft may have trimmed of trailing blank lines; line 13
+        // (owner UUID) is left as written by makeFirstLogPage. The original bounded this by the input
+        // page too; the fork checked final_lines and ran through 13, overwriting the UUID line.
+        for (int i = 5; i < 13 && i < final_lines.length; i++) {
+            final_lines[i] = (i - 1 < input_lines.size()) ? input_lines.get(i - 1).trim() : "";
         }
 
         String title = "§c[Postal Log]";
@@ -622,9 +622,8 @@ public class ID_Mail {
                         }
                     }
                 }
-            } else {
-                index++;
             }
+            index++;
         }
         if ((mail_found) &&
                 (VA_postal.mailtalk == 2)) {
@@ -932,7 +931,7 @@ public class ID_Mail {
                 owner = VA_postal.SERVER;
             }
         }
-        if (s_search_location == null || s_search_location.isEmpty()) {
+        if (s_search_location == null || s_search_location.isEmpty() || "null".equals(s_search_location)) {
             return;
         }
         String result = "null";
