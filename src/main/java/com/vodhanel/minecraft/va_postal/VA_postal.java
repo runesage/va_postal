@@ -390,6 +390,12 @@ public class VA_postal extends JavaPlugin {
         }
         RegisteredServiceProvider<Permission> rsp;
         rsp = getServer().getServicesManager().getRegistration(Permission.class);
+        if (rsp == null || rsp.getProvider() == null) {
+            // Vault is installed but no permissions plugin registered with it.
+            perms = null;
+            Util.cinform("[Postal] No Vault permissions provider, using Bukkit for permissions.");
+            return;
+        }
         perms = rsp.getProvider();
         Util.cinform("[Postal] Using Vault for permissions hook.");
     }
