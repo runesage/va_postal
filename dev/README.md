@@ -4,8 +4,10 @@
 can join with a Minecraft client and test by hand. It uses the same Paper and plugin builds as CI
 (pinned in `ci/lib.sh`), and Postal's debug output is switched on.
 
-**Needs:** Java 25+ (https://adoptium.net), Maven, curl, python3 and bash. On Windows, run it from
-WSL or Git Bash.
+**Needs:** Maven, curl, python3 and bash (on Windows, use WSL or Git Bash). Paper needs Java 25+:
+if `java` on your PATH is older, `setup` downloads a private Temurin JDK 25 into `dev-server/jdk` and
+uses it for the build and the server. Your system Java is left alone. To use a specific Java instead,
+set `JAVA=/path/to/java`.
 
 ```bash
 dev/test-server.sh setup                 # once: downloads, asks you to accept the EULA, asks your username
@@ -48,7 +50,7 @@ and what you expected.
 | `reset --all` | delete the whole server (downloads are kept) |
 | `setup --offline` | `online-mode=false`, for clients without an account. Private networks only. |
 
-Environment: `JAVA` (path to Java 25+), `DEV_DIR` (default `dev-server/`), `PAPER_VERSION`.
+Environment: `JAVA` (path to Java 25+, overrides the auto-detected/downloaded one), `DEV_DIR` (default `dev-server/`), `PAPER_VERSION`.
 
 The server has RCON enabled on port 25575 with a random password (in `server.properties`). The script
 uses it to send the op/seed commands while your console stays interactive. Don't expose that port.

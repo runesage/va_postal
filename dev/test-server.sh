@@ -10,15 +10,17 @@
 #   dev/test-server.sh report                              bundle logs + config for a bug report
 #   dev/test-server.sh reset [--all]                       wipe worlds/plugin data (--all: whole server)
 #
-# Env: JAVA (default: java, must be 25+), DEV_DIR (default: <repo>/dev-server), PAPER_VERSION
+# Env: JAVA (Java 25+; default: 'java' if it's 25+, else a JDK downloaded into dev-server/jdk),
+#      DEV_DIR (default: <repo>/dev-server), PAPER_VERSION
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=ci/lib.sh
 source "$REPO/ci/lib.sh"
 
-JAVA="${JAVA:-java}"
+JAVA_FROM_ENV="${JAVA:-}"
 DEV_DIR="${DEV_DIR:-$REPO/dev-server}"
+BUNDLED_JDK="$DEV_DIR/jdk"
 CACHE="$DEV_DIR/cache"
 SERVER="$DEV_DIR/server"
 REPORTS="$DEV_DIR/reports"
@@ -30,19 +32,70 @@ die() { echo "error: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 usage() {
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
+}
+
+java_ok() { # java-binary: true if it exists and is Java REQUIRED_JAVA+
+    local major
+    command -v "$1" >/dev/null 2>&1 || [ -x "$1" ] || return 1
+    major="$(java_major "$1")"
+    [ -n "$major" ] && [ "$major" -ge "$REQUIRED_JAVA" ]
+}
+
+# download_jdk: a private Temurin JDK into dev-server/jdk (no system install, no sudo).
+download_jdk() {
+    local os arch url tmp home
+    case "$(uname -s)" in
+        Linux) os=linux ;;
+        Darwin) os=mac ;;
+        *) die "can't download a JDK for $(uname -s); install Java $REQUIRED_JAVA+ yourself and set JAVA=/path/to/java" ;;
+    esac
+    case "$(uname -m)" in
+        x86_64|amd64) arch=x64 ;;
+        arm64|aarch64) arch=aarch64 ;;
+        *) die "can't download a JDK for $(uname -m); install Java $REQUIRED_JAVA+ yourself and set JAVA=/path/to/java" ;;
+    esac
+    url="https://api.adoptium.net/v3/binary/latest/$REQUIRED_JAVA/ga/$os/$arch/jdk/hotspot/normal/eclipse"
+    info "Downloading Temurin JDK $REQUIRED_JAVA ($os/$arch) into $BUNDLED_JDK (your system Java is left alone)"
+    tmp="$DEV_DIR/jdk-download"
+    rm -rf "$tmp" "$BUNDLED_JDK"
+    mkdir -p "$tmp"
+    curl -fSL --retry 3 --progress-bar -o "$tmp/jdk.tar.gz" "$url"
+    tar -xzf "$tmp/jdk.tar.gz" -C "$tmp"
+    # Linux: jdk-25.../bin/java; macOS: jdk-25.../Contents/Home/bin/java
+    home="$(dirname "$(dirname "$(find "$tmp" -path '*/bin/java' -type f | head -1)")")"
+    [ -x "$home/bin/java" ] || die "downloaded JDK has no bin/java"
+    mv "$home" "$BUNDLED_JDK"
+    rm -rf "$tmp"
+}
+
+# resolve_java: sets JAVA to a Java REQUIRED_JAVA+ binary: $JAVA if given, else 'java' on PATH if new
+# enough, else the bundled JDK (downloaded on first use).
+resolve_java() {
+    if [ -n "$JAVA_FROM_ENV" ]; then
+        java_ok "$JAVA_FROM_ENV" || die "JAVA=$JAVA_FROM_ENV is Java $(java_major "$JAVA_FROM_ENV" 2>/dev/null || echo '?'); Paper $PAPER_VERSION needs Java $REQUIRED_JAVA+"
+        JAVA="$JAVA_FROM_ENV"
+    elif java_ok java; then
+        JAVA=java
+    else
+        if [ ! -x "$BUNDLED_JDK/bin/java" ]; then
+            if command -v java >/dev/null 2>&1; then
+                info "Your default Java is Java $(java_major java); Paper $PAPER_VERSION needs Java $REQUIRED_JAVA+."
+            fi
+            download_jdk
+        fi
+        JAVA="$BUNDLED_JDK/bin/java"
+    fi
+    # Build Postal with the same JDK (Maven follows JAVA_HOME).
+    JAVA_HOME="$("$JAVA" -XshowSettings:properties -version 2>&1 | sed -n 's/^ *java.home = //p' | head -1)"
+    export JAVA_HOME
 }
 
 check_tools() {
     command -v curl >/dev/null || die "curl is required"
     command -v python3 >/dev/null || die "python3 is required (used for downloads and RCON)"
-    command -v "$JAVA" >/dev/null || die "Java not found. Install Java $REQUIRED_JAVA+ (https://adoptium.net) or set JAVA=/path/to/java"
-    local major
-    major="$(java_major "$JAVA")"
-    if [ -z "$major" ] || [ "$major" -lt "$REQUIRED_JAVA" ]; then
-        die "Paper $PAPER_VERSION needs Java $REQUIRED_JAVA+, but '$JAVA' is Java ${major:-unknown}. Install it from https://adoptium.net or set JAVA=/path/to/java"
-    fi
+    resolve_java
 }
 
 # set_property <key> <value>: sets a key in server.properties, adding it if missing.
@@ -200,6 +253,7 @@ cmd_start() {
 
     # Mark where this run starts so 'report' can include just the current session if wanted.
     date '+%Y-%m-%d %H:%M:%S' > "$SERVER/.last-start"
+    "$JAVA" -version 2>&1 | grep -v '^Picked up' | head -1 > "$SERVER/.last-java"
     rm -f "$SERVER/logs/latest.log"
 
     HELPER_PID=""
@@ -243,7 +297,7 @@ cmd_report() {
         echo "Postal commit: $(cd "$REPO" && git rev-parse --short HEAD 2>/dev/null) ($(cd "$REPO" && git rev-parse --abbrev-ref HEAD 2>/dev/null))"
         (cd "$REPO" && git status --porcelain 2>/dev/null | head -20 | sed 's/^/  dirty: /')
         echo "Paper: $PAPER_VERSION"
-        echo "Java: $("$JAVA" -version 2>&1 | grep -v '^Picked up' | head -1)"
+        echo "Java (last start): $(cat "$SERVER/.last-java" 2>/dev/null || echo unknown)"
         echo "OS: $(uname -srm)"
         echo "Plugins:"
         for jar in "$SERVER"/plugins/*.jar; do
