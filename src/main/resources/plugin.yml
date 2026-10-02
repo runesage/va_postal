@@ -1,10 +1,11 @@
 name: Postal
-version: 4.01
+version: '${project.version}'
+api-version: '1.21'
 description: Postal system manager.
 author: Vodhanel
 main: com.vodhanel.minecraft.va_postal.VA_postal
 depend: [Citizens]
-softdepend: [Vault, dynmap, WorldGuard, Towny, ParticleLIB]
+softdepend: [Vault, dynmap, WorldGuard, Towny]
 commands:
   postal:
     description: Administration and general help.

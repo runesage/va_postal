@@ -1,6 +1,7 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
+import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.common.VA_Timers;
@@ -214,7 +215,7 @@ public class Cmd_static {
             player.getInventory().setItem(i, null);
         }
 
-        player.getInventory().setItem(4, new ItemStack(345));
+        player.getInventory().setItem(4, new ItemStack(Material.COMPASS));
 
         RouteEditor.create_hud(stown, saddress);
 
@@ -273,7 +274,7 @@ public class Cmd_static {
         ItemStack stamped = stamp_cod(stack, cod_price);
         if (stamped == null) return;
         stack = null;
-        player.setItemInHand(stamped);
+        player.getInventory().setItemInMainHand(stamped);
         if (!no_charge) P_Economy.charge_cod_surcharge(player);
     }
 
@@ -333,7 +334,8 @@ public class Cmd_static {
         String chest_dir = "";
         Chest chest = (Chest) block.getState();
         if (chest == null) return false;
-        byte c_data = block.getData();
+        // Shipping labels keep v4's chest direction byte (2-5) so old labels still parse.
+        int c_data = BlockFacing.to_legacy(BlockFacing.facing(block));
         Inventory inventory = chest.getInventory();
 
         if (inventory.getSize() > 27) {
@@ -434,7 +436,7 @@ public class Cmd_static {
                 (title.equals(Util.df("[shipping label]")))) {
 
             ItemStack holding = player.getItemOnCursor();
-            if (holding.getType() != Material.AIR) {
+            if (!holding.getType().isAir()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), player.getItemOnCursor());
                 Util.pinform(player, "&9The item you were holding has been dropped.");
             }
@@ -551,7 +553,7 @@ public class Cmd_static {
             int index = 0;
             while (item_itr.hasNext()) {
                 ItemStack ind_item = (ItemStack) item_itr.next();
-                if ((ind_item == null) || (ind_item.getTypeId() == 0)) {
+                if ((ind_item == null) || ind_item.getType().isAir()) {
                     inventory.setItem(index, book_item);
                     return true;
                 }
@@ -667,7 +669,7 @@ public class Cmd_static {
             existing_pages[0] = spage;
             Book new_book = new Book(town, address, existing_pages);
             ItemStack new_stack = new_book.generateItemStack();
-            player.setItemInHand(new_stack);
+            player.getInventory().setItemInMainHand(new_stack);
             Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
             Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(address) + " &7&otown of &9&o" + Util.df(town));
             Util.pinform(player, "&7&oAttention: &9&o" + attention);

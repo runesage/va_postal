@@ -33,11 +33,10 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.ServerCommandEvent;
-import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.material.Chest;
-import org.bukkit.material.Sign;
+import org.bukkit.block.Chest;
+import org.bukkit.block.Sign;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -189,7 +188,7 @@ public class BukkitListener implements Listener {
 
         if ((state instanceof Sign)) {
             if (SignManip.is_this_a_postal_sign(event.getClickedBlock(), 2)) {
-                if (!event.isCancelled()) {
+                if (event.useInteractedBlock() != org.bukkit.event.Event.Result.DENY) {
                     event.setCancelled(true);
                 }
 
@@ -203,7 +202,7 @@ public class BukkitListener implements Listener {
         } else {
             Block sign_block = ChestManip.chest2sign_block(event.getClickedBlock());
             if ((sign_block != null) && (SignManip.is_this_a_postal_sign(sign_block, 2))) {
-                if (!event.isCancelled()) {
+                if (event.useInteractedBlock() != org.bukkit.event.Event.Result.DENY) {
                     event.setCancelled(true);
                 }
 
@@ -246,7 +245,7 @@ public class BukkitListener implements Listener {
         }
 
 
-        if (!event.isCancelled()) {
+        if (event.useInteractedBlock() != org.bukkit.event.Event.Result.DENY) {
             event.setCancelled(true);
         }
 
@@ -358,22 +357,6 @@ public class BukkitListener implements Listener {
     }
 
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public static void onChunkUnload(ChunkUnloadEvent event) {
-        if ((!VA_Dispatcher.dispatcher_running) || (event.isCancelled()) || (VA_postal.needs_configuration)) {
-            return;
-        }
-        Chunk chunk = event.getChunk();
-        if (is_chunk_on_route(chunk)) {
-            event.setCancelled(true);
-            return;
-        }
-        if ((temp_chunk_list != null) &&
-                (temp_chunk_list.contains(chunk))) {
-            event.setCancelled(true);
-        }
-    }
-
     public static boolean is_chunk_on_route(Chunk chunk) {
         String sworld = chunk.getWorld().getName();
         int X = chunk.getX();
@@ -417,6 +400,8 @@ public class BukkitListener implements Listener {
         }
         if (!temp_chunk_list.contains(chunk)) {
             temp_chunk_list.add(chunk);
+            // Chunk unloads can no longer be cancelled; a plugin ticket keeps it loaded instead.
+            chunk.addPluginChunkTicket(VA_postal.plugin);
         }
     }
 

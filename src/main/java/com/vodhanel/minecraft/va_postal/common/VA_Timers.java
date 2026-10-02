@@ -49,7 +49,8 @@ public class VA_Timers {
         VA_postal.wtr_waypoint_completed[id] = false;
         VA_postal.wtr_controller[id].clear();
         //Util.dinform("Added goal "+id);
-        VA_postal.wtr_controller[id].addGoal(VA_postal.wtr_goal[id], 10);
+        VA_postal.wtr_goal[id].rearm();
+        VA_postal.wtr_controller[id].addBehavior(VA_postal.wtr_goal[id]);
         VA_postal.wtr_controller[id].run();
         if ((VA_postal.wtr_controller[id] != null) && (VA_postal.wtr_controller[id].isPaused())) {
             VA_postal.wtr_controller[id].setPaused(false);

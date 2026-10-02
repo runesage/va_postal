@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.common;
 
+import com.palmergames.bukkit.towny.TownyUniverse;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.*;
 import com.palmergames.bukkit.towny.utils.PlayerCacheUtil;
@@ -52,9 +53,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 if (C_Towny.is_towny_town_defined(postal_town)) {
                     C_Towny.del_towny_town(postal_town);
                 }
@@ -490,9 +490,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 return "null";
             }
             if (tworld.hasTownBlock(coord)) {
@@ -519,9 +518,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 return null;
             }
             if (tworld.hasTownBlock(coord)) {
@@ -533,8 +531,7 @@ public class P_Towny {
                 }
                 if (tblock.hasTown()) {
                     try {
-                        int uid = tblock.getTown().getUID();
-                        return Integer.toHexString(uid);
+                        return tblock.getTown().getUUID().toString();
                     } catch (NotRegisteredException e) {
                         return null;
                     }
@@ -549,9 +546,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 return entry("not_towny", null);
             }
             if (tworld.hasTownBlock(coord)) {
@@ -596,9 +592,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 return false;
             }
             if (tworld.hasTownBlock(coord)) {
@@ -619,7 +614,7 @@ public class P_Towny {
                     return true;
                 }
 
-                for (Resident resident_i : town.getAssistants()) {
+                for (Resident resident_i : town.getRank("assistant")) {
                     if ((resident_i.getName().equalsIgnoreCase(splayer)) &&
                             (resident_i.hasTownRank("postal"))) {
                         return true;
@@ -645,9 +640,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 return false;
             }
             if (tworld.hasTownBlock(coord)) {
@@ -671,9 +665,8 @@ public class P_Towny {
             WorldCoord wc = WorldCoord.parseWorldCoord(location);
             Coord coord = wc.getCoord();
             TownyWorld tworld;
-            try {
-                tworld = wc.getTownyWorld();
-            } catch (NotRegisteredException e) {
+            tworld = wc.getTownyWorld();
+            if (tworld == null) {
                 return new AbstractMap.SimpleEntry<>("not_towny", null);
             }
             if (tworld.hasTownBlock(coord)) {
@@ -714,9 +707,8 @@ public class P_Towny {
                 WorldCoord wc = WorldCoord.parseWorldCoord(location);
                 Coord coord = wc.getCoord();
                 TownyWorld tworld;
-                try {
-                    tworld = wc.getTownyWorld();
-                } catch (NotRegisteredException e) {
+                tworld = wc.getTownyWorld();
+                if (tworld == null) {
                     return -1;
                 }
                 if (tworld.hasTownBlock(coord)) {
@@ -732,7 +724,7 @@ public class P_Towny {
                     } catch (NotRegisteredException e) {
                         return -1;
                     }
-                    return town.getTotalBlocks();
+                    return town.getNumTownBlocks();
                 }
             } else {
                 return -1;
@@ -749,9 +741,8 @@ public class P_Towny {
                 WorldCoord wc = WorldCoord.parseWorldCoord(location);
                 Coord coord = wc.getCoord();
                 TownyWorld tworld;
-                try {
-                    tworld = wc.getTownyWorld();
-                } catch (NotRegisteredException e) {
+                tworld = wc.getTownyWorld();
+                if (tworld == null) {
                     return "null";
                 }
                 if (tworld.hasTownBlock(coord)) {
@@ -784,9 +775,8 @@ public class P_Towny {
                 WorldCoord wc = WorldCoord.parseWorldCoord(location);
                 Coord coord = wc.getCoord();
                 TownyWorld tworld;
-                try {
-                    tworld = wc.getTownyWorld();
-                } catch (NotRegisteredException e) {
+                tworld = wc.getTownyWorld();
+                if (tworld == null) {
                     return false;
                 }
                 if (tworld.hasTownBlock(coord)) {
@@ -832,9 +822,8 @@ public class P_Towny {
                 WorldCoord wc = WorldCoord.parseWorldCoord(location);
                 Coord coord = wc.getCoord();
                 TownyWorld tworld;
-                try {
-                    tworld = wc.getTownyWorld();
-                } catch (NotRegisteredException e) {
+                tworld = wc.getTownyWorld();
+                if (tworld == null) {
                     return false;
                 }
                 if (tworld.hasTownBlock(coord)) {
@@ -850,13 +839,12 @@ public class P_Towny {
                     } catch (NotRegisteredException e) {
                         return false;
                     }
-                    Player mayor = (Player) town.getMayor();
-                    if (mayor == player) {
+                    if (town.hasMayor() && town.getMayor().getUUID().equals(player.getUniqueId())) {
                         return true;
                     }
 
-                    for (Resident resident_i : town.getAssistants()) {
-                        if (resident_i == player) {
+                    for (Resident resident_i : town.getRank("assistant")) {
+                        if (resident_i.getUUID().equals(player.getUniqueId())) {
                             if (resident_i.hasTownRank("postal")) {
                                 return true;
                             }
@@ -877,9 +865,7 @@ public class P_Towny {
     public static boolean is_towny_resident_by_tvrs(Player player) {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
             String splayer = player.getName();
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Resident> table = tverse.getResidentMap();
-            Enumeration<Resident> residents = table.elements();
+            Enumeration<Resident> residents = Collections.enumeration(TownyUniverse.getInstance().getResidents());
             while (residents.hasMoreElements()) {
                 Resident resident = residents.nextElement();
                 String sresident = resident.getName();
@@ -893,9 +879,7 @@ public class P_Towny {
 
     public static int get_num_town_residents_by_tvrs(String towny_town) {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Resident> table = tverse.getResidentMap();
-            Enumeration<Resident> residents = table.elements();
+            Enumeration<Resident> residents = Collections.enumeration(TownyUniverse.getInstance().getResidents());
             int hits = 0;
             while (residents.hasMoreElements()) {
                 Resident resident = residents.nextElement();
@@ -919,9 +903,7 @@ public class P_Towny {
 
     public static int get_num_total_residents_by_tvrs() {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Resident> table = tverse.getResidentMap();
-            Enumeration<Resident> residents = table.elements();
+            Enumeration<Resident> residents = Collections.enumeration(TownyUniverse.getInstance().getResidents());
             int hits = 0;
             while (residents.hasMoreElements()) {
                 Resident resident = residents.nextElement();
@@ -936,9 +918,7 @@ public class P_Towny {
 
     public static String[] get_town_residents_by_tvrs(String towny_town) {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Resident> table = tverse.getResidentMap();
-            Enumeration<Resident> residents = table.elements();
+            Enumeration<Resident> residents = Collections.enumeration(TownyUniverse.getInstance().getResidents());
             List<String> list = new ArrayList<>();
             while (residents.hasMoreElements()) {
                 Resident resident = residents.nextElement();
@@ -966,9 +946,7 @@ public class P_Towny {
 
     public static String[] get_all_residents_by_tvrs() {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Resident> table = tverse.getResidentMap();
-            Enumeration<Resident> residents = table.elements();
+            Enumeration<Resident> residents = Collections.enumeration(TownyUniverse.getInstance().getResidents());
             List<String> list = new ArrayList<>();
             while (residents.hasMoreElements()) {
                 Resident resident = residents.nextElement();
@@ -987,9 +965,7 @@ public class P_Towny {
 
     public static String[] get_towny_towns_by_tvrs() {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Town> table = tverse.getTownsMap();
-            Enumeration<Town> towns = table.elements();
+            Enumeration<Town> towns = Collections.enumeration(TownyUniverse.getInstance().getTowns());
             List<String> list = new ArrayList<>();
             while (towns.hasMoreElements()) {
                 Town town = towns.nextElement();
@@ -1006,13 +982,11 @@ public class P_Towny {
 
     public static int get_town_blocks_by_tvrs(String towny_town) {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
-            TownyUniverse tverse = VA_postal.towny.getTownyUniverse();
-            Hashtable<String, Town> table = tverse.getTownsMap();
-            Enumeration<Town> towns = table.elements();
+            Enumeration<Town> towns = Collections.enumeration(TownyUniverse.getInstance().getTowns());
             while (towns.hasMoreElements()) {
                 Town town = towns.nextElement();
                 if (town.getName().equalsIgnoreCase(towny_town)) {
-                    return town.getTotalBlocks();
+                    return town.getNumTownBlocks();
                 }
             }
         }

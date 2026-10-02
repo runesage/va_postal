@@ -1,6 +1,7 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
+import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.config.C_Owner;
@@ -219,18 +220,17 @@ public class BookManip {
         if (item_itr != null)
             while (item_itr.hasNext()) {
                 ItemStack ind_item = item_itr.next();
-                if ((ind_item == null) || (ind_item.getTypeId() == 0)) {
+                if ((ind_item == null) || ind_item.getType().isAir()) {
                     slot++;
                 } else {
                     String sqty = MailGen.ifixed_len(ind_item.getAmount(), 2);
-                    String sid = MailGen.ifixed_len(ind_item.getTypeId(), 3);
                     String name = Util.df(ind_item.getType().name().toLowerCase());
                     lines_and_items[(slot + 50)] = MailGen.stack2serial(ind_item);
 
-                    if (name.length() >= 12) {
-                        name = name.substring(0, 12);
+                    if (name.length() >= 16) {
+                        name = name.substring(0, 16);
                     }
-                    lines_and_items[index] = ("§2" + sqty + " §7" + sid + " §9" + name);
+                    lines_and_items[index] = ("§2" + sqty + " §9" + name);
                     index++;
                     slot++;
                 }
@@ -261,30 +261,26 @@ public class BookManip {
         ItemStack items = null;
         for (int i = 10; i < 37; i++) {
             if ((pages[i] != null) && (!pages[i].isEmpty())) {
-                short dur;
-                int item;
+                int dur;
                 int qty;
                 try {
                     parts = pages[i].split(",");
                     if (parts.length == 4) {
                         name = parts[0].trim();
                         qty = Util.str2int(parts[1]);
-                        item = Util.str2int(parts[2]);
-                        dur = (short) Util.str2int(parts[3]);
+                        dur = Util.str2int(parts[3]);
                     } else {
                         continue;
                     }
                 } catch (NumberFormatException numberFormatException) {
                     continue;
                 }
-                try {
-                    items = new ItemStack(item);
-                    items.setDurability(dur);
-                    items.setAmount(qty);
-                    inventory.setItem(i - 10, items);
-                } catch (Exception e) {
-                    Util.dinform("Did not include " + name + " itrm: " + item);
+                items = MailGen.serial2stack(name, qty, dur);
+                if (items == null) {
+                    Util.cinform("[Postal] Could not restore parcel item " + name + " x" + qty);
+                    continue;
                 }
+                inventory.setItem(i - 10, items);
             }
         }
         book = null;
@@ -292,7 +288,7 @@ public class BookManip {
     }
 
     public static synchronized String[] parcel_pages(Player player, Inventory inventory) {
-        ItemStack stack_in_hand = player.getItemInHand();
+        ItemStack stack_in_hand = player.getInventory().getItemInMainHand();
         if ((stack_in_hand != null) &&
                 (stack_in_hand.getType() == Material.WRITTEN_BOOK)) {
             Book book = new Book(stack_in_hand);
@@ -360,7 +356,7 @@ public class BookManip {
                 item_itr = inventory.iterator(0);
                 while (item_itr.hasNext()) {
                     ItemStack ind_item = item_itr.next();
-                    if ((ind_item == null) || (ind_item.getTypeId() == 0)) {
+                    if ((ind_item == null) || ind_item.getType().isAir()) {
                         item_itr.set(stack.clone());
                         done = true;
                         break;
@@ -453,23 +449,8 @@ public class BookManip {
         if (!(block.getState() instanceof Chest)) {
             return;
         }
-        byte dir = block.getData();
-        Location chest_front = block.getLocation();
-
-        if (dir == 2) {
-            chest_front.subtract(0.0D, 0.0D, 1.0D);
-        } else if (dir == 3) {
-            chest_front.add(0.0D, 0.0D, 1.0D);
-        } else if (dir == 4) {
-            chest_front.subtract(1.0D, 0.0D, 0.0D);
-        } else if (dir == 5) {
-            chest_front.add(1.0D, 0.0D, 0.0D);
-        }
-        Block block_sign = w.getBlockAt(chest_front);
-        try {
-            block_sign.setTypeId(68);
-            block_sign.setData(dir);
-        } catch (Exception e) {
+        Block block_sign = BlockFacing.front(block);
+        if (block_sign == block || !BlockFacing.place_wall_sign(block_sign, BlockFacing.facing(block))) {
             return;
         }
 

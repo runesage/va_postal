@@ -14,12 +14,13 @@ import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.trait.LookClose;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Tag;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Openable;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Player;
-import org.bukkit.material.Door;
-import org.bukkit.material.Gate;
 
 import java.util.Map;
 
@@ -359,7 +360,7 @@ public class ID_WTR {
             VA_postal.wtr_waypoint_completed[id] = true;
             VA_postal.wtr_watchdog_stuck_retry[id] = 0;
             Util.dinform(AnsiColor.GREEN + "INW: New target for " + id + " " + null);
-            VA_postal.wtr_nav[id].setTarget(null);
+            VA_postal.wtr_nav[id].setTarget((org.bukkit.Location) null);
 
             if (VA_postal.wtr_door[id]) {
                 Util.dinform("THERE IS DOOR FOR " + id);
@@ -478,49 +479,37 @@ public class ID_WTR {
         }
     }
 
+    /** Doors and fence gates a postman may open on a route (any wood type, plus iron doors). */
+    public static boolean is_route_door(Material type) {
+        return Tag.DOORS.isTagged(type) || Tag.FENCE_GATES.isTagged(type);
+    }
+
     private static void openDoor(int id, Block block, boolean quiet) {
-        if (block != null) {
-            if (block.getType() == Material.FENCE_GATE) {
-                BlockState state = block.getState();
-                Gate gate = (Gate) state.getData();
-                gate.setOpen(true);
-                state.update();
-                if (!quiet) {
-                    block.getWorld().playSound(block.getLocation(), Sound.BLOCK_FENCE_GATE_OPEN, 1.0F, 0.0F);
-                }
-            } else if ((block.getType() == Material.IRON_DOOR_BLOCK) || (block.getType() == Material.WOODEN_DOOR)) {
-                BlockState state = block.getState();
-                Door data = (Door) state.getData();
-                data.setOpen(true);
-                state.setData(data);
-                state.update();
-                if (!quiet) {
-                    block.getWorld().playSound(block.getLocation(), Sound.BLOCK_WOODEN_DOOR_OPEN, 1.0F, 0.0F);
-                }
-            }
-        }
+        set_door_open(block, true, quiet);
     }
 
     private static void closeDoor(int id, Block block, boolean quiet) {
-        if (block != null) {
-            if (block.getType() == Material.FENCE_GATE) {
-                BlockState state = block.getState();
-                Gate gate = (Gate) state.getData();
-                gate.setOpen(false);
-                state.update();
-                if (!quiet) {
-                    block.getWorld().playSound(block.getLocation(), Sound.BLOCK_FENCE_GATE_CLOSE, 1F, 1F);
-                }
-            } else if ((block.getType() == Material.IRON_DOOR_BLOCK) || (block.getType() == Material.WOODEN_DOOR)) {
-                BlockState state = block.getState();
-                Door data = (Door) state.getData();
-                data.setOpen(false);
-                state.setData(data);
-                state.update();
-                if (!quiet) {
-                    block.getWorld().playSound(block.getLocation(), Sound.BLOCK_WOODEN_DOOR_CLOSE, 1F, 1F);
-                }
+        set_door_open(block, false, quiet);
+    }
+
+    private static void set_door_open(Block block, boolean open, boolean quiet) {
+        if (block == null || !is_route_door(block.getType())) {
+            return;
+        }
+        BlockData data = block.getBlockData();
+        if (!(data instanceof Openable) || ((Openable) data).isOpen() == open) {
+            return;
+        }
+        ((Openable) data).setOpen(open);
+        block.setBlockData(data);
+        if (!quiet) {
+            Sound sound;
+            if (Tag.FENCE_GATES.isTagged(block.getType())) {
+                sound = open ? Sound.BLOCK_FENCE_GATE_OPEN : Sound.BLOCK_FENCE_GATE_CLOSE;
+            } else {
+                sound = open ? Sound.BLOCK_WOODEN_DOOR_OPEN : Sound.BLOCK_WOODEN_DOOR_CLOSE;
             }
+            block.getWorld().playSound(block.getLocation(), sound, 1.0F, open ? 0.0F : 1.0F);
         }
     }
 
@@ -600,7 +589,7 @@ public class ID_WTR {
             return;
         }
         if ((VA_postal.lookclose_on_route) && (open)) {
-            VA_postal.wtr_npc[id].getTrait(LookClose.class).lookClose(false);
+            VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(false);
         }
         target.setY(door_loc.getY());
         final Location f_target = target;
@@ -617,7 +606,7 @@ public class ID_WTR {
                 VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
                     faceLocation(VA_postal.wtr_npc[id].getEntity(), f_target);
                     if (VA_postal.lookclose_on_route) {
-                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> VA_postal.wtr_npc[id].getTrait(LookClose.class).lookClose(true), 40L);
+                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true), 40L);
                     }
                 }, 20L);
             }, 60L);
@@ -827,7 +816,7 @@ public class ID_WTR {
         Location test_loc = Util.offset_from_ref(door, 0, -1, 0);
         Block test_block = test_loc.getBlock();
         Material m_id = test_block.getType();
-        if ((m_id == Material.WOODEN_DOOR) || (m_id == Material.IRON_DOOR_BLOCK) || (m_id == Material.FENCE_GATE)) {
+        if (is_route_door(m_id)) {
             return test_loc;
         }
 

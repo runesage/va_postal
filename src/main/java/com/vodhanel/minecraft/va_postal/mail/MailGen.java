@@ -3,7 +3,9 @@ package com.vodhanel.minecraft.va_postal.mail;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 
 
 public class MailGen {
@@ -13,12 +15,42 @@ public class MailGen {
         plugin = instance;
     }
 
+    /**
+     * Parcel line format, unchanged from v4: {@code MATERIAL,qty,id,damage}. Numeric item IDs no longer
+     * exist, so the id field is written as 0 and ignored; the material name is authoritative.
+     */
     public static synchronized String stack2serial(ItemStack stack) {
         String name = stack.getType().name();
         String qty = Util.int2str(stack.getAmount());
-        String id = Util.int2str(stack.getTypeId());
-        String durability = Util.int2str(stack.getDurability());
-        return name + "," + qty + "," + id + "," + durability;
+        int damage = (stack.getItemMeta() instanceof Damageable) ? ((Damageable) stack.getItemMeta()).getDamage() : 0;
+        return name + "," + qty + ",0," + Util.int2str(damage);
+    }
+
+    /** Rebuilds a parcel item from its serialized material name, amount and damage; null if unknown. */
+    @SuppressWarnings("deprecation")
+    public static ItemStack serial2stack(String name, int qty, int damage) {
+        Material material = Material.matchMaterial(name);
+        if (material == null) {
+            // Parcels written by v4 on 1.12 carry pre-1.13 names (e.g. WOOD, SMOOTH_BRICK).
+            Material legacy = Material.matchMaterial(name, true);
+            if (legacy != null) {
+                try {
+                    material = Bukkit.getUnsafe().fromLegacy(legacy);
+                } catch (RuntimeException ignored) {
+                    material = null;
+                }
+            }
+        }
+        if (material == null || material.isAir() || !material.isItem()) {
+            return null;
+        }
+        ItemStack stack = new ItemStack(material, Math.max(1, qty));
+        if (damage > 0 && stack.getItemMeta() instanceof Damageable) {
+            Damageable meta = (Damageable) stack.getItemMeta();
+            meta.setDamage(damage);
+            stack.setItemMeta(meta);
+        }
+        return stack;
     }
 
     public static synchronized void replace_slot_by_index_cen(int index, final ItemStack book_item) {

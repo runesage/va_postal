@@ -1,10 +1,10 @@
 package com.vodhanel.minecraft.va_postal.listeners;
 
-import com.darkblade12.particleeffect.ParticleEffect;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.commands.Cmd_static;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
@@ -30,7 +30,7 @@ public class RouteEditor implements Listener {
     public static VA_postal plugin;
     public static BukkitTask plistener_hud_worker = null;
     public static ArrayList<Location> route_blocks_loc = null;
-    public static int wpnt_hilite_id = 152;
+    public static BlockData wpnt_hilite_id = Material.REDSTONE_BLOCK.createBlockData();
     public static boolean process_ground_click = false;
     private static long last_click = 0L;
     private static String last_2dloc = "";
@@ -77,14 +77,14 @@ public class RouteEditor implements Listener {
         Action action = event.getAction();
         process_ground_click = false;
         if (should_cancel(player, block, action)) {
-            if (!event.isCancelled()) {
+            if (event.useInteractedBlock() != org.bukkit.event.Event.Result.DENY) {
                 event.setCancelled(true);
             }
             return;
         }
 
         if (process_ground_click) {
-            if (!event.isCancelled()) {
+            if (event.useInteractedBlock() != org.bukkit.event.Event.Result.DENY) {
                 event.setCancelled(true);
             }
 
@@ -313,7 +313,7 @@ public class RouteEditor implements Listener {
         last_2dloc = location_2_XZ(block.getLocation());
 
         Material ti = block.getType();
-        if ((ti == Material.WOODEN_DOOR) || (ti == Material.IRON_DOOR_BLOCK) || (ti == Material.TRAP_DOOR) || (ti == Material.SIGN_POST) || (ti == Material.WALL_SIGN) || (ti == Material.FENCE_GATE)) {
+        if (Tag.DOORS.isTagged(ti) || Tag.TRAPDOORS.isTagged(ti) || Tag.ALL_SIGNS.isTagged(ti) || Tag.FENCE_GATES.isTagged(ti)) {
             return action != Action.RIGHT_CLICK_BLOCK;
         }
 
@@ -861,7 +861,7 @@ public class RouteEditor implements Listener {
             for (int i = 0; i < route_blocks_loc.size(); i++) {
                 Block marker = w.getBlockAt(route_blocks_loc.get(i));
                 try {
-                    player.sendBlockChange(route_blocks_loc.get(i), marker.getType(), marker.getData());
+                    player.sendBlockChange(route_blocks_loc.get(i), marker.getBlockData());
                 } catch (Exception e) {
                     Util.dinform(AnsiColor.RED + "EXCEPTION IN clear_route_markers: " + e);
                     if (VA_postal.debug) e.printStackTrace();
@@ -891,7 +891,7 @@ public class RouteEditor implements Listener {
         }
         route_blocks_loc.add(location);
         try {
-            VA_postal.plistener_player.sendBlockChange(location, wpnt_hilite_id, (byte) 0);
+            VA_postal.plistener_player.sendBlockChange(location, wpnt_hilite_id);
         } catch (Exception e) {
             return false;
         }
@@ -904,7 +904,7 @@ public class RouteEditor implements Listener {
             if (index >= 0) {
                 World w = route_blocks_loc.get(index).getWorld();
                 Block marker = w.getBlockAt(route_blocks_loc.get(index));
-                VA_postal.plistener_player.sendBlockChange(route_blocks_loc.get(index), marker.getType(), marker.getData());
+                VA_postal.plistener_player.sendBlockChange(route_blocks_loc.get(index), marker.getBlockData());
                 route_blocks_loc.remove(index);
             }
         }
@@ -931,7 +931,7 @@ public class RouteEditor implements Listener {
 
     public static void Blockhighlightworker(Player player, String stown, String sadress) {
         for (Location location : C_Route.get_waypoint_locations(stown, sadress)) {
-            player.sendBlockChange(location, wpnt_hilite_id, (byte) 0);
+            player.sendBlockChange(location, wpnt_hilite_id);
         }
     }
 
@@ -950,25 +950,24 @@ public class RouteEditor implements Listener {
         }
     }
 
-    public static ParticleEffect getConfiguredPE() {
+    /** settings.showroute_pe: 0 end rod, 1 portal, 2 instant effect, 3/7 coloured effect, 4 crit, 5/6 coloured dust. */
+    public static Particle getConfiguredPE() {
         switch (VA_postal.showroute_PE) {
             default:
             case 0:
-                return ParticleEffect.END_ROD;
+                return Particle.END_ROD;
             case 1:
-                return ParticleEffect.PORTAL;
+                return Particle.PORTAL;
             case 2:
-                return ParticleEffect.SPELL_INSTANT;
+                return Particle.INSTANT_EFFECT;
             case 3:
-                return ParticleEffect.SPELL_MOB;
-            case 4:
-                return ParticleEffect.CRIT;
-            case 5:
-                return ParticleEffect.FOOTSTEP;
-            case 6:
-                return ParticleEffect.REDSTONE;
             case 7:
-                return ParticleEffect.SPELL_MOB_AMBIENT;
+                return Particle.ENTITY_EFFECT;
+            case 4:
+                return Particle.CRIT;
+            case 5:
+            case 6:
+                return Particle.DUST;
         }
     }
 

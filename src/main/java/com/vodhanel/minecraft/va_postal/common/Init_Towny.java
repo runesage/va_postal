@@ -1,8 +1,7 @@
 package com.vodhanel.minecraft.va_postal.common;
 
 import com.palmergames.bukkit.towny.Towny;
-import com.palmergames.bukkit.towny.object.Resident;
-import com.palmergames.bukkit.towny.object.TownyUniverse;
+import com.palmergames.bukkit.towny.TownyUniverse;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 
 public class Init_Towny implements Runnable {
@@ -15,11 +14,8 @@ public class Init_Towny implements Runnable {
     }
 
     public void run() {
-        int hits = 0;
         plugin.getLogger().info("================================================");
-        for (Resident resident : TownyUniverse.getDataSource().getResidents()) {
-            hits++;
-        }
+        int hits = TownyUniverse.getInstance().getResidents().size();
         plugin.getLogger().info("Postal registered " + hits + " Towny residents");
         plugin.getLogger().info("================================================");
     }

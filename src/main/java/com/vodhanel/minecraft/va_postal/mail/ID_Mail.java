@@ -108,7 +108,7 @@ public class ID_Mail {
             int index = 0;
             while (item_itr.hasNext()) {
                 ItemStack ind_item = item_itr.next();
-                if ((ind_item == null) || (ind_item.getType() == Material.AIR)) {
+                if ((ind_item == null) || ind_item.getType().isAir()) {
                     VA_postal.wtr_inventory_address[id].setItem(index, book_item);
                     return true;
                 }

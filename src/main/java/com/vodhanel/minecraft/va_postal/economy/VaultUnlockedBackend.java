@@ -30,7 +30,7 @@ final class VaultUnlockedBackend implements EconomyBackend {
 
     @Override
     public String format(double amount) {
-        return econ.format(BigDecimal.valueOf(amount));
+        return econ.format(PLUGIN_NAME, BigDecimal.valueOf(amount));
     }
 
     @Override
@@ -48,7 +48,7 @@ final class VaultUnlockedBackend implements EconomyBackend {
         if (!econ.hasAccount(id)) {
             return 0.0D;
         }
-        BigDecimal balance = econ.getBalance(PLUGIN_NAME, id);
+        BigDecimal balance = econ.balance(PLUGIN_NAME, id);
         return balance == null ? 0.0D : balance.doubleValue();
     }
 

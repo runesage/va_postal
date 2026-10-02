@@ -121,7 +121,7 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path44, "&9I don't have any mail for you, &b%player% &9maybe next time.");
         VA_postal.plugin.getConfig().addDefault(path45, "&9Pardon me. That was awful clumsy of me.");
         VA_postal.plugin.getConfig().addDefault(path46, "&aType '/postal' for post office commands.");
-        VA_postal.plugin.getConfig().addDefault(path47, "152");
+        VA_postal.plugin.getConfig().addDefault(path47, "REDSTONE_BLOCK");
         VA_postal.plugin.getConfig().addDefault(path48, "true");
         VA_postal.plugin.getConfig().addDefault(path49, "180");
         VA_postal.plugin.getConfig().addDefault(path50, "false");

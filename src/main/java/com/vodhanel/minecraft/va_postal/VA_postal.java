@@ -14,8 +14,7 @@ import com.vodhanel.minecraft.va_postal.navigation.Goal_WTR;
 import com.vodhanel.minecraft.va_postal.navigation.RouteMngr;
 import com.vodhanel.minecraft.va_postal.navigation.Stuck_NPC;
 import net.citizensnpcs.api.CitizensAPI;
-import net.citizensnpcs.api.ai.GoalController;
-import net.citizensnpcs.api.ai.GoalSelector;
+import net.citizensnpcs.api.ai.BehaviorController;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.api.npc.NPCRegistry;
@@ -95,8 +94,8 @@ public class VA_postal extends JavaPlugin {
     public static Stuck_NPC[] wtr_Stuck_npc;
     public static Goal_WTR[] wtr_goal;
     public static Navigator[] wtr_nav;
-    public static GoalSelector[] wtr_goalselector;
-    public static GoalController[] wtr_controller;
+    public static Goal_WTR[] wtr_goalselector;
+    public static BehaviorController[] wtr_controller;
     public static String[] wtr_swaypoint;
     public static String[] wtr_swaypoint_last;
     public static String[] wtr_swaypoint_next;
@@ -247,6 +246,7 @@ public class VA_postal extends JavaPlugin {
 
     public static synchronized void SHUTDOWN() {
         VA_Dispatcher.dispatcher_running = false;
+        release_chunk_tickets();
         if (Postal_Started) {
             Postal_Started = false;
             if (!needs_configuration) {
@@ -262,6 +262,19 @@ public class VA_postal extends JavaPlugin {
             }
             if (plistener_player != null)
                 RouteEditor.Exit_routeEditor(plistener_player);
+        }
+    }
+
+    /** Lets go of every chunk Postal kept loaded for routes. */
+    public static void release_chunk_tickets() {
+        if (plugin == null) {
+            return;
+        }
+        for (org.bukkit.World world : Bukkit.getWorlds()) {
+            world.removePluginChunkTickets(plugin);
+        }
+        if (BukkitListener.temp_chunk_list != null) {
+            BukkitListener.temp_chunk_list.clear();
         }
     }
 
@@ -285,7 +298,7 @@ public class VA_postal extends JavaPlugin {
             return;
         }
 
-        SERVER = new ServerPlayer(SERVER_ID);
+        SERVER = ServerPlayer.create(SERVER_ID);
 
         plugin = this;
         admin_overide = false;
