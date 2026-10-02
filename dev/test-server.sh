@@ -223,13 +223,13 @@ cmd_start() {
     [ -f "$SERVER/paper.jar" ] || die "no server yet; run: dev/test-server.sh setup"
 
     if [ "$build" -eq 1 ]; then
-        command -v mvn >/dev/null || die "Maven is required to build (or pass --no-build)"
+        # The Maven Wrapper fetches the pinned Maven on first use; no Maven install needed.
         info "Building Postal"
-        (cd "$REPO" && mvn -B -q package)
+        (cd "$REPO" && ./mvnw -B -q package)
     fi
     local jar
     jar="$(ls -t "$REPO"/target/va_postal-*.jar 2>/dev/null | head -1 || true)"
-    [ -n "$jar" ] || die "no Postal jar in target/; build first (mvn package)"
+    [ -n "$jar" ] || die "no Postal jar in target/; build first (./mvnw package)"
     cp "$jar" "$SERVER/plugins/Postal.jar"
     info "Installed $(basename "$jar")"
 

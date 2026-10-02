@@ -4,7 +4,8 @@
 can join with a Minecraft client and test by hand. It uses the same Paper and plugin builds as CI
 (pinned in `ci/lib.sh`), and Postal's debug output is switched on.
 
-**Needs:** Maven, curl, python3 and bash (on Windows, use WSL or Git Bash). Paper needs Java 25+:
+**Needs:** curl, python3 and bash (on Windows, use WSL or Git Bash). Maven isn't needed: the build
+uses the repo's Maven Wrapper (`./mvnw`), which downloads the pinned Maven on first use. Paper needs Java 25+:
 if `java` on your PATH is older, `setup` downloads a private Temurin JDK 25 into `dev-server/jdk` and
 uses it for the build and the server. Your system Java is left alone. To use a specific Java instead,
 set `JAVA=/path/to/java`.
