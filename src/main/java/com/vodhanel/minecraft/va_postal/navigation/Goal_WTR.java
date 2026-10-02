@@ -34,12 +34,13 @@ public class Goal_WTR implements Behavior {
         finished = false;
     }
 
-    /** Ends this run; the controller removes and resets the behavior on its next tick. */
+    /**
+     * Ends this run; the controller removes and resets the behavior on its next tick. Like the old
+     * GoalSelector, {@code wtr_goalselector} keeps pointing here: route code checks it right after
+     * finishing a waypoint, before the behavior is re-added for the next one.
+     */
     public void finishAndRemove() {
         finished = true;
-        if (VA_postal.wtr_goalselector[id] == this) {
-            VA_postal.wtr_goalselector[id] = null;
-        }
     }
 
     @EventHandler

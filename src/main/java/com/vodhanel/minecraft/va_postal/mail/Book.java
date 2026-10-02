@@ -231,7 +231,7 @@ public class Book {
 
     public Player extractEmbeddedAuthor() {
         String[] parts = getPage(1).split("\n");
-        if (parts.length > 13) {
+        if (parts.length > 14) {
             return Util.UUID2Player(parts[14].trim());
         }
         return null;
@@ -255,7 +255,7 @@ public class Book {
 
     public Player extractEmbeddedReceipient() {
         String[] parts = getPage(1).split("\n");
-        if (parts.length > 14) {
+        if (parts.length > 15) {
             return Util.UUID2Player(parts[15].trim());
         }
         return null;
