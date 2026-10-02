@@ -45,9 +45,14 @@ install_server() {
     cp "$1/Citizens.jar" "$1/VaultUnlocked.jar" "$1/EssentialsX.jar" "$2/plugins/"
 }
 
-# java_major <java-binary>: prints the major version, e.g. 25.
+# java_major <java-binary>: prints the major version, e.g. 25 (and 8 for Java 8's "1.8.0").
 java_major() {
-    "$1" -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1
+    local v
+    v="$("$1" -version 2>&1 | sed -n 's/.*version "\([0-9][0-9.]*\).*/\1/p' | head -1)"
+    case "$v" in
+        1.*) v="${v#1.}" ;;
+    esac
+    echo "${v%%.*}"
 }
 
 # ---- Seed test network ---------------------------------------------------------------------

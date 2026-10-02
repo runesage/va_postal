@@ -30,8 +30,8 @@ public class VA_Ping {
         }
 
         if (VA_Dispatcher.dispatcher_async) {
-            VA_postal.plugin.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
-            }, 20L);
+            VA_postal.plugin.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin,
+                    VA_Ping::ping_route_watchdog_worker, 20L);
 
 
         } else {

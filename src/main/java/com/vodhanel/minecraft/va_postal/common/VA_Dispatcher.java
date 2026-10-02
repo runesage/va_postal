@@ -97,6 +97,8 @@ public class VA_Dispatcher {
             Util.con_type(AnsiColor.RED + "VA_Postal start aborted - could not compile town list.");
             return;
         }
+        // Clear PostMen/PostMasters left by an earlier run before creating this run's.
+        RouteMngr.remove_postal_npcs();
         VA_Arrays.init_wtr_arrays(town_list.length + aux_slots);
 
         C_Dispatcher.reality_check_n_chunk_list();

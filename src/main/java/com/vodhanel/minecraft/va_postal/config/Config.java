@@ -96,14 +96,15 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path19, "30");
         VA_postal.plugin.getConfig().addDefault(path20, "&cPost&9Man");
         VA_postal.plugin.getConfig().addDefault(path21, "&cPost&9Master");
-        VA_postal.plugin.getConfig().addDefault(path22, "310");
-        VA_postal.plugin.getConfig().addDefault(path23, "307");
-        VA_postal.plugin.getConfig().addDefault(path24, "312");
-        VA_postal.plugin.getConfig().addDefault(path25, "309");
-        VA_postal.plugin.getConfig().addDefault(path26, "306");
-        VA_postal.plugin.getConfig().addDefault(path27, "307");
-        VA_postal.plugin.getConfig().addDefault(path28, "308");
-        VA_postal.plugin.getConfig().addDefault(path29, "309");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.enabled"), "false");
+        VA_postal.plugin.getConfig().addDefault(path22, "LEATHER_HELMET #8E1F2B");
+        VA_postal.plugin.getConfig().addDefault(path23, "LEATHER_CHESTPLATE #8E1F2B");
+        VA_postal.plugin.getConfig().addDefault(path24, "LEATHER_LEGGINGS #24345C");
+        VA_postal.plugin.getConfig().addDefault(path25, "LEATHER_BOOTS #2B2B2B");
+        VA_postal.plugin.getConfig().addDefault(path26, "LEATHER_HELMET #24345C");
+        VA_postal.plugin.getConfig().addDefault(path27, "LEATHER_CHESTPLATE #9CC3E6");
+        VA_postal.plugin.getConfig().addDefault(path28, "LEATHER_LEGGINGS #24345C");
+        VA_postal.plugin.getConfig().addDefault(path29, "LEATHER_BOOTS #2B2B2B");
         VA_postal.plugin.getConfig().addDefault(path30, "false");
         VA_postal.plugin.getConfig().addDefault(path31, "false");
         VA_postal.plugin.getConfig().addDefault(path32, "true");
@@ -133,6 +134,13 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path56, "15");
         VA_postal.plugin.getConfig().addDefault(path57, "10");
         VA_postal.plugin.getConfig().addDefault(path58, "2");
+
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.local"), "bundled");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.central"), "bundled");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.local.texture"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.local.signature"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.texture"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.signature"), "");
 
         VA_postal.plugin.getConfig().addDefault(lossy, true);
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);

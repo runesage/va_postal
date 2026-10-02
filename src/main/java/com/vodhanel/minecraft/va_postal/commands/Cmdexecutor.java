@@ -265,7 +265,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&a&oConfig reloaded.");
             return true;
         }
-        if ("test".equals(args[0].toLowerCase().trim())) {
+        if ("test".equals(args[0].toLowerCase().trim()) && hasPermission(player, "postal.admin") && args.length >= 3) {
             String[] xyz1 = args[1].split(",");
             String[] xyz2 = args[2].split(",");
             Location one = new Location(player.getWorld(), Double.parseDouble(xyz1[0]), Double.parseDouble(xyz1[1]), Double.parseDouble(xyz1[2]));
@@ -1341,7 +1341,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oTo distrubute the book in your hand to Postal addresses");
             return true;
         }
-        ItemStack stack = player.getItemOnCursor();
+        ItemStack stack = player.getInventory().getItemInMainHand();
         if ((stack == null) || (stack.getType() != Material.WRITTEN_BOOK)) {
             Util.pinform(player, "&7&oYou must have a signed book in your hand.");
             return true;
@@ -1411,7 +1411,7 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
-        ItemStack stack = player.getItemOnCursor();
+        ItemStack stack = player.getInventory().getItemInMainHand();
         if (!BookManip.holding_valid_shipper(player, stack, true)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
@@ -1445,7 +1445,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&f&rReady accept shipment.");
             Util.pinform(player, "&7&oShipment will be placed directly in front of you.");
             if (price > 0.0D) Util.pinform(player, "&7&oThis is COD and you will be charged $" + ef(price));
-            String scommand = "/postal accept";
+            String scommand = "/accept";
             register_player_comfirmation(player, scommand);
         }
 
@@ -1458,7 +1458,7 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
-        ItemStack stack = player.getItemOnCursor();
+        ItemStack stack = player.getInventory().getItemInMainHand();
         if (!BookManip.holding_valid_shipper(player, stack, true)) {
             Util.pinform(player, "&7&oYou must have a valid parcel statement in your hand.");
             return true;
@@ -1479,7 +1479,7 @@ public class Cmdexecutor implements CommandExecutor {
 
 
         ItemStack stamped = BookManip.stamp_parcel_statement(player, stack, false);
-        player.setItemOnCursor(null);
+        player.getInventory().setItemInMainHand(null);
         BookManip.parcel_stmnt_to_chest(inventory, stamped, block, 4);
         Util.pinform(player, "&7&oShipment has been returned to sender.");
 
@@ -1580,7 +1580,7 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
-        ItemStack stack = player.getItemOnCursor();
+        ItemStack stack = player.getInventory().getItemInMainHand();
         if (!BookManip.holding_valid_shipper(player, stack, false)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
@@ -1618,7 +1618,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNo parameter resets book to &f&r'[Resident]'");
             return true;
         }
-        ItemStack stack = player.getItemOnCursor();
+        ItemStack stack = player.getInventory().getItemInMainHand();
         if ((stack == null) || (stack.getType() != Material.WRITTEN_BOOK)) {
             Util.pinform(player, "&7&oYou must have the book you want to address in your hand.");
             return true;
@@ -1832,11 +1832,13 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         double price = 0.0D;
-        if (psubject != null) if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_address(psubject);
-            if (price < 0.0D) {
-                Util.pinform(player, "&f&o" + Util.df(subject) + "&7&o does not have enough money to cover the purchase price.");
-                return true;
+        if (psubject != null) {
+            if (VA_postal.economy_configured) {
+                price = P_Economy.has_price_of_address(psubject);
+                if (price < 0.0D) {
+                    Util.pinform(player, "&f&o" + Util.df(subject) + "&7&o does not have enough money to cover the purchase price.");
+                    return true;
+                }
             }
         } else if ((VA_postal.economy_configured) &&
                 (!P_Economy.can_central_buy_addr())) {
@@ -1855,7 +1857,7 @@ public class Cmdexecutor implements CommandExecutor {
                     (price > 0.0D))
                 Util.pinform(player, "&f&o" + Util.df(subject) + "&7&o will be charged &f&o" + ef(price));
 
-            String scommand = "/owneraddr " + stown + " " + saddress + " " + psubject.getName();
+            String scommand = "/owneraddr " + stown + " " + saddress + " " + (psubject != null ? psubject.getName() : "none");
             register_player_comfirmation(player, scommand);
         }
 
@@ -1894,11 +1896,13 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         double price = 0.0D;
-        if (subject != null) if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_address(subject);
-            if (price < 0.0D) {
-                Util.con_type(subject + " does not have enough money to cover the purchase price.");
-                return true;
+        if (subject != null) {
+            if (VA_postal.economy_configured) {
+                price = P_Economy.has_price_of_address(subject);
+                if (price < 0.0D) {
+                    Util.con_type(subject + " does not have enough money to cover the purchase price.");
+                    return true;
+                }
             }
         } else if ((VA_postal.economy_configured) &&
                 (!P_Economy.can_central_buy_addr())) {
@@ -1915,7 +1919,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.con_type("Ready to make " + subject + " the address owner of " + Util.df(stown) + ", " + Util.df(saddress));
             if ((subject != null) && (price > 0.0D))
                 Util.con_type(subject + " will be charged " + ef(price));
-            String scommand = "owneraddr " + stown + " " + saddress + " " + subject.getName();
+            String scommand = "owneraddr " + stown + " " + saddress + " " + (subject != null ? subject.getName() : "none");
             register_player_comfirmation(null, scommand);
         }
 
@@ -1954,11 +1958,13 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         double price = 0.0D;
-        if (subject != null) if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_postoffice(subject);
-            if (price < 0.0D) {
-                Util.pinform(player, "&f&o" + subject + "&7&o does not have enough money to cover the purchase price.");
-                return true;
+        if (subject != null) {
+            if (VA_postal.economy_configured) {
+                price = P_Economy.has_price_of_postoffice(subject);
+                if (price < 0.0D) {
+                    Util.pinform(player, "&f&o" + subject + "&7&o does not have enough money to cover the purchase price.");
+                    return true;
+                }
             }
         } else if ((VA_postal.economy_configured) &&
                 (!P_Economy.can_central_buy_po())) {
@@ -2006,11 +2012,13 @@ public class Cmdexecutor implements CommandExecutor {
             }
         }
         double price = 0.0D;
-        if (subject != null) if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_postoffice(subject);
-            if (price < 0.0D) {
-                Util.con_type(subject + " does not have enough money to cover the purchase price.");
-                return true;
+        if (subject != null) {
+            if (VA_postal.economy_configured) {
+                price = P_Economy.has_price_of_postoffice(subject);
+                if (price < 0.0D) {
+                    Util.con_type(subject + " does not have enough money to cover the purchase price.");
+                    return true;
+                }
             }
         } else if ((VA_postal.economy_configured) &&
                 (!P_Economy.can_central_buy_po())) {
@@ -2028,7 +2036,7 @@ public class Cmdexecutor implements CommandExecutor {
             if ((subject != null) && (price > 0.0D)) Util.con_type(subject + " will be charged " + ef(price));
 
 
-            String scommand = "ownerlocal " + stown + " " + subject;
+            String scommand = "ownerlocal " + stown + " " + (subject != null ? subject.getName() : "none");
             register_player_comfirmation(null, scommand);
         }
 

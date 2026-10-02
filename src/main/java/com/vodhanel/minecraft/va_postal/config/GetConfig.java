@@ -257,37 +257,6 @@ public class GetConfig {
         return 7;
     }
 
-    public static synchronized int uniform_part_config(int slot, boolean local) {
-        String spotype = "local";
-        if (!local) {
-            spotype = "central";
-        }
-        String uniform_part = "";
-        switch (slot) {
-            case 1:
-                uniform_part = "helmet";
-                break;
-            case 2:
-                uniform_part = "chestplate";
-                break;
-            case 3:
-                uniform_part = "leggings";
-                break;
-            case 4:
-                uniform_part = "boots";
-                break;
-            default:
-                return -1;
-        }
-        String spath = path_format("settings.uniform." + spotype + "." + uniform_part);
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            return Integer.parseInt(str);
-        } catch (Exception e) {
-        }
-        return -1;
-    }
-
     public static synchronized int postman_cool_sec() {
         String spath = path_format("settings.postman_cool_sec");
         try {
@@ -436,8 +405,9 @@ public class GetConfig {
             int result = 3;
             result += Integer.parseInt(str);
             if ((result < 3) || (result > 10)) {
+                result = 3;
             }
-            return 3;
+            return result;
         } catch (Exception e) {
         }
 

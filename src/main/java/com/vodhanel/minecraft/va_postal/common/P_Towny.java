@@ -251,7 +251,7 @@ public class P_Towny {
                             Util.pinform(player, "&7&oTowny Post Offices: ");
                         }
                         owner = C_Owner.get_owner_local_po(stown);
-                        if (owner != null) {
+                        if (owner == null || owner == VA_postal.SERVER) {
                             sowner = "&7&oServer";
                         } else {
                             sowner = "&f&r" + owner.getDisplayName();
@@ -299,9 +299,9 @@ public class P_Towny {
                         sinterval = C_Address.get_addr_interval(spoffice, saddress);
                         total += Integer.parseInt(sinterval);
                         sinterval = "&7&oSeconds: &f&r" + sinterval;
-                        saddress = fixed_len(Util.df(saddress) + "&7&o", 24, "-");
                         owner = C_Owner.get_owner_address(spoffice, saddress);
-                        if (owner != null) {
+                        saddress = fixed_len(Util.df(saddress) + "&7&o", 24, "-");
+                        if (owner == null || owner == VA_postal.SERVER) {
                             sowner = "&7&oServer";
                         } else {
                             sowner = "&f&r" + owner.getDisplayName();
@@ -375,7 +375,7 @@ public class P_Towny {
 
 
                 if (srch_by_tny ?
-                        (p_poffice != null) && (!town.contains(p_poffice)) :
+                        (p_poffice == null) || (town.contains(p_poffice)) :
                         (p_poffice == null) || (poffice.contains(p_poffice))) {
 
 
@@ -565,7 +565,7 @@ public class P_Towny {
                 }
                 TownBlockOwner towner = resident;
                 if (tblock.isOwner(towner)) {
-                    return entry("OK", (Player) resident);
+                    return entry("OK", Util.UUID2Player(resident.getUUID()));
                 }
                 return entry("un_owned_plot", null);
             }
@@ -689,7 +689,7 @@ public class P_Towny {
                     return new AbstractMap.SimpleEntry<>("not_mayor", null);
                 }
                 if (resident != null) {
-                    return new AbstractMap.SimpleEntry<>("OK", (Player) resident);
+                    return new AbstractMap.SimpleEntry<>("OK", Util.UUID2Player(resident.getUUID()));
                 }
                 return new AbstractMap.SimpleEntry<>("not_mayor", null);
             }

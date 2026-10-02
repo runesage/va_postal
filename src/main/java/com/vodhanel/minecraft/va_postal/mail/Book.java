@@ -229,20 +229,26 @@ public class Book {
         return newbook;
     }
 
-    public Player extractEmbeddedAuthor() {
+    // Page 1 line layout: makeFirstMailPage puts the author's UUID on line 13 and the attention
+    // (recipient) UUID on line 14; makeFirstLogPage puts the owner's UUID on line 13.
+    private static final int AUTHOR_UUID_LINE = 13;
+    private static final int RECIPIENT_UUID_LINE = 14;
+
+    private String page1_line(int line) {
         String[] parts = getPage(1).split("\n");
-        if (parts.length > 14) {
-            return Util.UUID2Player(parts[14].trim());
-        }
-        return null;
+        return line < parts.length ? parts[line].trim() : null;
+    }
+
+    public Player extractEmbeddedAuthor() {
+        return Util.UUID2Player(page1_line(AUTHOR_UUID_LINE));
     }
 
     /** UUID embedded as the author on page 1, or null. Unlike extractEmbeddedAuthor, works for offline authors. */
     public java.util.UUID extractEmbeddedAuthorId() {
-        String[] parts = getPage(1).split("\n");
-        if (parts.length > 14) {
+        String line = page1_line(AUTHOR_UUID_LINE);
+        if (line != null && !line.isEmpty()) {
             try {
-                return java.util.UUID.fromString(parts[14].trim());
+                return java.util.UUID.fromString(line);
             } catch (IllegalArgumentException ignored) {
             }
         }
@@ -254,10 +260,6 @@ public class Book {
     }
 
     public Player extractEmbeddedReceipient() {
-        String[] parts = getPage(1).split("\n");
-        if (parts.length > 15) {
-            return Util.UUID2Player(parts[15].trim());
-        }
-        return null;
+        return Util.UUID2Player(page1_line(RECIPIENT_UUID_LINE));
     }
 }
