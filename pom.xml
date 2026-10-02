@@ -53,6 +53,10 @@
             <url>https://maven.enginehub.org/repo/</url>
         </repository>
         <repository>
+            <id>glaremasters</id>
+            <url>https://repo.glaremasters.me/repository/towny/</url>
+        </repository>
+        <repository>
             <id>dynmap</id>
             <url>https://repo.mikeprimm.com/</url>
         </repository>
@@ -115,14 +119,17 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Vendored Towny jar the fork was written against. Towny publishes to repo.glaremasters.io
-             (not reachable from CI yet) and its JitPack build is empty; swap this out in the integrations pass. -->
         <dependency>
-            <groupId>com.palmergames.bukkit</groupId>
+            <groupId>com.palmergames.bukkit.towny</groupId>
             <artifactId>towny</artifactId>
-            <version>legacy</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/Towny.jar</systemPath>
+            <version>0.103.2.9</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
