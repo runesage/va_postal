@@ -155,7 +155,7 @@ public class MailSecurity {
 
 
         if ((valid_admin_attempt) &&
-                (player == last_splayer_inform)) {
+                (player != last_splayer_inform)) {
             Util.pinform(player, "&7&oYou have permission, but enter &f&r'/postal bypass' &7&ofirst.");
             last_splayer_inform = player;
         }
@@ -463,7 +463,7 @@ public class MailSecurity {
             }
 
 
-            if ((recipient != null) &&
+            if ((srecipient != null) &&
                     (!address_owned) && (srecipient.equals("[resident]"))) {
                 Util.perm_inform("Mail access: mail addressed to [resident], " + player);
                 return true;

@@ -107,6 +107,10 @@ public class Goal_WTR implements Behavior {
             Util.dinform(AnsiColor.RED + "isSpawned: "+VA_postal.wtr_npc[id].isSpawned());
             Util.dinform("reinitialising...");
             VA_postal.wtr_npc[id].spawn(Util.str2location(VA_postal.wtr_slocation_local_po_spawn[id]));
+            if (VA_postal.wtr_npc[id].getEntity() instanceof Player) {
+                VA_postal.wtr_npc_player[id] = (Player) VA_postal.wtr_npc[id].getEntity();
+                VA_postal.wtr_inventory_npc[id] = VA_postal.wtr_npc_player[id].getInventory();
+            }
         }
 
 

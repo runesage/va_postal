@@ -176,6 +176,48 @@ public class SignManip {
         return null;
     }
 
+    /**
+     * Explains a failed sign-chest lookup: every chest {@link #LookForSignChest} would consider around
+     * {@code search_location}, the block in front of it, and that sign's text. Lines are for the log.
+     */
+    public static synchronized java.util.List<String> describe_chests_near(Location search_location, int maxradius) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (search_location == null || search_location.getWorld() == null) {
+            out.add("  (no search location)");
+            return out;
+        }
+        out.add("  Searched within " + maxradius + " blocks of " + search_location.getBlockX() + ","
+                + search_location.getBlockY() + "," + search_location.getBlockZ() + " (chests at y "
+                + (search_location.getBlockY() - 1) + " to " + (search_location.getBlockY() + 3) + ")");
+        Block center = search_location.getBlock();
+        for (int dx = -maxradius; dx <= maxradius; dx++) {
+            for (int dy = -maxradius; dy <= maxradius; dy++) {
+                for (int dz = -maxradius; dz <= maxradius; dz++) {
+                    Block a = center.getRelative(dx, dy, dz);
+                    if (!ChestManip.is_chest(a.getType())) {
+                        continue;
+                    }
+                    String where = a.getX() + "," + a.getY() + "," + a.getZ();
+                    boolean in_band = a.getY() > search_location.getY() - 2.0D && a.getY() < search_location.getY() + 4.0D;
+                    BlockFace facing = BlockFacing.facing(a);
+                    Block front = BlockFacing.front(a);
+                    String detail;
+                    if (front.getState() instanceof Sign) {
+                        Sign sign = (Sign) front.getState();
+                        detail = "sign " + java.util.Arrays.toString(sign.getLines());
+                    } else {
+                        detail = "no sign in front (" + front.getType() + " at " + front.getX() + "," + front.getY() + "," + front.getZ() + ")";
+                    }
+                    out.add("  chest " + where + " facing " + facing + (in_band ? "" : " [outside height band]") + ": " + detail);
+                }
+            }
+        }
+        if (out.size() == 1) {
+            out.add("  no chests found");
+        }
+        return out;
+    }
+
     public static synchronized boolean text_lines_exists_sign_id_chest(Block block, String line1, String line2, String line3, String line4) {
         if (!(block.getState() instanceof Chest)) {
             return false;

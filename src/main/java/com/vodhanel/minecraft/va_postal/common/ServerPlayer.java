@@ -6,19 +6,27 @@ import java.lang.reflect.Proxy;
 import java.util.UUID;
 
 /**
- * The "Server" pseudo-player used as the owner of anything no real player owns.
+ * Identity-only {@link Player} stand-ins: the "Server" pseudo-player used as the owner of anything no
+ * real player owns, and offline players (owners, senders, recipients) that the fork's Player-typed
+ * code needs to refer to while they aren't online.
  * <p>
- * Only identity is meaningful: the UUID, and "Server" as every name. Every other Player method
- * answers null/false/0. Built as a dynamic proxy so it doesn't have to track every method Paper adds
- * to {@link Player}.
+ * Only identity is meaningful: the UUID and the name (also returned as display/list/custom name).
+ * Every other Player method answers null/false/0, so messages to an offline stand-in are dropped.
+ * Built as a dynamic proxy so it doesn't have to track every method Paper adds to {@link Player}.
  */
 public final class ServerPlayer {
-    private static final String NAME = "Server";
+    private static final String SERVER_NAME = "Server";
 
     private ServerPlayer() {
     }
 
     public static Player create(UUID id) {
+        return create(id, SERVER_NAME);
+    }
+
+    /** Stand-in for an offline player. {@code name} may be null if the server has never seen them. */
+    public static Player create(UUID id, String name) {
+        final String shown = name != null ? name : id.toString();
         return (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
                 (proxy, method, args) -> {
                     switch (method.getName()) {
@@ -28,13 +36,13 @@ public final class ServerPlayer {
                         case "getDisplayName":
                         case "getPlayerListName":
                         case "getCustomName":
-                            return NAME;
+                            return shown;
                         case "equals":
                             return proxy == args[0];
                         case "hashCode":
                             return id.hashCode();
                         case "toString":
-                            return NAME;
+                            return shown;
                         default:
                             return default_value(method.getReturnType());
                     }

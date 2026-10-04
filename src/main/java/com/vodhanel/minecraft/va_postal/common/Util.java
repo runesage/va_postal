@@ -1202,7 +1202,9 @@ public class Util {
             }
 
             for (OfflinePlayer a_player : offlineplayers) {
-                player_list.put(VA_postal.plugin.getServer().getPlayer(a_player.getUniqueId()), a_player.getName());
+                if (a_player.getName() != null && !a_player.isOnline()) {
+                    player_list.put(UUID2Player(a_player.getUniqueId()), a_player.getName());
+                }
             }
         } catch (Exception e) {
             Util.dinform(AnsiColor.RED + "EXCEPTION IN GETTING PLAYER LIST: " + e);
@@ -1293,7 +1295,10 @@ public class Util {
             if (parts.length > 2) {
                 name = name + "_" + Util.proper(parts[2]);
             }
-            return name + "_" + Util.proper(parts[3]);
+            if (parts.length > 3) {
+                name = name + "_" + Util.proper(parts[3]);
+            }
+            return name;
         } catch (Exception e) {
             //Util.dinform("ERROR IN DF: " + e);
             return string;
@@ -1377,13 +1382,36 @@ public class Util {
     }
 
     public static Player UUID2Player(String id) {
-        return UUID2Player(UUID.fromString(id));
+        if (id == null || id.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID2Player(UUID.fromString(id.trim()));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
+    /** Offline players resolve to one cached stand-in per UUID, so == comparisons stay consistent. */
+    private static final Map<UUID, Player> OFFLINE_STAND_INS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The player with this UUID: the live Player when online, otherwise an identity-only stand-in
+     * (see {@link ServerPlayer}) so owners, senders and recipients keep working while offline. The
+     * original plugin identified players by name and never had a "missing owner" case.
+     */
     public static Player UUID2Player(UUID UUID) {
-        if (VA_postal.SERVER_ID.equals(UUID))
+        if (UUID == null) {
+            return null;
+        }
+        if (VA_postal.SERVER_ID.equals(UUID)) {
             return VA_postal.SERVER;
-        else
-            return VA_postal.plugin.getServer().getPlayer(UUID);
+        }
+        Player online = VA_postal.plugin.getServer().getPlayer(UUID);
+        if (online != null) {
+            return online;
+        }
+        return OFFLINE_STAND_INS.computeIfAbsent(UUID,
+                id -> ServerPlayer.create(id, VA_postal.plugin.getServer().getOfflinePlayer(id).getName()));
     }
 }

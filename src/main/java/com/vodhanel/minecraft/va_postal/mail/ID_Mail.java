@@ -9,6 +9,7 @@ import com.vodhanel.minecraft.va_postal.config.C_Owner;
 import com.vodhanel.minecraft.va_postal.config.C_Postoffice;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import com.vodhanel.minecraft.va_postal.navigation.NpcLook;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -204,6 +205,23 @@ public class ID_Mail {
         return true;
     }
 
+    private static final java.util.Set<String> explained_missing_chests = new java.util.HashSet<>();
+
+    /** Logs, once per mailbox per server run, what the chest lookup saw, so a missing sign can be diagnosed. */
+    private static void explain_missing_chest(String what, String slocation) {
+        if (!explained_missing_chests.add(what.toLowerCase())) {
+            return;
+        }
+        Location search = Util.str2location(slocation);
+        if (search != null) {
+            search = search.clone().subtract(0.0D, 1.0D, 0.0D);
+        }
+        Util.cinform("\033[0;33m[Postal] Mailbox lookup for " + what + " failed. Needs a chest with a sign in front: [Postal_Mail] / town / address or [Local] / owner (if any).");
+        for (String line : SignManip.describe_chests_near(search, VA_postal.search_distance)) {
+            Util.cinform("\033[0;33m[Postal] " + line);
+        }
+    }
+
     public static synchronized boolean set_postoffice_chest_inv(int id) {
         String spostoffice = VA_postal.wtr_poffice[id];
         VA_postal.wtr_slocation_local_po[id] = Util.put_point_on_ground(C_Postoffice.get_local_po_location_by_name(spostoffice), false);
@@ -215,6 +233,7 @@ public class ID_Mail {
         if ("null".equals(VA_postal.wtr_schest_location_postoffice[id])) {
             VA_postal.wtr_inventory_postoffice[id] = null;
             Util.cinform(AnsiColor.RED + "Unable to locate post office chest: " + spostoffice);
+            explain_missing_chest(spostoffice + " [Local]", VA_postal.wtr_slocation_local_po[id]);
             return false;
         }
         Util.dinform("\033[0;32m[" + spostoffice + "] chest location: " + VA_postal.wtr_schest_location_postoffice[id]);
@@ -243,6 +262,7 @@ public class ID_Mail {
         if ("null".equals(VA_postal.wtr_schest_location[id])) {
             VA_postal.wtr_inventory_address[id] = null;
             Util.cinform(AnsiColor.RED + "Unable to locate residence chest: " + spostoffice + ", " + saddress);
+            explain_missing_chest(spostoffice + ", " + saddress, VA_postal.wtr_slocation_address[id]);
             return false;
         }
         Util.dinform("\033[0;32m[" + spostoffice + ", " + saddress + "] chest location: " + VA_postal.wtr_schest_location[id]);
@@ -284,7 +304,8 @@ public class ID_Mail {
 
         ItemStack log_book = create_log(id);
 
-        replace_slot_by_index_addr(id, 0, log_book);
+        MailGen.install_postal_log(() -> VA_postal.wtr_inventory_address[id], log_book, 2L,
+                VA_postal.wtr_poffice[id] + ", " + VA_postal.wtr_address[id]);
         return true;
     }
 
@@ -333,7 +354,8 @@ public class ID_Mail {
 
         ItemStack log_book = po_create_log(id);
 
-        replace_slot_by_index_po(id, 0, log_book);
+        MailGen.install_postal_log(() -> VA_postal.wtr_inventory_postoffice[id], log_book, 4L,
+                VA_postal.wtr_poffice[id] + " [Local]");
         return true;
     }
 
@@ -404,12 +426,12 @@ public class ID_Mail {
         ArrayList<String> input_lines = new ArrayList<>(Arrays.asList(log_book.getPage(1).split("\n")));
         String[] final_lines = Book.makeFirstLogPage(sworld, slocation_mod, saddr, sowner, owner).split("\n");
 
-        for (int i = 5; i < 14; i++) {
-            if ((i - 1 < final_lines.length) && (input_lines.get(i - 1) != null)) {
-                final_lines[i] = input_lines.get(i - 1).trim();
-            } else {
-                final_lines[i] = "";
-            }
+        // Lines 5-12 are the visit history: shift the previous page's lines 4-11 (last visit + history) down
+        // one. Bounded by the old page, which Minecraft may have trimmed of trailing blank lines; line 13
+        // (owner UUID) is left as written by makeFirstLogPage. The original bounded this by the input
+        // page too; the fork checked final_lines and ran through 13, overwriting the UUID line.
+        for (int i = 5; i < 13 && i < final_lines.length; i++) {
+            final_lines[i] = (i - 1 < input_lines.size()) ? input_lines.get(i - 1).trim() : "";
         }
 
         String title = "§c[Postal Log]";
@@ -544,15 +566,12 @@ public class ID_Mail {
 
         if (shipper_found) {
             ItemStack in_hand = new ItemStack(Material.CHEST);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else if (mail_found) {
             ItemStack in_hand = new ItemStack(Material.BOOK);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else {
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
         }
     }
 
@@ -622,9 +641,8 @@ public class ID_Mail {
                         }
                     }
                 }
-            } else {
-                index++;
             }
+            index++;
         }
         if ((mail_found) &&
                 (VA_postal.mailtalk == 2)) {
@@ -634,15 +652,12 @@ public class ID_Mail {
 
         if (shipper_found) {
             ItemStack in_hand = new ItemStack(Material.CHEST);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else if (mail_found) {
             ItemStack in_hand = new ItemStack(Material.BOOK);
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(in_hand);
+            NpcLook.hold(VA_postal.wtr_npc[id], in_hand);
         } else {
-            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
         }
     }
 
@@ -702,8 +717,7 @@ public class ID_Mail {
                         if (add_to_residence_chest(id, stamped_mail)) {
                             item_itr.set(null);
 
-                            VA_postal.wtr_npc_player[id] = ((Player) VA_postal.wtr_npc[id].getEntity());
-                            VA_postal.wtr_npc_player[id].setItemOnCursor(null);
+                            NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
                             mail_delivered = true;
                             C_Address.set_address_newmail(stown, this_address, true);
                         }
@@ -765,8 +779,7 @@ public class ID_Mail {
         }
 
 
-        VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
-        VA_postal.central_route_player.setItemOnCursor(null);
+        NpcLook.hold(VA_postal.central_route_npc, (ItemStack) null);
 
         ListIterator<ItemStack> local_item_itr = VA_postal.wtr_inventory_postoffice[id].iterator();
         boolean out_of_town_received = false;
@@ -791,11 +804,9 @@ public class ID_Mail {
                                 ChestManip.parcel_remove_origen_chest(ind_item);
                                 ItemStack chest_in_hand = new ItemStack(Material.CHEST);
 
-                                VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
-                                VA_postal.central_route_player.setItemOnCursor(chest_in_hand);
+                                NpcLook.hold(VA_postal.central_route_npc, chest_in_hand);
                             } else {
-                                VA_postal.central_route_player = (Player) VA_postal.central_route_npc.getEntity();
-                                VA_postal.central_route_player.setItemOnCursor(stamped_mail);
+                                NpcLook.hold(VA_postal.central_route_npc, stamped_mail);
                             }
                         } else {
                             ChestManip.add_to_central_chest(ind_item);
@@ -932,7 +943,7 @@ public class ID_Mail {
                 owner = VA_postal.SERVER;
             }
         }
-        if (s_search_location == null || s_search_location.isEmpty()) {
+        if (s_search_location == null || s_search_location.isEmpty() || "null".equals(s_search_location)) {
             return;
         }
         String result = "null";

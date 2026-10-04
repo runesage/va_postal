@@ -795,7 +795,7 @@ public class C_Dispatcher {
         String spo_index = "";
         String spl_index = "";
         String sdefault_time = Util.stime_stamp();
-        String promoted_time = Util.s_adj_time_stamp(60536);
+        String promoted_time = Util.s_adj_time_stamp(-5000);
         String selected_time = "";
 
         String path = GetConfig.path_format("address");
