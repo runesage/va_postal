@@ -145,6 +145,14 @@ public class Cmdexecutor implements CommandExecutor {
             Cmd_static.menu_player(player);
             return true;
         }
+        if ("bank".equals(args[0].toLowerCase().trim())) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            P_Bank.command(player, args);
+            return true;
+        }
         if ("speed".equals(args[0].toLowerCase().trim())) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
@@ -281,10 +289,14 @@ public class Cmdexecutor implements CommandExecutor {
         if (args.length == 0) {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
-            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute>");
+            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank>");
             return true;
         }
 
+        if ("bank".equals(args[0].toLowerCase().trim())) {
+            P_Bank.command(sender, args);
+            return true;
+        }
         if ("conc".equals(args[0].toLowerCase().trim())) {
             if (VA_postal.wtr_concurrent) {
                 VA_postal.wtr_concurrent = false;

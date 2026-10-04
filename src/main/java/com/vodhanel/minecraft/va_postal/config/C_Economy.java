@@ -91,4 +91,38 @@ public class C_Economy {
         }
         return result;
     }
+
+    private static double config_double(String path, double fallback) {
+        try {
+            String str = VA_postal.plugin.getConfig().getString(GetConfig.path_format(path));
+            return str == null ? fallback : Double.parseDouble(str.trim());
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    /** F: the working balance every office keeps on top of its liabilities. */
+    public static synchronized double office_floor() {
+        return Math.max(0.0D, config_double("economy.office_floor", 500.0D));
+    }
+
+    /** Central keeps its liabilities plus this before releasing surplus. */
+    public static synchronized double central_buffer() {
+        return Math.max(0.0D, config_double("economy.central_buffer", 5000.0D));
+    }
+
+    /** Length of a Postal economy day, in seconds (minimum one minute). */
+    public static synchronized long day_seconds() {
+        return Math.max(60L, (long) config_double("economy.day_seconds", 86400.0D));
+    }
+
+    /** Epoch second the last Postal day ran (0: never). */
+    public static synchronized long last_day() {
+        return (long) config_double("economy.last_day", 0.0D);
+    }
+
+    public static synchronized void set_last_day(long epoch_seconds) {
+        VA_postal.plugin.getConfig().set(GetConfig.path_format("economy.last_day"), Long.toString(epoch_seconds));
+        VA_postal.plugin.saveConfig();
+    }
 }

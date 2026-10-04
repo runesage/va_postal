@@ -17,61 +17,10 @@ import java.util.UUID;
  * office are real accounts in the server economy, not Vault banks.
  */
 public class P_Economy {
-    /** Seconds between distributions of Central's surplus to the local offices. */
-    private static final int DISTRIBUTION_INTERVAL = 1200;
-
-    public static int last_central_dist = 0;
     VA_postal plugin;
 
     public P_Economy(VA_postal instance) {
         plugin = instance;
-    }
-
-    public static void init_economy() {
-        last_central_dist = Util.time_stamp();
-    }
-
-    /**
-     * Every {@link #DISTRIBUTION_INTERVAL} seconds, Central keeps one post office purchase price in
-     * reserve (to fund ownership refunds) and splits the rest evenly between the local offices.
-     */
-    public static void ping_economy_schedule() {
-        if (!VA_postal.economy_configured) {
-            return;
-        }
-        if (Util.time_stamp() - last_central_dist <= DISTRIBUTION_INTERVAL) {
-            return;
-        }
-        last_central_dist = Util.time_stamp();
-        verify_central();
-
-        double retension = C_Economy.po_purchase_price();
-        double central_balance = central_balance();
-        if (central_balance <= retension) {
-            return;
-        }
-        String[] town_list = C_Arrays.town_list();
-        if ((town_list == null) || (town_list.length <= 0)) {
-            return;
-        }
-
-        double po_share = (central_balance - retension) / town_list.length;
-        double transfered = 0.0D;
-        Util.cinform("\033[0;37m[Postal] ============================================");
-        Util.cinform("\033[0;33m[Postal] Daily distribution of central proceeds......");
-        Util.cinform("\033[0;33m[Postal] Beginning central balance ------ \033[0;37m" + fixed_len_rt(ef(central_balance), 10));
-        Util.cinform("\033[0;33m[Postal] Local post office share -------- \033[0;37m" + fixed_len_rt(ef(po_share), 10));
-        Util.cinform("\033[0;33m[Postal] New local balances:");
-        for (String stown : town_list) {
-            if (does_the_bank_exist(stown) && PostalEconomy.central_to_office(stown, po_share)) {
-                transfered += po_share;
-                String new_bal = fixed_len_rt(ef(local_balance(stown)), 10);
-                String f_postoffice = fixed_len(Util.df(stown), 16, " ");
-                Util.cinform("\033[0;33m[Postal]    " + f_postoffice + "  " + AnsiColor.WHITE + new_bal);
-            }
-        }
-        Util.cinform("\033[0;33m[Postal] Ending  central  balance  ------ \033[0;37m" + fixed_len_rt(ef(central_balance - transfered), 10));
-        Util.cinform("\033[0;37m[Postal] ============================================");
     }
 
     // ---- Office accounts -------------------------------------------------------------------

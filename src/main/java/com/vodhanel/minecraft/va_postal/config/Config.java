@@ -142,6 +142,10 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.texture"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.signature"), "");
 
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.day_seconds"), "86400");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.office_floor"), "500");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.central_buffer"), "5000");
+
         VA_postal.plugin.getConfig().addDefault(lossy, true);
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);
         VA_postal.plugin.getConfig().addDefault(srp, 0);

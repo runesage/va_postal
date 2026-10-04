@@ -19,7 +19,8 @@ Towny gives towns accounts:
 - With **VaultUnlocked**, Postal creates proper non-player accounts (`createAccount(uuid, name, false)`).
 - With plain **Vault**, the accounts are ordinary player accounts held by an NPC `OfflinePlayer` stand-in.
 
-Office balances therefore appear in baltop and can be paid into by other plugins.
+Other plugins can pay into them like any account. EssentialsX leaves NPC accounts out of `/baltop` by
+default (`npcs-in-balance-ranking` in its config); use `/postal bank` to see them.
 
 ## Money flow
 
@@ -37,8 +38,29 @@ When an office or address changes hands, the previous player owner is refunded t
 (and, for offices, gets the office's balance) **only if Central (and the office, for addresses) can
 cover it**. Postal never creates money to pay a refund.
 
-Every 1200 s, Central keeps one post office purchase price in reserve and splits the rest evenly across
-the local offices.
+Central keeps what it collects; it no longer hands its surplus out to every office on a timer (that paid
+offices for existing rather than for working). The design for upkeep, owner withdrawals and an
+activity-based dividend is in [`docs/design/economy.md`](design/economy.md).
+
+## Reserves and `/postal bank`
+
+Postal runs a full reserve: every account keeps enough to pay every refund it could owe.
+
+- An office **owes** half the address price for each player-owned address it serves, and keeps that plus
+  a working floor (`Economy.Office_floor`, default 500) as its **reserve**. A player owner may take out
+  anything above the reserve.
+- **Central owes** the office price for each player-owned office plus the other half of every player-owned
+  address. It aims to hold that plus `Economy.Central_buffer` (default 5000).
+
+`/postal bank` (admin, or console) shows Central's balance, what it owes and its target, and for every
+office its owner, balance, reserve and what the owner may withdraw. `/postal bank newday` runs a Postal day
+immediately.
+
+## The Postal day
+
+Daily economy actions run once per Postal day: 24 hours by default (`Economy.Day_seconds`). The time of the
+last day is saved (`Economy.Last_day`), so restarts don't skip or repeat one; after a long downtime a single
+catch-up day runs.
 
 ## Upgrading from v4.x
 
