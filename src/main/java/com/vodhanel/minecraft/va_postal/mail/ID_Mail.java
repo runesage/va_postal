@@ -335,7 +335,8 @@ public class ID_Mail {
                     String slocation_comp = parts[0].trim() + "," + parts[1].trim();
                     if (slocation.equalsIgnoreCase(slocation_comp)) {
                         Player owner_comp = book.extractEmbeddedOwner();
-                        if (owner == owner_comp) {
+                        // Same owner by UUID: an online owner and their offline stand-in are different objects.
+                        if ((owner != null) && (owner_comp != null) && owner.getUniqueId().equals(owner_comp.getUniqueId())) {
                             return true;
                         }
                     }
@@ -1187,9 +1188,10 @@ public class ID_Mail {
         String sowner = "§7[Server]";
         String stitle = "§a[Postal_Mail]";
         if (C_Owner.is_address_owner_defined(stown, saddress)) {
-            sowner = C_Owner.get_owner_address(stown, saddress).getDisplayName();
-            if (sowner.length() > 15) {
-                sowner = sowner.substring(0, 15);
+            // The account name, which is what the mailbox lookup matches (a display name can be a nickname).
+            sowner = C_Owner.get_owner_address(stown, saddress).getName();
+            if (sowner.length() > SignManip.OWNER_LINE_MAX) {
+                sowner = sowner.substring(0, SignManip.OWNER_LINE_MAX);
             }
         }
         SignManip.create_sign_id_chest(block, stitle, Util.df(stown), Util.df(saddress), sowner);

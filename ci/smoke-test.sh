@@ -77,7 +77,7 @@ PY
 
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
-    "postal debug" "postal start" "sleep:270" "tlist" "alist Testville" "npc list" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
+    "postal debug" "postal start" "sleep:270" "tlist" "alist Testville" "npc list" "showroute testville home" "/" "sleep:2" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
     "data get block 40 -60 0 Items" "data get block 20 -60 0 Items" "data get block 0 -60 0 Items"
 
 # Recorded now: on its next start EssentialsX may purge NPC accounts still at the starting balance
@@ -112,7 +112,7 @@ for phase in phase1 phase2; do
     check "$phase: Postal enabled" grep -q "Enabling Postal" "$log"
     check "$phase: no enable failure" no_match "Error occurred while enabling Postal" "$log"
     check "$phase: no Postal stack traces" no_match "at .*com\.vodhanel\." "$log"
-    check "$phase: no command exceptions" no_match "Command exception: /?(postal|tlist|alist)" "$log"
+    check "$phase: no command exceptions" no_match "Command exception: /?(postal|tlist|alist|showroute)" "$log"
 done
 check "phase1: unconfigured start refused cleanly" grep -q "could not compile town list" "$WORK_DIR/phase1.log"
 check "phase2: economy hooked" grep -q "for economy\." "$WORK_DIR/phase2.log"
@@ -147,6 +147,7 @@ check "phase3: Testville keeps its half of the address refund plus the floor" gr
 check "phase3: console sees an office's position" grep -qE "Testville: balance .* reserve \\\$750 \\(owes \\\$250 for 1 player-owned address" "$WORK_DIR/phase3.txt"
 check "phase3: only the owner moves an office's money" grep -q "Only the office's owner can move its money, in game." "$WORK_DIR/phase3.txt"
 check "phase3: no Postal stack traces" no_match "at .*com\\.vodhanel\\." "$WORK_DIR/phase3.txt"
+check "phase2: console /showroute highlights the route" grep -q "Waypoints have been highlighted for everyone online" "$WORK_DIR/phase2.log"
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
 # Postal recreates its NPCs on every start; Citizens must not save them (saved copies came back as idle
 # duplicates on each restart).

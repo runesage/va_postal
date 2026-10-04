@@ -4,7 +4,11 @@ import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.config.*;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.dynmap.markers.CircleMarker;
 import org.dynmap.markers.Marker;
+import org.dynmap.markers.MarkerIcon;
+import org.dynmap.markers.MarkerSet;
+import org.dynmap.markers.PolyLineMarker;
 
 import java.util.Collection;
 
@@ -29,7 +33,6 @@ public class P_Dynmap {
     private static int postal_blue = 5079807;
     private static boolean dynmap_markerset_created = false;
     private static boolean creating_labels = false;
-    private static boolean running_delayed_nulls = false;
     VA_postal plugin;
 
     public P_Dynmap(VA_postal instance) {
@@ -45,8 +48,8 @@ public class P_Dynmap {
             if (VA_postal.dynmap.isEnabled()) {
                 delete_postmen();
                 delete_routes();
-                long delay = VA_Dispatcher.restart_cool / 2L;
-                delayed_nulls(delay);
+                clear_dynamic_markers();
+                delete_static_labels();
                 if (VA_postal.markerset != null) {
                     VA_postal.markerset.deleteMarkerSet();
                     VA_postal.markerset = null;
@@ -173,8 +176,8 @@ public class P_Dynmap {
             msg = "Post office for " + Util.df(stown) + ", owned by " + owner + ", services " + saddr_cnt + " addresses.";
         }
 
-        VA_postal.dyn_po_mrkr[index] = VA_postal.markerset.createMarker(sid, Util.df(stown), sworld, X, Y, Z, VA_postal.dyn_postoffice_ico, false);
-        VA_postal.dyn_po_mrkr[index].setDescription(msg);
+        VA_postal.dyn_po_mrkr[index] = point_marker(sid, Util.df(stown), sworld, X, Y, Z, VA_postal.dyn_postoffice_ico);
+        if (VA_postal.dyn_po_mrkr[index] != null) VA_postal.dyn_po_mrkr[index].setDescription(msg);
         VA_postal.dyn_po_str[index] = stown;
 
         dyn_po_cnt += 1;
@@ -194,7 +197,9 @@ public class P_Dynmap {
             return;
         }
 
-        VA_postal.dyn_po_mrkr[index].deleteMarker();
+        if (VA_postal.dyn_po_mrkr[index] != null) {
+            VA_postal.dyn_po_mrkr[index].deleteMarker();
+        }
         VA_postal.dyn_po_mrkr[index] = null;
         VA_postal.dyn_po_str[index] = null;
     }
@@ -234,8 +239,8 @@ public class P_Dynmap {
             msg = "Address: " + Util.df(saddress) + ", in town: " + Util.df(stown) + ", owned by: " + owner;
         }
 
-        VA_postal.dyn_addr_mrkr[index] = VA_postal.markerset.createMarker(sid, Util.df(saddress), sworld, X, Y, Z, VA_postal.dyn_address_ico, false);
-        VA_postal.dyn_addr_mrkr[index].setDescription(msg);
+        VA_postal.dyn_addr_mrkr[index] = point_marker(sid, Util.df(saddress), sworld, X, Y, Z, VA_postal.dyn_address_ico);
+        if (VA_postal.dyn_addr_mrkr[index] != null) VA_postal.dyn_addr_mrkr[index].setDescription(msg);
         VA_postal.dyn_addr_str_po[index] = stown;
         VA_postal.dyn_addr_str_addr[index] = saddress;
 
@@ -340,8 +345,8 @@ public class P_Dynmap {
                                 msg = "Post office for " + Util.df(stown) + ", owned by " + owner + ", services " + saddr_cnt + " addresses.";
                             }
 
-                            VA_postal.dyn_po_mrkr[i] = VA_postal.markerset.createMarker(sid, Util.df(stown), sworld, X, Y, Z, VA_postal.dyn_postoffice_ico, false);
-                            VA_postal.dyn_po_mrkr[i].setDescription(msg);
+                            VA_postal.dyn_po_mrkr[i] = point_marker(sid, Util.df(stown), sworld, X, Y, Z, VA_postal.dyn_postoffice_ico);
+                            if (VA_postal.dyn_po_mrkr[i] != null) VA_postal.dyn_po_mrkr[i].setDescription(msg);
                             VA_postal.dyn_po_str[i] = stown;
 
 
@@ -371,8 +376,8 @@ public class P_Dynmap {
                                         msg = "Address: " + Util.df(saddr) + ", in town: " + Util.df(stown) + ", owned by: " + owner;
                                     }
 
-                                    VA_postal.dyn_addr_mrkr[address_count] = VA_postal.markerset.createMarker(sid, Util.df(saddr), sworld, X, Y, Z, VA_postal.dyn_address_ico, false);
-                                    VA_postal.dyn_addr_mrkr[address_count].setDescription(msg);
+                                    VA_postal.dyn_addr_mrkr[address_count] = point_marker(sid, Util.df(saddr), sworld, X, Y, Z, VA_postal.dyn_address_ico);
+                                    if (VA_postal.dyn_addr_mrkr[address_count] != null) VA_postal.dyn_addr_mrkr[address_count].setDescription(msg);
                                     VA_postal.dyn_addr_str_po[address_count] = stown;
                                     VA_postal.dyn_addr_str_addr[address_count] = saddr;
 
@@ -436,7 +441,7 @@ public class P_Dynmap {
             if (VA_postal.dyn_postmaster != null) {
                 VA_postal.dyn_postmaster.deleteMarker();
             }
-            VA_postal.dyn_postmaster = VA_postal.markerset.createMarker(sid, label, sworld, X, Y, Z, VA_postal.dyn_postmaster_ico, false);
+            VA_postal.dyn_postmaster = point_marker(sid, label, sworld, X, Y, Z, VA_postal.dyn_postmaster_ico);
         }
     }
 
@@ -462,7 +467,7 @@ public class P_Dynmap {
             if (VA_postal.dyn_postman[id] != null) {
                 VA_postal.dyn_postman[id].deleteMarker();
             }
-            VA_postal.dyn_postman[id] = VA_postal.markerset.createCircleMarker(sid, label, false, sworld, X, Y, Z, radius, radius, false);
+            VA_postal.dyn_postman[id] = circle_marker(sid, label, sworld, X, Y, Z, radius);
             VA_postal.dyn_postman_po[id] = label;
         }
         dyn_postmen_cnt += 1;
@@ -527,12 +532,14 @@ public class P_Dynmap {
 
                 String msg = "Route from the " + Util.df(stown) + " post office to the address: " + Util.df(saddr) + ". Last walk took " + route_secs + " seconds round trip.";
                 if (VA_postal.dyn_route[id] == null) {
-                    VA_postal.dyn_route[id] = VA_postal.markerset.createPolyLineMarker(sid, msg, false, sworld, X, Y, Z, false);
+                    VA_postal.dyn_route[id] = polyline_marker(sid, msg, sworld, X, Y, Z);
                 } else {
                     VA_postal.dyn_route[id].setCornerLocations(X, Y, Z);
                     VA_postal.dyn_route[id].setLabel(msg);
                 }
-                VA_postal.dyn_route[id].setLineStyle(line_weight, line_opacity, line_color);
+                if (VA_postal.dyn_route[id] != null) {
+                    VA_postal.dyn_route[id].setLineStyle(line_weight, line_opacity, line_color);
+                }
             }
         }, 5L);
     }
@@ -594,51 +601,74 @@ public class P_Dynmap {
         deleting_routes = false;
     }
 
-    private static void delayed_nulls(long delay) {
-        if (!VA_postal.dynmap_configured) {
-            return;
-        }
-        if (running_delayed_nulls) {
-            return;
-        }
-        running_delayed_nulls = true;
-
-        VA_postal.plugin.getServer().getScheduler().runTaskLaterAsynchronously(VA_postal.plugin, new Runnable() {
-            public void run() {
-                if ((!VA_postal.dynmap_active) || (!VA_Dispatcher.dispatcher_running)) {
-                    return;
+    /**
+     * Deletes the route, postman and PostMaster markers and drops the references. The markers belong to
+     * the marker set, which dynmap_stop deletes right after, so this must happen now: v4 did it in a
+     * delayed task that bailed out because dynmap_active was already false, leaving references to
+     * deleted markers (and the task's busy flag set for good) that the next start tripped over.
+     */
+    private static void clear_dynamic_markers() {
+        if (VA_postal.dyn_route != null) {
+            for (int i = 0; i < VA_postal.dyn_route.length; i++) {
+                if (VA_postal.dyn_route[i] != null) {
+                    VA_postal.dyn_route[i].deleteMarker();
+                    VA_postal.dyn_route[i] = null;
                 }
-
-
-                if (VA_postal.dyn_route != null) {
-                    for (int i = 0; i < VA_postal.dyn_route.length; i++) {
-                        if (VA_postal.dyn_route[i] != null) {
-                            VA_postal.dyn_route[i].deleteMarker();
-                            VA_postal.dyn_route[i] = null;
-                        }
-                    }
-                }
-
-
-                if (VA_postal.dyn_postman != null) {
-                    for (int i = 0; i < VA_postal.dyn_postman.length; i++) {
-                        if (VA_postal.dyn_postman[i] != null) {
-                            VA_postal.dyn_postman[i].deleteMarker();
-                            VA_postal.dyn_postman[i] = null;
-                        }
-                    }
-                }
-
-
-                if (VA_postal.dyn_postmaster != null) {
-                    VA_postal.dyn_postmaster.deleteMarker();
-                    VA_postal.dyn_postmaster = null;
-                }
-                P_Dynmap.running_delayed_nulls = (false);
             }
-        }, delay);
+        }
+        if (VA_postal.dyn_postman != null) {
+            for (int i = 0; i < VA_postal.dyn_postman.length; i++) {
+                if (VA_postal.dyn_postman[i] != null) {
+                    VA_postal.dyn_postman[i].deleteMarker();
+                    VA_postal.dyn_postman[i] = null;
+                }
+            }
+        }
+        if (VA_postal.dyn_postmaster != null) {
+            VA_postal.dyn_postmaster.deleteMarker();
+            VA_postal.dyn_postmaster = null;
+        }
     }
 
+    // Dynmap's create*Marker returns null when the id is already taken (e.g. a marker left in a reused
+    // marker set), which v4 never checked. These replace any marker with that id, and may still return
+    // null (no marker set, or Dynmap refused), so callers must check.
+
+    private static Marker point_marker(String id, String label, String world, double x, double y, double z, MarkerIcon icon) {
+        MarkerSet set = VA_postal.markerset;
+        if (set == null) {
+            return null;
+        }
+        Marker old = set.findMarker(id);
+        if (old != null) {
+            old.deleteMarker();
+        }
+        return set.createMarker(id, label, world, x, y, z, icon, false);
+    }
+
+    private static CircleMarker circle_marker(String id, String label, String world, double x, double y, double z, double radius) {
+        MarkerSet set = VA_postal.markerset;
+        if (set == null) {
+            return null;
+        }
+        CircleMarker old = set.findCircleMarker(id);
+        if (old != null) {
+            old.deleteMarker();
+        }
+        return set.createCircleMarker(id, label, false, world, x, y, z, radius, radius, false);
+    }
+
+    private static PolyLineMarker polyline_marker(String id, String label, String world, double[] x, double[] y, double[] z) {
+        MarkerSet set = VA_postal.markerset;
+        if (set == null) {
+            return null;
+        }
+        PolyLineMarker old = set.findPolyLineMarker(id);
+        if (old != null) {
+            old.deleteMarker();
+        }
+        return set.createPolyLineMarker(id, label, false, world, x, y, z, false);
+    }
 
     public static void update_central_pos(String stown) {
         if (!VA_postal.dynmap_configured) {
@@ -749,6 +779,11 @@ public class P_Dynmap {
         VA_postal.plugin.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, new Runnable() {
             public void run() {
                 if ((!VA_postal.dynmap_active) || (!VA_Dispatcher.dispatcher_running)) {
+                    return;
+                }
+                // Re-check: a stop or restart in the last 7 ticks may have cleared any of these.
+                if ((VA_postal.wtr_npc_player == null) || (VA_postal.wtr_waypoint == null) || (VA_postal.dyn_postman == null)
+                        || (VA_postal.wtr_npc_player[id] == null) || (VA_postal.wtr_waypoint[id] == null) || (VA_postal.dyn_postman[id] == null)) {
                     return;
                 }
                 Location loc = VA_postal.wtr_npc_player[id].getLocation();

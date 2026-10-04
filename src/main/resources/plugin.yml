@@ -22,6 +22,7 @@ commands:
   go:
     description: Used to teleport based on parameter count
     usage: /go [town] [address] (no parameters = Central)
+    aliases: [va_go]
   package:
     description: Used to prepare a chest for shipping.
     usage: /package <town> <address>
