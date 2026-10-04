@@ -56,6 +56,18 @@ Postal runs a full reserve: every account keeps enough to pay every refund it co
 office its owner, balance, reserve and what the owner may withdraw. `/postal bank newday` runs a Postal day
 immediately.
 
+Office owners manage their office's money with `/postal office`:
+
+| Command | Does |
+|---|---|
+| `/postal office` | your offices: balance, reserve, withdrawable |
+| `/postal office <office> [balance]` | one office (admins and the console can view any) |
+| `/postal office <office> deposit <amount>` | move money from you into the office |
+| `/postal office <office> withdraw <amount\|all>` | take money out, down to the reserve |
+
+Below its reserve an office's withdrawals are blocked. Each transfer checks both sides and undoes the first
+if the second fails, so money is never lost or created.
+
 ## The Postal day
 
 Daily economy actions run once per Postal day: 24 hours by default (`Economy.Day_seconds`). The time of the

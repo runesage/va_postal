@@ -66,6 +66,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/expedite <PostOffice> <address> &7&o(alias: /ex)");
         Util.pinform(player, " &7&oSet the central post office");
         Util.pinform(player, " &f&r/setcentral");
+        Util.pinform(player, " &7&oPostal accounts: Central and every office; run a Postal day now");
+        Util.pinform(player, " &f&r/postal bank [newday]");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oSet a town address");
@@ -118,6 +120,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/gps <PostOffice> [Address] &7&o(alias: /gpsp)");
         Util.pinform(player, " &7&oPush a route schedule forward");
         Util.pinform(player, " &f&r/expedite <PostOffice> <address> &7&o(alias: /ex)");
+        Util.pinform(player, " &7&oYour post offices' money: balance, deposit, withdraw (down to the reserve)");
+        Util.pinform(player, " &f&r/postal office [PostOffice] [balance|deposit <amt>|withdraw <amt|all>]");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oDefine route from local post office to address");

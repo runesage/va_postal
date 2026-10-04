@@ -184,7 +184,8 @@ longer than a day runs a single catch-up day rather than one per missed day.
 - `/postal bank policy [<setting> <value>]` (admin): show or change the dividend and upkeep settings at
   runtime (saved to config).
 - `/postal bank report [days]` (admin): the daily flow log (§14).
-- `/pobank <office> [balance | deposit <amount> | withdraw <amount>]` (owner; name to be decided).
+- `/postal office [<office>] [balance | deposit <amount> | withdraw <amount|all>]` (owner; admins may view).
+  Everything stays under `/postal` to avoid clashing with other plugins.
 
 ## 13. Config (proposed)
 
