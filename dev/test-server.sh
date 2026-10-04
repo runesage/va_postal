@@ -15,7 +15,8 @@
 # Env: JAVA (Java 25+; default: 'java' if it's 25+, else a JDK downloaded into dev-server/jdk),
 #      DEV_DIR (default: <repo>/dev-server), PAPER_VERSION,
 #      DEV_BALANCE (starting money for players on the test server; default 100000),
-#      SEED_SIZE (full: 3 towns x 5 addresses, the default; small: Testville + Home only)
+#      SEED_SIZE (full: 3 towns x 5 addresses, the default; small: Testville + Home only),
+#      DEV_PACE (fast: quick postman cycles, the default; normal: Postal's live-server pacing)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -38,7 +39,7 @@ die() { echo "error: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 usage() {
-    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -193,21 +194,36 @@ save_op() {
     info "Will op $1 on every start (change with --op NAME)"
 }
 
-# write_postal_config: debug and economy on; keeps everything else Postal already wrote.
+# write_postal_config: debug and economy on, plus (unless DEV_PACE=normal) faster dispatcher pacing
+# than Postal's live-server defaults, so postmen cycle through a town's addresses in a minute or two
+# instead of ~6 minutes. Keeps everything else Postal already wrote.
 write_postal_config() {
     mkdir -p "$(dirname "$POSTAL_CONFIG")"
-    if [ ! -f "$POSTAL_CONFIG" ]; then
-        printf "Settings:\n  Debug: 'true'\nEconomy:\n  Use: 'true'\n" > "$POSTAL_CONFIG"
-        return
-    fi
-    python3 - "$POSTAL_CONFIG" <<'EOF'
+    [ -f "$POSTAL_CONFIG" ] || printf "Settings:\n  Debug: 'true'\nEconomy:\n  Use: 'true'\n" > "$POSTAL_CONFIG"
+    python3 - "$POSTAL_CONFIG" "${DEV_PACE:-fast}" <<'EOF'
 import re, sys
-path = sys.argv[1]
+path, pace = sys.argv[1], sys.argv[2]
 text = open(path).read()
 text = re.sub(r"(?m)^(  Debug: )'false'", r"\1'true'", text)
 text = re.sub(r"(?m)^(  Use: )'false'", r"\1'true'", text)
+# Postal's defaults: 60 s between a postman's routes, 30 s for the PostMaster, 5 s at each mailbox,
+# a dispatcher check every 5 s that tunes itself.
+pacing = {
+    "fast":   {"Postman_cool_sec": "10", "Central_cool_sec": "10", "Residence_cool_ticks": "40",
+               "Heart_beat_ticks": "40", "Heart_beat_auto": "false"},
+    "normal": {"Postman_cool_sec": "60", "Central_cool_sec": "30", "Residence_cool_ticks": "100",
+               "Heart_beat_ticks": "100", "Heart_beat_auto": "true"},
+    }[pace]
+for key, value in pacing.items():
+    line = "  %s: '%s'" % (key, value)
+    text, n = re.subn(r"(?m)^  %s: .*$" % key, line, text)
+    if n == 0:
+        text = re.sub(r"(?m)^Settings:$", "Settings:\n" + line, text, count=1)
 open(path, "w").write(text)
 EOF
+    if [ "${DEV_PACE:-fast}" = fast ]; then
+        info "Fast postman pacing (10 s between routes); DEV_PACE=normal for Postal's defaults"
+    fi
 }
 
 # Players get DEV_BALANCE on their first join, so paid features can be tested without /eco.

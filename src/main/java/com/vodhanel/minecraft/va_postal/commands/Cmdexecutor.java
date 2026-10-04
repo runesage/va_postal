@@ -1444,7 +1444,7 @@ public class Cmdexecutor implements CommandExecutor {
         } else {
             Util.pinform(player, "&f&rReady accept shipment.");
             Util.pinform(player, "&7&oShipment will be placed directly in front of you.");
-            if (price > 0.0D) Util.pinform(player, "&7&oThis is COD and you will be charged $" + ef(price));
+            if (price > 0.0D) Util.pinform(player, "&7&oThis is COD and you will be charged " + ef(price));
             String scommand = "/accept";
             register_player_comfirmation(player, scommand);
         }
@@ -1601,7 +1601,7 @@ public class Cmdexecutor implements CommandExecutor {
         } else {
             Util.pinform(player, "&7&oReady make this shipper into a C.O.D.");
             Util.pinform(player, "&fYou will be charged " + ef(cod_charge) + " as a COD surcharge.");
-            Util.pinform(player, "&fThe recipient must pay you $" + ef(cod_price) + " to accept the package.");
+            Util.pinform(player, "&fThe recipient must pay you " + ef(cod_price) + " to accept the package.");
             String scommand = "/cod " + args[0];
             register_player_comfirmation(player, scommand);
         }

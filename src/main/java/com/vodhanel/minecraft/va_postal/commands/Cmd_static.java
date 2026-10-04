@@ -1,5 +1,7 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
+import com.vodhanel.minecraft.va_postal.mail.CodLabel;
+
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
@@ -28,7 +30,6 @@ import java.util.Date;
 import java.util.ListIterator;
 
 public class Cmd_static {
-    private static String cod_prepend = "§c  [COD] $";
     VA_postal plugin;
 
     public Cmd_static(VA_postal instance) {
@@ -287,7 +288,7 @@ public class Cmd_static {
         if ((pages == null) || (pages.length < 1)) return null;
         String[] parts = pages[0].split("\n");
         if ((parts == null) || (parts.length < 12)) return null;
-        parts[11] = (cod_prepend + ef(price));
+        parts[11] = CodLabel.line(price);
         pages[0] = "";
         for (String part : parts) pages[0] = (pages[0] + part + "\n");
         Book stamped_book = new Book(title, author, pages);
@@ -306,12 +307,7 @@ public class Cmd_static {
         if ((parts == null) || (parts.length < 12)) return 0.0D;
         String sraw = parts[11].trim();
         if (sraw.contains("§7.")) return 0.0D;
-        if (sraw.contains(cod_prepend)) {
-            String sprice = sraw.replace(cod_prepend, "");
-            sprice = sprice.replace(",", "").trim();
-            return Util.str2double(sprice);
-        }
-        return 0.0D;
+        return CodLabel.amount(sraw);
     }
 
     public static Player cod_sender(ItemStack ind_item) {

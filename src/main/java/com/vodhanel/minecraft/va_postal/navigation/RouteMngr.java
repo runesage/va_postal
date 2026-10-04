@@ -435,7 +435,7 @@ public class RouteMngr {
         }
 
         if (VA_Dispatcher.dispatcher_heartbeat > 200L) VA_Dispatcher.dispatcher_heartbeat = 200L;
-        if (VA_Dispatcher.dispatcher_heartbeat < 30L) VA_Dispatcher.dispatcher_heartbeat = 305L;
+        if (VA_Dispatcher.dispatcher_heartbeat < 30L) VA_Dispatcher.dispatcher_heartbeat = 30L; // v4: 305L, a 15 s heartbeat past the cap
 
         if (reset) {
             VA_postal.plugin.getServer().getScheduler().cancelTask(VA_Dispatcher.dispatcher_id);
