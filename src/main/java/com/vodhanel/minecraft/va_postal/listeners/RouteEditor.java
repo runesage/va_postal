@@ -327,8 +327,7 @@ public class RouteEditor implements Listener {
         String saddress = VA_postal.plistener_address;
 
         String s2dlocation = location_2_XZ(location);
-        String slast_waypoint = C_Route.get_last_waypoint_location(stown, saddress);
-        String s2dlocation_last = location_2_XZ(Util.str2location(slast_waypoint));
+        String s2dlocation_last = location_2_XZ(last_waypoint(stown, saddress));
         if (!s2dlocation.equals(s2dlocation_last)) {
             if ((VA_postal.using_towny()) && (P_Towny.is_waypoint_limit(player, stown, saddress))) {
                 return;
@@ -809,7 +808,7 @@ public class RouteEditor implements Listener {
                         return;
                     }
                     Location playr_loc = VA_postal.plistener_player.getLocation();
-                    Location lwpt_loc = Util.str2location(C_Route.get_last_waypoint_location(po, addr));
+                    Location lwpt_loc = last_waypoint(po, addr);
                     if ((playr_loc != null) && (loc_po != null)) {
                         int dist_po = (int) playr_loc.distance(loc_po);
                         VA_postal.plistener_hud_po.setScore(dist_po);
@@ -973,6 +972,15 @@ public class RouteEditor implements Listener {
             case 6:
                 return Particle.DUST;
         }
+    }
+
+    /** The route's last waypoint, or null for a route with none yet (without str2location's debug noise). */
+    private static Location last_waypoint(String po, String addr) {
+        String slocation = C_Route.get_last_waypoint_location(po, addr);
+        if (slocation == null || slocation.trim().isEmpty() || "null".equals(slocation)) {
+            return null;
+        }
+        return Util.str2location(slocation);
     }
 
     private static String location_2_XZ(Location loc) {

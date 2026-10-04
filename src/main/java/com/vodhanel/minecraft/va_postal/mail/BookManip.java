@@ -433,7 +433,7 @@ public class BookManip {
 
         ItemStack log_book = ChestManip.central_create_log();
 
-        MailGen.replace_slot_by_index_cen(0, log_book);
+        MailGen.install_postal_log(() -> VA_postal.central_po_inventory, log_book, 6L, "Central");
         return true;
     }
 

@@ -304,7 +304,8 @@ public class ID_Mail {
 
         ItemStack log_book = create_log(id);
 
-        replace_slot_by_index_addr(id, 0, log_book);
+        MailGen.install_postal_log(() -> VA_postal.wtr_inventory_address[id], log_book, 2L,
+                VA_postal.wtr_poffice[id] + ", " + VA_postal.wtr_address[id]);
         return true;
     }
 
@@ -353,7 +354,8 @@ public class ID_Mail {
 
         ItemStack log_book = po_create_log(id);
 
-        replace_slot_by_index_po(id, 0, log_book);
+        MailGen.install_postal_log(() -> VA_postal.wtr_inventory_postoffice[id], log_book, 4L,
+                VA_postal.wtr_poffice[id] + " [Local]");
         return true;
     }
 

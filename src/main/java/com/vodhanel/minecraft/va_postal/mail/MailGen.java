@@ -64,6 +64,43 @@ public class MailGen {
 
     }
 
+    /**
+     * Puts a postal log in slot 0 (where Postal looks for it) after {@code delay} ticks. Whatever else is in
+     * slot 0 moves to an empty slot first: the log used to overwrite it, which destroyed a letter delivered
+     * on a mailbox's first visit (the log is only created then). With no free slot the log waits for a
+     * later visit rather than destroy anything.
+     */
+    public static synchronized void install_postal_log(final java.util.function.Supplier<org.bukkit.inventory.Inventory> chest,
+                                                       final ItemStack log_book, long delay, final String where) {
+        if (log_book == null) {
+            return;
+        }
+        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
+            org.bukkit.inventory.Inventory inventory = chest.get();
+            if (inventory == null) {
+                return;
+            }
+            ItemStack current = inventory.getItem(0);
+            if (current != null && !current.getType().isAir() && !is_postal_log(current)) {
+                int free = inventory.firstEmpty();
+                if (free < 0) {
+                    Util.dinform("[" + where + "] No room to install a postal log; will retry next visit");
+                    return;
+                }
+                inventory.setItem(free, current);
+            }
+            inventory.setItem(0, log_book);
+        }, delay);
+    }
+
+    private static boolean is_postal_log(ItemStack item) {
+        if (item.getType() != org.bukkit.Material.WRITTEN_BOOK) {
+            return false;
+        }
+        Book book = new Book(item);
+        return book.is_valid() && book.getTitle() != null && book.getTitle().toLowerCase().contains("postal log");
+    }
+
     public static synchronized String proper(String string) {
         try {
             if (string.length() > 0) {

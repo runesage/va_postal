@@ -55,7 +55,10 @@ run_server() {
 
 echo "== Phase 1: plugin enables, commands respond, world is seeded"
 run_server "$WORK_DIR/phase1.log" \
-    "plugins" "postal" "tlist" "alist" "postal start" "${SEED_COMMANDS[@]}" "sleep:3"
+    "plugins" "postal" "tlist" "alist" "postal start" "${SEED_COMMANDS[@]}" \
+    "minecraft:item replace block 40 -60 0 container.0 with minecraft:diamond" \
+    "minecraft:item replace block 20 -60 0 container.0 with minecraft:emerald" \
+    "minecraft:item replace block 0 -60 0 container.0 with minecraft:gold_ingot" "sleep:3"
 
 # Seed the network the way /setcentral, /setlocal, /setaddr and the route editor would.
 CONFIG="$SERVER/plugins/Postal/config.yml"
@@ -72,7 +75,8 @@ PY
 
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
-    "postal debug" "postal start" "sleep:270" "tlist" "alist Testville" "npc list" "postal stop" "sleep:5"
+    "postal debug" "postal start" "sleep:270" "tlist" "alist Testville" "npc list" "postal stop" "sleep:5" \
+    "data get block 40 -60 0 Items" "data get block 20 -60 0 Items" "data get block 0 -60 0 Items"
 
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
@@ -102,6 +106,13 @@ check "phase2: existing postal log updated" grep -q "Postal log exists" "$WORK_D
 check "phase2: postman never stuck on a completed waypoint" no_match "wtr_waypoint_completed is true" "$WORK_DIR/phase2.log"
 check "phase2: round trip recorded for Home" grep -qE "Home +Server +Seconds: [1-9]" "$WORK_DIR/phase2.log"
 check "phase2: NPC skins and uniform configured cleanly" no_match "Unknown uniform item|needs a texture and signature" "$WORK_DIR/phase2.log"
+# Each chest started with an item in slot 0, where Postal installs its postal log on the first visit.
+# The log used to overwrite that slot, destroying e.g. a letter delivered on a new mailbox's first visit.
+items_of() { sed $'s/\x1b\\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\]: $1, -60, 0 has the following block data" | tail -1; }
+check "phase2: postal log install kept Home's existing item" grep -q "minecraft:diamond" <(items_of "40")
+check "phase2: postal log install kept Testville's existing item" grep -q "minecraft:emerald" <(items_of "20")
+check "phase2: postal log install kept Central's existing item" grep -q "minecraft:gold_ingot" <(items_of "0")
+check "phase2: Home has its postal log" grep -qi "postal log" <(items_of "40")
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
 # Postal recreates its NPCs on every start; Citizens must not save them (saved copies came back as idle
 # duplicates on each restart).
