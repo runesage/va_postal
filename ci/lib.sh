@@ -56,49 +56,98 @@ java_major() {
 }
 
 # ---- Seed test network ---------------------------------------------------------------------
-# A central office, one local office ("Testville") and one address ("Home") with a five-waypoint
-# route, laid out on a flat world (surface y=-60) around the origin:
+# A flat world (surface y=-60) with Central at the origin and one street per town. On each street
+# the post office chest is at x=20 and the addresses at x=40,50,60,70,80; every chest faces south
+# with its sign in front (z+1), and routes run along z+2 from the post office to the address, one
+# waypoint every 5 blocks.
 #
-#   Central chest (0,-60,0)   Testville chest+sign (20,-60,0)   Home chest+sign (40,-60,0)
-#   route: (20,-60,2) -> (25) -> (30) -> (35) -> (40,-60,2)
+#   SEED_SIZE=full (default): 3 towns x 5 addresses
+#     Testville  z=0   Home, Bakery, Smithy, Library, Farm
+#     Riverside  z=40  Mill, Docks, Inn, Chapel, Market
+#     Hilltop    z=80  Manor, Tower, Lodge, Orchard, Barracks
+#   SEED_SIZE=small: Testville with Home only (what the CI smoke test runs; quick to cycle)
 #
-# SEED_COMMANDS must run in the server console; seed_config writes the matching Postal config.
+# SEED_COMMANDS (run in the server console) and seed_config (the matching Postal config) both
+# follow SEED_SIZE as it is when this file is sourced.
 
-SEED_SIGN_LOCAL='minecraft:oak_wall_sign[facing=south]{front_text:{messages:["[Postal_Mail]","Testville","[Local]",""]}}'
-SEED_SIGN_HOME='minecraft:oak_wall_sign[facing=south]{front_text:{messages:["[Postal_Mail]","Testville","Home",""]}}'
-SEED_COMMANDS=(
-    "forceload add -16 -16 64 16"
-    "setblock 0 -60 0 minecraft:chest[facing=south]"
-    "setblock 20 -60 0 minecraft:chest[facing=south]"
-    "setblock 20 -60 1 $SEED_SIGN_LOCAL"
-    "setblock 40 -60 0 minecraft:chest[facing=south]"
-    "setblock 40 -60 1 $SEED_SIGN_HOME"
+SEED_SIZE="${SEED_SIZE:-full}"
+SEED_TOWNS=(Testville Riverside Hilltop)
+declare -A SEED_TOWN_Z=([Testville]=0 [Riverside]=40 [Hilltop]=80)
+declare -A SEED_ADDRESSES=(
+    [Testville]="Home Bakery Smithy Library Farm"
+    [Riverside]="Mill Docks Inn Chapel Market"
+    [Hilltop]="Manor Tower Lodge Orchard Barracks"
 )
+SEED_ADDRESS_X=(40 50 60 70 80)
+SEED_PO_X=20
 
-# seed_config <postal-config.yml>: appends the seed network's offices, address and route.
+# seed_towns / seed_addresses <town>: the parts of the network SEED_SIZE includes.
+seed_towns() {
+    if [ "$SEED_SIZE" = small ]; then echo Testville; else echo "${SEED_TOWNS[@]}"; fi
+}
+seed_addresses() {
+    if [ "$SEED_SIZE" = small ]; then echo Home; else echo "${SEED_ADDRESSES[$1]}"; fi
+}
+
+seed_sign() { # line1 line2 line3
+    printf 'minecraft:oak_wall_sign[facing=south]{front_text:{messages:["%s","%s","%s",""]}}' "$1" "$2" "$3"
+}
+
+seed_network() {
+    local town z i addr x
+    if [ "$SEED_SIZE" = small ]; then
+        SEED_COMMANDS=("forceload add -16 -16 64 16")
+    else
+        SEED_COMMANDS=("forceload add -16 -16 96 96")
+    fi
+    SEED_COMMANDS+=("setblock 0 -60 0 minecraft:chest[facing=south]")
+    for town in $(seed_towns); do
+        z=${SEED_TOWN_Z[$town]}
+        SEED_COMMANDS+=("setblock $SEED_PO_X -60 $z minecraft:chest[facing=south]"
+                        "setblock $SEED_PO_X -60 $((z + 1)) $(seed_sign "[Postal_Mail]" "$town" "[Local]")")
+        i=0
+        for addr in $(seed_addresses "$town"); do
+            x=${SEED_ADDRESS_X[$i]}
+            SEED_COMMANDS+=("setblock $x -60 $z minecraft:chest[facing=south]"
+                            "setblock $x -60 $((z + 1)) $(seed_sign "[Postal_Mail]" "$town" "$addr")")
+            i=$((i + 1))
+        done
+    done
+}
+seed_network
+
+# seed_config <postal-config.yml>: appends the seed network's offices, addresses and routes.
 seed_config() {
-    cat >> "$1" <<'EOF'
-Postoffice:
-  Central:
-    Location: world,0.0,-60.0,2.0
-  Local:
-    Testville:
-      Location: world,20.0,-60.0,2.0
-Address:
-  Testville:
-    Home:
-      Residence:
-        Location: world,40.0,-60.0,2.0
-      Route:
-        '0':
-          Location: world,20.0,-60.0,2.0
-        '1':
-          Location: world,25.0,-60.0,2.0
-        '2':
-          Location: world,30.0,-60.0,2.0
-        '3':
-          Location: world,35.0,-60.0,2.0
-        '4':
-          Location: world,40.0,-60.0,2.0
-EOF
+    local town z i addr x wx n
+    {
+        echo "Postoffice:"
+        echo "  Central:"
+        echo "    Location: world,0.0,-60.0,2.0"
+        echo "  Local:"
+        for town in $(seed_towns); do
+            z=${SEED_TOWN_Z[$town]}
+            echo "    $town:"
+            echo "      Location: world,$SEED_PO_X.0,-60.0,$((z + 2)).0"
+        done
+        echo "Address:"
+        for town in $(seed_towns); do
+            z=${SEED_TOWN_Z[$town]}
+            echo "  $town:"
+            i=0
+            for addr in $(seed_addresses "$town"); do
+                x=${SEED_ADDRESS_X[$i]}
+                echo "    $addr:"
+                echo "      Residence:"
+                echo "        Location: world,$x.0,-60.0,$((z + 2)).0"
+                echo "      Route:"
+                n=0
+                for ((wx = SEED_PO_X; wx <= x; wx += 5)); do
+                    echo "        '$n':"
+                    echo "          Location: world,$wx.0,-60.0,$((z + 2)).0"
+                    n=$((n + 1))
+                done
+                i=$((i + 1))
+            done
+        done
+    } >> "$1"
 }

@@ -24,14 +24,20 @@ on a brand-new server this applies from the second start; an account that joined
 topped up once on the next start. To reset your balance at any time while the server is running:
 `dev/test-server.sh money [AMOUNT]`.
 
-`--seed` builds a small working network at the world origin on first use, the same one CI tests:
+`--seed` builds a test network at the world origin on first use: Central plus three towns, each a
+street with a post office and five addresses, all with routes.
 
 | Where | What |
 |---|---|
 | `0 -60 0` | Central post office chest |
-| `20 -60 0` | Testville local post office (chest + sign) |
-| `40 -60 0` | Home address (chest + sign) |
-| `20..40 -60 2` | route from Testville to Home |
+| street at `z=0` | **Testville**: post office `20 -60 0`; Home `40`, Bakery `50`, Smithy `60`, Library `70`, Farm `80` (x) |
+| street at `z=40` | **Riverside**: post office `20 -60 40`; Mill, Docks, Inn, Chapel, Market at x = 40..80 |
+| street at `z=80` | **Hilltop**: post office `20 -60 80`; Manor, Tower, Lodge, Orchard, Barracks at x = 40..80 |
+
+Every chest faces south with its `[Postal_Mail]` sign in front of it, and each route runs along the
+street (`z+2`) from the post office to the address. Each town has its own postman. Use
+`SEED_SIZE=small` for just Testville and Home (what CI runs). An already-seeded server keeps its old
+network: run `dev/test-server.sh reset`, then `start --seed`, to get this one.
 
 The dispatcher starts automatically once the network is seeded, so a postman walks the route within
 a minute or two. Build your own offices and routes with the normal commands (`/setcentral`,

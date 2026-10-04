@@ -13,6 +13,7 @@ POSTAL_JAR="$(realpath "${1:?usage: smoke-test.sh <postal.jar>}")"
 JAVA="${JAVA:-java}"
 WORK_DIR="${WORK_DIR:-smoke}"
 # shellcheck source=ci/lib.sh
+SEED_SIZE=small  # one address, so three deliveries fit in the run
 source "$(dirname "$0")/lib.sh"
 
 mkdir -p "$WORK_DIR/cache"

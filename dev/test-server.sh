@@ -14,7 +14,8 @@
 #
 # Env: JAVA (Java 25+; default: 'java' if it's 25+, else a JDK downloaded into dev-server/jdk),
 #      DEV_DIR (default: <repo>/dev-server), PAPER_VERSION,
-#      DEV_BALANCE (starting money for players on the test server; default 100000)
+#      DEV_BALANCE (starting money for players on the test server; default 100000),
+#      SEED_SIZE (full: 3 towns x 5 addresses, the default; small: Testville + Home only)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,7 +38,7 @@ die() { echo "error: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 usage() {
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -269,7 +270,7 @@ cmd_start() {
         if [ -f "$SERVER/.seeded" ]; then
             info "Test network already seeded; skipping (dev/test-server.sh reset to start over)"
         else
-            info "Seeding the test network (Central, Testville, Home) at the world origin"
+            info "Seeding the test network ($SEED_SIZE: Central + $(seed_towns | wc -w) town(s)) at the world origin"
             seed_config "$POSTAL_CONFIG"
             commands+=("${SEED_COMMANDS[@]}")
             touch "$SERVER/.seeded"
@@ -303,7 +304,7 @@ cmd_start() {
     local port
     port="$(get_property server-port)"
     info "Starting Paper $PAPER_VERSION. Join at localhost:${port:-25565}. Type 'stop' to shut down."
-    [ -f "$SERVER/.seeded" ] && echo "    Test network: Central (0,-60,0), Testville post office (20,-60,0), Home (40,-60,0)."
+    [ -f "$SERVER/.seeded" ] && echo "    Test network: Central (0,-60,0); streets at z=0 Testville, z=40 Riverside, z=80 Hilltop (post office x=20, addresses x=40-80)."
     echo "    Afterwards: dev/test-server.sh report"
     (cd "$SERVER" && "$JAVA" -Xms2G -Xmx4G -jar paper.jar nogui) || true
 }
