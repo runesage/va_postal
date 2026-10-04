@@ -13,7 +13,7 @@ public class Stuck_NPC implements StuckAction {
 
     public boolean run(NPC npc, Navigator navigator) {
         int id = -1;
-        for (int i = 0; i < VA_postal.wtr_npc.length; i++) {
+        for (int i = 0; VA_postal.wtr_npc != null && i < VA_postal.wtr_npc.length; i++) {
             if ((VA_postal.wtr_npc[i] != null) && (VA_postal.wtr_npc[i] == npc)) {
                 id = i;
                 break;
@@ -53,7 +53,7 @@ public class Stuck_NPC implements StuckAction {
                 return true;
             }
 
-            if (VA_postal.wtr_last_stuck_action[id].contains("DOOR")) {
+            if ((VA_postal.wtr_last_stuck_action[id] != null) && (VA_postal.wtr_last_stuck_action[id].contains("DOOR"))) {
                 VA_postal.wtr_last_stuck_action[id] = "";
             }
 
@@ -86,8 +86,8 @@ public class Stuck_NPC implements StuckAction {
             return false;
         }
 
-
-        VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
+        // Not one of Postal's postmen (or it was removed meanwhile): nothing of ours to reset. v4 still
+        // wrote wtr_last_stuck_stamp[id] here with id -1 and threw.
         return false;
     }
 
@@ -120,16 +120,16 @@ public class Stuck_NPC implements StuckAction {
 
     public void soft_reset_stuck_door(int id, NPC npc, String stuck_action) {
         int pass = -1;
-        if (VA_postal.wtr_last_stuck_action[id] == "DOOR") {
+        if ("DOOR".equals(VA_postal.wtr_last_stuck_action[id])) {
             pass = 2;
             stuck_action = "DOOR2";
-        } else if (VA_postal.wtr_last_stuck_action[id] == "DOOR2") {
+        } else if ("DOOR2".equals(VA_postal.wtr_last_stuck_action[id])) {
             pass = 3;
             stuck_action = "DOOR3";
-        } else if (VA_postal.wtr_last_stuck_action[id] == "DOOR3") {
+        } else if ("DOOR3".equals(VA_postal.wtr_last_stuck_action[id])) {
             pass = 4;
             stuck_action = "DOOR4";
-        } else if (VA_postal.wtr_last_stuck_action[id] == "DOOR4") {
+        } else if ("DOOR4".equals(VA_postal.wtr_last_stuck_action[id])) {
             pass = 5;
             stuck_action = "DOOR5";
         } else {

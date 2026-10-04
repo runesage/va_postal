@@ -125,13 +125,14 @@ public class BukkitListener implements Listener {
             return;
         }
 
+        // Route /go and /gps to Postal even if another plugin also registers them, via Postal-only aliases.
         if ("/go".equalsIgnoreCase(root)) {
-            String re_route = entered_cmd.replace(root, "/va_go");
-            event.setMessage(entered_cmd);
+            String re_route = "/va_go" + entered_cmd.substring(root.length());
+            event.setMessage(re_route);
             return;
         }
         if ("/gps".equalsIgnoreCase(root)) {
-            String re_route = entered_cmd.replace(root, "/gpsp");
+            String re_route = "/gpsp" + entered_cmd.substring(root.length());
             event.setMessage(re_route);
         }
     }

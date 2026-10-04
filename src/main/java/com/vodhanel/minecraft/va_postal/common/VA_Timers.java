@@ -100,10 +100,6 @@ public class VA_Timers {
         }, 10L);
     }
 
-    public static synchronized void hideroute(final Player p) {
-        VA_postal.plugin.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> RouteEditor.clear_route_markers(p), 1000L);
-    }
-
     public static void report_newmail_all() {
         int interval_secs = VA_postal.check_new_mail_secs;
         if (interval_secs < 30) {
