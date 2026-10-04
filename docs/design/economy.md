@@ -153,18 +153,25 @@ it has paid in and out), uses `T` against the shared balance, warns admins when 
   reserve if that's ever wanted.
 - **Insurance fund** as a Central liability inside `L_c`.
 
-## 11. Commands
+## 11. The Postal day *(decided)*
+
+Upkeep, the server-owned sweep and the dividend run once per **Postal day**: 24 hours by default,
+configurable with `Economy.Day_seconds`. It's Postal's own timer, independent of Towny's day. Postal
+records when the last day ran, so a restart neither skips nor repeats one, and a server that was down for
+longer than a day runs a single catch-up day rather than one per missed day.
+
+## 12. Commands
 
 - `/postal bank` (admin): Central's `B_c`, `L_c`, `T`; every office's owner, `B_o`, `R_o`, withdrawable,
   arrears.
 - `/pobank <office> [balance | deposit <amount> | withdraw <amount>]` (owner; name to be decided).
 
-## 12. Config (proposed)
+## 13. Config (proposed)
 
 ```yaml
 Economy:
   Central_account: postal          # postal | towny
-  Day_seconds: 86400               # length of a Postal economy day
+  Day_seconds: 86400               # length of a Postal economy day (default 24 h)
   Office_floor: 500                # F
   Central_buffer: 5000             # T = L_c + this
   Upkeep:
@@ -182,4 +189,3 @@ office 5000, address 500).
 
 1. The service dividend (§8): right mechanism? Pro-rata by revenue handled, or by deliveries completed?
 2. Upkeep shape: flat + per address, as above?
-3. Postal day: a fixed 24 h, or follow Towny's day when Towny is installed?
