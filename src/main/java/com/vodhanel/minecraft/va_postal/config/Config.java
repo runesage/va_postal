@@ -142,6 +142,9 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.texture"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.signature"), "");
 
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.type"), "sqlite");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.server_id"), "main");
+
         VA_postal.plugin.getConfig().addDefault(lossy, true);
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);
         VA_postal.plugin.getConfig().addDefault(srp, 0);

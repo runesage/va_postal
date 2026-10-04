@@ -326,6 +326,9 @@ public class VA_postal extends JavaPlugin {
         wtr_stuck_npc = new Stuck_NPC();
         setupScoreboard();
         setupPermissions();
+        com.vodhanel.minecraft.va_postal.store.MailStores.open(getDataFolder(),
+                getConfig().getString(GetConfig.path_format("storage.type"), "sqlite"),
+                getConfig().getString(GetConfig.path_format("network.server_id"), "main"), getLogger());
         setupEconomy();
         setupDynmap();
         setupTowny();
@@ -379,6 +382,7 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         SHUTDOWN();
         PostalEconomy.shutdown();
+        com.vodhanel.minecraft.va_postal.store.MailStores.close();
     }
 
     private synchronized void setupPermissions() {

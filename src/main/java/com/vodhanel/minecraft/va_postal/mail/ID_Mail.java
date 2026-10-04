@@ -167,17 +167,22 @@ public class ID_Mail {
     }
 
     public static synchronized boolean add_to_postoffice_chest(int id, final ItemStack book_item) {
+        return add_to_postoffice_chest(id, book_item, Letters.Move.UNTRACKED);
+    }
+
+    /** Adds the book to the office chest (after 10 ticks), then commits {@code move}. */
+    public static synchronized boolean add_to_postoffice_chest(int id, final ItemStack book_item, Letters.Move move) {
         if (book_item == null) {
+            move.cancel("nothing to add");
             return false;
         }
-        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, new Runnable() {
-
-            public void run() {
-                VA_postal.wtr_inventory_postoffice[id].addItem(book_item);
+        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
+            if (VA_postal.wtr_inventory_postoffice[id] != null && VA_postal.wtr_inventory_postoffice[id].addItem(book_item).isEmpty()) {
+                move.commit();
+            } else {
+                move.cancel("post office chest unavailable or full"); // reconciliation re-materialises it there
             }
         }, 10L);
-
-
         return true;
     }
 
@@ -544,8 +549,18 @@ public class ID_Mail {
                         if (page1.contains("[not-processed]")) {
                             mail_found = true;
                             if (!mail_address.equals(this_address)) {
+                                Letters.Move move = Letters.begin(ind_item, VA_postal.wtr_schest_location[id],
+                                        com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH,
+                                        VA_postal.wtr_schest_location_postoffice[id], com.vodhanel.minecraft.va_postal.store.Actor.postman(VA_postal.wtr_poffice[id]));
+                                if (move.result == Letters.Move.Result.STALE) {
+                                    item_itr.set(null);
+                                    continue;
+                                }
+                                if (!move.proceed()) {
+                                    continue;
+                                }
                                 ItemStack stamped_mail = stamp_pickup(id, ind_item);
-                                add_to_postoffice_chest(id, stamped_mail);
+                                add_to_postoffice_chest(id, stamped_mail, move);
 
                                 if (page1.contains("[shipping label]")) {
                                     shipper_found = true;
@@ -602,7 +617,7 @@ public class ID_Mail {
 
         Book stamped_book = new Book(title, author, pages);
 
-        return stamped_book.generateItemStack();
+        return MailIds.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void npc_start_route(int id) {
@@ -628,6 +643,9 @@ public class ID_Mail {
                         String page1 = spage[0].toLowerCase();
                         if (page1.contains("[not-processed]")) {
                             ItemStack stamped_mail = stamp_po_pickup(id, ind_item);
+                            Letters.arrived(stamped_mail, VA_postal.wtr_schest_location_postoffice[id],
+                                    com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH,
+                                    com.vodhanel.minecraft.va_postal.store.Actor.postman(VA_postal.wtr_poffice[id]));
                             replace_slot_by_index_po(id, index, stamped_mail);
 
                             if (page1.contains("[shipping label]")) {
@@ -688,7 +706,7 @@ public class ID_Mail {
 
         Book stamped_book = new Book(title, author, pages);
 
-        return stamped_book.generateItemStack();
+        return MailIds.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void npc_deliver_mail(int id) {
@@ -714,9 +732,22 @@ public class ID_Mail {
                     String mail_address = book.getAuthor().toLowerCase().trim();
                     String this_address = VA_postal.wtr_address[id].toLowerCase().trim();
                     if (mail_address.equals(this_address)) {
-                        ItemStack stamped_mail = stamp_deliver(id, ind_item);
-                        if (add_to_residence_chest(id, stamped_mail)) {
+                        Letters.Move move = Letters.begin(ind_item, VA_postal.wtr_schest_location_postoffice[id],
+                                com.vodhanel.minecraft.va_postal.store.MailState.DELIVERED, VA_postal.wtr_schest_location[id],
+                                com.vodhanel.minecraft.va_postal.store.Actor.postman(VA_postal.wtr_poffice[id]));
+                        if (move.result == Letters.Move.Result.STALE) {
                             item_itr.set(null);
+                            continue;
+                        }
+                        if (!move.proceed()) {
+                            continue;
+                        }
+                        ItemStack stamped_mail = stamp_deliver(id, ind_item);
+                        if (!add_to_residence_chest(id, stamped_mail)) {
+                            move.cancel("residence chest full");
+                        } else {
+                            item_itr.set(null);
+                            move.commit();
 
                             NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
                             mail_delivered = true;
@@ -765,7 +796,7 @@ public class ID_Mail {
             }
         }
         Book stamped_book = new Book(title, author, pages);
-        return stamped_book.generateItemStack();
+        return MailIds.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void postmaster_service_postoffice(int id, String spostoffice) {
@@ -794,12 +825,22 @@ public class ID_Mail {
                     String mail_to_town = book.getTitle().toLowerCase().trim();
                     String this_town = spostoffice.toLowerCase().trim();
                     if ((!mail_to_town.equals(this_town)) && (!mail_to_town.contains("postal log"))) {
+                        Letters.Move move = Letters.begin(ind_item, VA_postal.wtr_schest_location_postoffice[id],
+                                com.vodhanel.minecraft.va_postal.store.MailState.AT_CENTRAL, VA_postal.central_schest_location,
+                                com.vodhanel.minecraft.va_postal.store.Actor.central());
+                        if (move.result == Letters.Move.Result.STALE) {
+                            local_item_itr.set(null);
+                            continue;
+                        }
+                        if (!move.proceed()) {
+                            continue;
+                        }
                         C_Dispatcher.promote_central(mail_to_town, 5000);
                         Util.dinform("Schedule promotion - CENTRAL " + mail_to_town);
                         String[] spage = book.getPages();
                         if (spage[0].contains("[not-processed]")) {
                             ItemStack stamped_mail = stamp_central_pickup(id, ind_item);
-                            ChestManip.add_to_central_chest(stamped_mail);
+                            ChestManip.add_to_central_chest(stamped_mail, move);
 
                             if (spage[0].contains("[shipping label]")) {
                                 ChestManip.parcel_remove_origen_chest(ind_item);
@@ -810,7 +851,7 @@ public class ID_Mail {
                                 NpcLook.hold(VA_postal.central_route_npc, stamped_mail);
                             }
                         } else {
-                            ChestManip.add_to_central_chest(ind_item);
+                            ChestManip.add_to_central_chest(ind_item, move);
                         }
 
                         local_item_itr.set(null);
@@ -838,7 +879,17 @@ public class ID_Mail {
                     String mail_to_addr = book.getAuthor().toLowerCase().trim();
                     String this_town = spostoffice.toLowerCase().trim();
                     if (mail_to_town.equalsIgnoreCase(this_town)) {
-                        add_to_postoffice_chest(id, ind_item);
+                        Letters.Move move = Letters.begin(ind_item, VA_postal.central_schest_location,
+                                com.vodhanel.minecraft.va_postal.store.MailState.AT_DEST_BRANCH,
+                                VA_postal.wtr_schest_location_postoffice[id], com.vodhanel.minecraft.va_postal.store.Actor.central());
+                        if (move.result == Letters.Move.Result.STALE) {
+                            central_item_itr.set(null);
+                            continue;
+                        }
+                        if (!move.proceed()) {
+                            continue;
+                        }
+                        add_to_postoffice_chest(id, ind_item, move);
                         central_item_itr.set(null);
                         out_of_town_delivered = true;
                         C_Dispatcher.promote_schedule(mail_to_town, mail_to_addr, 5000, false);
@@ -915,7 +966,7 @@ public class ID_Mail {
 
         Book stamped_book = new Book(title, author, pages);
 
-        return stamped_book.generateItemStack();
+        return MailIds.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void SetPostoffice_Chest_nTP_point(int id) {

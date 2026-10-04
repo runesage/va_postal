@@ -296,12 +296,22 @@ public class ChestManip {
     }
 
     public static synchronized void add_to_central_chest(ItemStack book_item) {
+        add_to_central_chest(book_item, Letters.Move.UNTRACKED);
+    }
+
+    /** Adds the book to Central's chest (after 12 ticks), then commits {@code move}. */
+    public static synchronized void add_to_central_chest(ItemStack book_item, Letters.Move move) {
         if (book_item == null) {
+            move.cancel("nothing to add");
             return;
         }
-        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> VA_postal.central_po_inventory.addItem(book_item), 12L);
-
-
+        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
+            if (VA_postal.central_po_inventory != null && VA_postal.central_po_inventory.addItem(book_item).isEmpty()) {
+                move.commit();
+            } else {
+                move.cancel("Central's chest unavailable or full"); // reconciliation re-materialises it there
+            }
+        }, 12L);
     }
 
     public static synchronized void set_central_chest_inv() {
