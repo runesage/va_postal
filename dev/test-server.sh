@@ -7,11 +7,14 @@
 #   dev/test-server.sh start [--no-build] [--seed] [--op NAME]
 #                                                          build Postal, install it, run the server
 #                                                          (your saved account is opped automatically)
+#                                                          (your account also gets DEV_BALANCE money once)
+#   dev/test-server.sh money [AMOUNT]                      set your balance now (server must be running)
 #   dev/test-server.sh report                              bundle logs + config for a bug report
 #   dev/test-server.sh reset [--all]                       wipe worlds/plugin data (--all: whole server)
 #
 # Env: JAVA (Java 25+; default: 'java' if it's 25+, else a JDK downloaded into dev-server/jdk),
-#      DEV_DIR (default: <repo>/dev-server), PAPER_VERSION
+#      DEV_DIR (default: <repo>/dev-server), PAPER_VERSION,
+#      DEV_BALANCE (starting money for players on the test server; default 100000)
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,12 +30,14 @@ REPORTS="$DEV_DIR/reports"
 RCON_PORT=25575
 POSTAL_CONFIG="$SERVER/plugins/Postal/config.yml"
 OP_FILE="$DEV_DIR/op-player"  # your Minecraft username, opped on every start
+DEV_BALANCE="${DEV_BALANCE:-100000}"
+ESSENTIALS_DIR="$SERVER/plugins/Essentials"
 
 die() { echo "error: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 usage() {
-    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -204,6 +209,23 @@ open(path, "w").write(text)
 EOF
 }
 
+# Players get DEV_BALANCE on their first join, so paid features can be tested without /eco.
+# Essentials writes its config on first start, so this takes effect from the second start on.
+set_starting_balance() {
+    [ -f "$ESSENTIALS_DIR/config.yml" ] || return 0
+    sed -i "s/^starting-balance: .*/starting-balance: $DEV_BALANCE/" "$ESSENTIALS_DIR/config.yml"
+}
+
+# money_commands <name>: '/eco set' for an account that joined before the starting balance applied,
+# once per account (the marker lives in Essentials' userdata, so 'reset' clears it).
+money_commands() {
+    local marker="$ESSENTIALS_DIR/userdata/.dev-balance-$1"
+    [ -f "$marker" ] && return 0
+    grep -qsx "last-account-name: $1" "$ESSENTIALS_DIR"/userdata/*.yml || return 0
+    touch "$marker"
+    echo "eco set $1 $DEV_BALANCE"
+}
+
 rcon() {
     python3 "$REPO/dev/rcon.py" 127.0.0.1 "$(get_property rcon.port)" "$(get_property rcon.password)" "$@"
 }
@@ -236,7 +258,13 @@ cmd_start() {
     write_postal_config
     [ -n "$op" ] && save_op "$op"
     local commands=()
-    [ -s "$OP_FILE" ] && commands+=("op $(cat "$OP_FILE")")
+    set_starting_balance
+    if [ -s "$OP_FILE" ]; then
+        commands+=("op $(cat "$OP_FILE")")
+        local money
+        money="$(money_commands "$(cat "$OP_FILE")")"
+        [ -n "$money" ] && commands+=("$money")
+    fi
     if [ "$seed" -eq 1 ]; then
         if [ -f "$SERVER/.seeded" ]; then
             info "Test network already seeded; skipping (dev/test-server.sh reset to start over)"
@@ -318,6 +346,14 @@ cmd_report() {
     echo "    Say what you did in game and what you expected to happen."
 }
 
+cmd_money() {
+    local amount="${1:-$DEV_BALANCE}" name
+    case "$amount" in *[!0-9.]*|"") die "'$amount' is not an amount" ;; esac
+    [ -s "$OP_FILE" ] || die "no saved account; run: dev/test-server.sh start --op NAME"
+    name="$(cat "$OP_FILE")"
+    rcon "eco set $name $amount" || die "could not reach the server over RCON (is it running?)"
+}
+
 cmd_reset() {
     local all=0
     [ "${1:-}" = "--all" ] && all=1
@@ -340,6 +376,7 @@ cmd_reset() {
 case "${1:-}" in
     setup) shift; cmd_setup "$@" ;;
     start) shift; cmd_start "$@" ;;
+    money) shift; cmd_money "$@" ;;
     report) shift; cmd_report "$@" ;;
     reset) shift; cmd_reset "$@" ;;
     -h|--help|help|"") usage 0 ;;

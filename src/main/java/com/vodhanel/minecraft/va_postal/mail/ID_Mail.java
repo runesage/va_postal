@@ -205,6 +205,23 @@ public class ID_Mail {
         return true;
     }
 
+    private static final java.util.Set<String> explained_missing_chests = new java.util.HashSet<>();
+
+    /** Logs, once per mailbox per server run, what the chest lookup saw, so a missing sign can be diagnosed. */
+    private static void explain_missing_chest(String what, String slocation) {
+        if (!explained_missing_chests.add(what.toLowerCase())) {
+            return;
+        }
+        Location search = Util.str2location(slocation);
+        if (search != null) {
+            search = search.clone().subtract(0.0D, 1.0D, 0.0D);
+        }
+        Util.cinform("\033[0;33m[Postal] Mailbox lookup for " + what + " failed. Needs a chest with a sign in front: [Postal_Mail] / town / address or [Local] / owner (if any).");
+        for (String line : SignManip.describe_chests_near(search, VA_postal.search_distance)) {
+            Util.cinform("\033[0;33m[Postal] " + line);
+        }
+    }
+
     public static synchronized boolean set_postoffice_chest_inv(int id) {
         String spostoffice = VA_postal.wtr_poffice[id];
         VA_postal.wtr_slocation_local_po[id] = Util.put_point_on_ground(C_Postoffice.get_local_po_location_by_name(spostoffice), false);
@@ -216,6 +233,7 @@ public class ID_Mail {
         if ("null".equals(VA_postal.wtr_schest_location_postoffice[id])) {
             VA_postal.wtr_inventory_postoffice[id] = null;
             Util.cinform(AnsiColor.RED + "Unable to locate post office chest: " + spostoffice);
+            explain_missing_chest(spostoffice + " [Local]", VA_postal.wtr_slocation_local_po[id]);
             return false;
         }
         Util.dinform("\033[0;32m[" + spostoffice + "] chest location: " + VA_postal.wtr_schest_location_postoffice[id]);
@@ -244,6 +262,7 @@ public class ID_Mail {
         if ("null".equals(VA_postal.wtr_schest_location[id])) {
             VA_postal.wtr_inventory_address[id] = null;
             Util.cinform(AnsiColor.RED + "Unable to locate residence chest: " + spostoffice + ", " + saddress);
+            explain_missing_chest(spostoffice + ", " + saddress, VA_postal.wtr_slocation_address[id]);
             return false;
         }
         Util.dinform("\033[0;32m[" + spostoffice + ", " + saddress + "] chest location: " + VA_postal.wtr_schest_location[id]);

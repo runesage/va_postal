@@ -18,6 +18,12 @@ dev/test-server.sh start --seed          # builds Postal, installs it, starts th
 Join at `localhost:25565`. You're opped automatically on every start (the username is saved in
 `dev-server/op-player`; change it with `--op NAME`). The world is flat, creative and peaceful.
 
+Players start with 100,000 in the economy (set `DEV_BALANCE` to change it), so you can test buying
+offices and paying postage without `/eco`. Essentials only writes its config on its first start, so
+on a brand-new server this applies from the second start; an account that joined before then is
+topped up once on the next start. To reset your balance at any time while the server is running:
+`dev/test-server.sh money [AMOUNT]`.
+
 `--seed` builds a small working network at the world origin on first use, the same one CI tests:
 
 | Where | What |
