@@ -166,7 +166,10 @@ public final class Letters {
             if (r.moving()) {
                 return new Move(Move.Result.SKIP, r);
             }
-            if (r.state.terminal() || !where_record_says(r, found_at)) {
+            if (r.state.terminal()) {
+                return new Move(Move.Result.SKIP, r); // e.g. a delivered letter a player put back: theirs, not ours to route
+            }
+            if (!where_record_says(r, found_at)) {
                 Util.cinform("[Postal] Removing a stale copy of letter " + r.id + " (its record: " + r.state + "@" + r.custody + ").");
                 return new Move(Move.Result.STALE, r);
             }
@@ -196,6 +199,58 @@ public final class Letters {
             });
         } catch (StoreException | ConflictException e) {
             Util.cinform("[Postal] Could not record letter " + id + " at its post office: " + e.getMessage());
+        }
+    }
+
+    // ---- Route runs ------------------------------------------------------------------------
+
+    private static final java.util.Map<Integer, String[]> runs = new java.util.HashMap<>();
+
+    /**
+     * A postman sets out for {@code address}: records the run (so a crash can return its letters) and marks the
+     * letters waiting at the office for that address as out for delivery.
+     */
+    public static synchronized void route_started(int npc, String office, String address, String office_chest) {
+        MailStore store = store();
+        if (store == null || office == null || address == null) {
+            return;
+        }
+        try {
+            route_finished(npc);
+            String run = UUID.randomUUID().toString();
+            store.start_run(run, office, address, Integer.toString(npc), System.currentTimeMillis());
+            runs.put(npc, new String[]{run, office, address});
+            for (MailState waiting : new MailState[]{MailState.AT_DEST_BRANCH, MailState.AT_ORIGIN_BRANCH}) {
+                for (MailRecord r : store.by_destination(waiting, office)) {
+                    // Only letters in this office's chest: a cross-town letter still at its origin office is also
+                    // AT_ORIGIN_BRANCH with this destination.
+                    if (address.equalsIgnoreCase(r.dest_address) && !r.moving() && r.custody.kind
+                            == com.vodhanel.minecraft.va_postal.store.Custody.Kind.CHEST && same_place(r.custody.ref, office_chest)) {
+                        store.transition(r, MailState.OUT_FOR_DELIVERY, r.custody, Actor.postman(office), "run " + run);
+                    }
+                }
+            }
+        } catch (StoreException | ConflictException e) {
+            Util.cinform("[Postal] Could not record the route run to " + office + ", " + address + ": " + e.getMessage());
+        }
+    }
+
+    /** The run is over: anything still out for delivery (e.g. a full mailbox) goes back to waiting at the office. */
+    public static synchronized void route_finished(int npc) {
+        MailStore store = store();
+        String[] run = runs.remove(npc);
+        if (store == null || run == null) {
+            return;
+        }
+        try {
+            for (MailRecord r : store.by_destination(MailState.OUT_FOR_DELIVERY, run[1])) {
+                if (run[2].equalsIgnoreCase(r.dest_address) && !r.moving()) {
+                    store.transition(r, MailState.AT_DEST_BRANCH, r.custody, Actor.postman(run[1]), "run ended without delivering it");
+                }
+            }
+            store.end_run(run[0]);
+        } catch (StoreException | ConflictException e) {
+            Util.cinform("[Postal] Could not close the route run " + run[0] + ": " + e.getMessage());
         }
     }
 

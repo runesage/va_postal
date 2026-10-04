@@ -332,8 +332,9 @@ public class Cmd_static {
         String chest_dir = "";
         Chest chest = (Chest) block.getState();
         if (chest == null) return false;
-        // Shipping labels keep v4's chest direction byte (2-5) so old labels still parse.
-        int c_data = BlockFacing.to_legacy(BlockFacing.facing(block));
+        // The label records which way the chest faces, to rebuild it facing the same way.
+        org.bukkit.block.BlockFace facing = BlockFacing.facing(block);
+        String c_data = facing == null ? "NORTH" : facing.name();
         Inventory inventory = chest.getInventory();
 
         if (inventory.getSize() > 27) {

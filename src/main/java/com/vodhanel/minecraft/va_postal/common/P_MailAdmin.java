@@ -109,6 +109,9 @@ public final class P_MailAdmin {
             send(sender, "&7" + from + "'s post office chest is full.");
             return;
         }
+        // Handed in over the counter: the office has it from now on (so reconciliation watches that chest).
+        Letters.arrived(letter, com.vodhanel.minecraft.va_postal.common.Util.location2str(chest.getLocation()),
+                com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH, com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()));
         UUID id = com.vodhanel.minecraft.va_postal.mail.MailIds.read(letter);
         send(sender, "&6Test letter " + (id == null ? "(untracked)" : id.toString()) + " handed in at " + Util.df(from)
                 + " for " + Util.df(to) + ", " + Util.df(address) + ".");

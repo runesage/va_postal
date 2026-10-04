@@ -205,14 +205,12 @@ public class ChestManip {
         String X;
         String Y;
         String Z;
-        String sdir;
-        byte dir;
+        org.bukkit.block.BlockFace dir;
         try {
             X = parts_c[0].trim();
             Y = parts_c[1].trim();
             Z = parts_c[2].trim();
-            sdir = parts_c[3].trim();
-            dir = Byte.parseByte(sdir);
+            dir = org.bukkit.block.BlockFace.valueOf(parts_c[3].trim());
         } catch (Exception e) {
             return null;
         }
@@ -245,7 +243,7 @@ public class ChestManip {
             if (test_block.getType().isAir()) {
                 try {
                     test_block.setType(Material.CHEST);
-                    BlockFacing.set_facing(test_block, Util.int2BF(dir));
+                    BlockFacing.set_facing(test_block, dir);
                     return test_block;
                 } catch (Exception e) {
                     return null;

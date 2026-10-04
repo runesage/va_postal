@@ -8,8 +8,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
 
 /**
- * Block orientation helpers replacing v4's legacy data bytes (2 = north, 3 = south, 4 = west,
- * 5 = east for chests and wall signs) with modern {@link BlockData}.
+ * Block orientation helpers for chests and wall signs, over modern {@link BlockData}.
  */
 public final class BlockFacing {
     private BlockFacing() {
@@ -62,38 +61,4 @@ public final class BlockFacing {
         return true;
     }
 
-    /** Legacy 2/3/4/5 direction byte to a face, as stored in old configs. */
-    public static BlockFace from_legacy(int dir) {
-        switch (dir) {
-            case 2:
-                return BlockFace.NORTH;
-            case 3:
-                return BlockFace.SOUTH;
-            case 4:
-                return BlockFace.WEST;
-            case 5:
-                return BlockFace.EAST;
-            default:
-                return null;
-        }
-    }
-
-    /** Face to the legacy 2/3/4/5 direction byte (0 if not horizontal). */
-    public static int to_legacy(BlockFace face) {
-        if (face == null) {
-            return 0;
-        }
-        switch (face) {
-            case NORTH:
-                return 2;
-            case SOUTH:
-                return 3;
-            case WEST:
-                return 4;
-            case EAST:
-                return 5;
-            default:
-                return 0;
-        }
-    }
 }

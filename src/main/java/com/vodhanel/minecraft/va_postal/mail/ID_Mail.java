@@ -663,6 +663,7 @@ public class ID_Mail {
             }
             index++;
         }
+        Letters.route_started(id, VA_postal.wtr_poffice[id], VA_postal.wtr_address[id], VA_postal.wtr_schest_location_postoffice[id]);
         if ((mail_found) &&
                 (VA_postal.mailtalk == 2)) {
             Util.cinform("&9&o" + Util.df(VA_postal.wtr_poffice[id]) + " &7&oPostMan picked up mail at the post office.");

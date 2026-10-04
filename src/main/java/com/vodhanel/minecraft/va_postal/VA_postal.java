@@ -329,6 +329,9 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.store.MailStores.open(getDataFolder(),
                 getConfig().getString(GetConfig.path_format("storage.type"), "sqlite"),
                 getConfig().getString(GetConfig.path_format("network.server_id"), "main"), getLogger());
+        // Reconcile once the server is up (it may load chunks), then every 5 minutes for loaded chunks only.
+        getServer().getScheduler().runTaskLater(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(true), 40L);
+        getServer().getScheduler().runTaskTimer(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(false), 6000L, 6000L);
         setupEconomy();
         setupDynmap();
         setupTowny();

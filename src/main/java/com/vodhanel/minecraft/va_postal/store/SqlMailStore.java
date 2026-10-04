@@ -142,7 +142,7 @@ public final class SqlMailStore implements MailStore {
                     ps.setLong(i++, r.updated_at);
                     ps.executeUpdate();
                 }
-                event(c, r.id, r.version, null, r.state, actor, detail);
+                event(c, r.id, r.version, null, r.state, r.custody, actor, detail);
                 c.commit();
             } catch (SQLException e) {
                 c.rollback();
@@ -239,7 +239,8 @@ public final class SqlMailStore implements MailStore {
                     c.rollback();
                     throw new ConflictException(current.id + " changed since version " + current.version);
                 }
-                event(c, current.id, current.version + 1, current.state, pending_state != null ? pending_state : state, actor, detail);
+                event(c, current.id, current.version + 1, current.state, pending_state != null ? pending_state : state,
+                        custody, actor, detail);
                 c.commit();
             } catch (SQLException e) {
                 c.rollback();
@@ -251,10 +252,10 @@ public final class SqlMailStore implements MailStore {
         return get(current.id).orElseThrow();
     }
 
-    private void event(Connection c, UUID id, int version, MailState from, MailState to, Actor actor, String detail)
-            throws SQLException {
+    private void event(Connection c, UUID id, int version, MailState from, MailState to, Custody custody, Actor actor,
+                       String detail) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement("INSERT INTO mail_event (mail_id, version, at, server_id, "
-                + "from_state, to_state, actor_kind, actor_ref, detail) VALUES (?,?,?,?,?,?,?,?,?)")) {
+                + "from_state, to_state, actor_kind, actor_ref, detail, custody_kind, custody_ref) VALUES (?,?,?,?,?,?,?,?,?,?,?)")) {
             ps.setString(1, id.toString());
             ps.setInt(2, version);
             ps.setLong(3, System.currentTimeMillis());
@@ -264,6 +265,8 @@ public final class SqlMailStore implements MailStore {
             ps.setString(7, actor.kind);
             ps.setString(8, actor.ref);
             ps.setString(9, detail == null ? null : (detail.length() > 255 ? detail.substring(0, 255) : detail));
+            ps.setString(10, custody.kind.name());
+            ps.setString(11, custody.ref);
             ps.executeUpdate();
         }
     }
@@ -295,6 +298,46 @@ public final class SqlMailStore implements MailStore {
             }
         } catch (SQLException e) {
             throw new StoreException("Mail query failed", e);
+        }
+        return out;
+    }
+
+    @Override
+    public Custody previous_chest(MailRecord current) {
+        try (Connection c = source.getConnection();
+             PreparedStatement ps = c.prepareStatement("SELECT custody_kind, custody_ref FROM mail_event WHERE mail_id = ? "
+                     + "AND version < ? ORDER BY version DESC")) {
+            ps.setString(1, current.id.toString());
+            ps.setInt(2, current.version);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Custody k = Custody.of(rs.getString(1), rs.getString(2));
+                    if (k.kind == Custody.Kind.CHEST && !k.equals(current.custody)) {
+                        return k;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read the history of " + current.id, e);
+        }
+        return null;
+    }
+
+    @Override
+    public List<MailRecord> delivered_since(long since_millis) {
+        List<MailRecord> out = new ArrayList<>();
+        try (Connection c = source.getConnection();
+             PreparedStatement ps = c.prepareStatement("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? "
+                     + "AND state = 'DELIVERED' AND updated_at >= ?")) {
+            ps.setString(1, server_id);
+            ps.setLong(2, since_millis);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(read(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read delivered mail", e);
         }
         return out;
     }

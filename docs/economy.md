@@ -39,9 +39,3 @@ cover it**. Postal never creates money to pay a refund.
 
 Every 1200 s, Central keeps one post office purchase price in reserve and splits the rest evenly across
 the local offices.
-
-## Upgrading from v4.x
-
-v4 kept balances in Vault banks named `Central` and after each town. Those balances are **not** migrated.
-Move them into the new accounts by hand with your economy plugin's admin commands before removing the
-old banks.

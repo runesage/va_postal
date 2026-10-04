@@ -45,6 +45,10 @@ CREATE TABLE mail_event (
     actor_kind  VARCHAR(16)  NOT NULL,
     actor_ref   VARCHAR(64),
     detail      VARCHAR(255),
+    -- Custody after this event: lets reconciliation find where a letter was before (a world rolled back by
+    -- a crash still has it there).
+    custody_kind VARCHAR(8),
+    custody_ref  VARCHAR(160),
     PRIMARY KEY (mail_id, version)
 );
 

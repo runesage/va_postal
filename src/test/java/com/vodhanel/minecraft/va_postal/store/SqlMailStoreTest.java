@@ -157,6 +157,27 @@ class SqlMailStoreTest {
     }
 
     @Test
+    void previousChestIsWhereARolledBackWorldStillHasIt() {
+        MailRecord r = letter();
+        Custody home = Custody.chest("world,40,-60,0");
+        Custody office = Custody.chest("world,20,-60,0");
+        r = store.commit_move(store.begin_move(r, MailState.AT_ORIGIN_BRANCH, office, Actor.system("t"), null), Actor.system("t"), null);
+        assertNull(store.previous_chest(r)); // it was with its sender before
+        r = store.transition(r, MailState.OUT_FOR_DELIVERY, office, Actor.system("t"), null); // same chest
+        r = store.commit_move(store.begin_move(r, MailState.DELIVERED, home, Actor.system("t"), null), Actor.system("t"), null);
+        assertEquals(office, store.previous_chest(r));
+    }
+
+    @Test
+    void deliveredSinceListsOnlyRecentDeliveries() {
+        long before = System.currentTimeMillis() - 1;
+        MailRecord d = store.transition(letter(), MailState.DELIVERED, Custody.chest("home"), Actor.system("t"), null);
+        letter();
+        assertEquals(List.of(d.id), store.delivered_since(before).stream().map(r -> r.id).toList());
+        assertTrue(store.delivered_since(System.currentTimeMillis() + 60_000).isEmpty());
+    }
+
+    @Test
     void migrationScriptSplitsAndDropsComments() {
         List<String> parts = SqlMailStore.statements("-- c\nCREATE TABLE a (x INT); -- trailing\nCREATE TABLE b (y INT);\n");
         assertEquals(List.of("CREATE TABLE a (x INT)", "CREATE TABLE b (y INT)"), parts);

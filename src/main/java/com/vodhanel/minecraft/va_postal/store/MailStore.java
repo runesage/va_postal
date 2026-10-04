@@ -41,6 +41,12 @@ public interface MailStore extends AutoCloseable {
 
     List<MailEvent> history(UUID id);
 
+    /** The last chest the mail was in before its current custody (null if none): where a rolled-back world has it. */
+    Custody previous_chest(MailRecord current);
+
+    /** Letters delivered on this server since {@code since_millis}. */
+    List<MailRecord> delivered_since(long since_millis);
+
     /** The newest records on this server, newest first. */
     List<MailRecord> recent(int limit);
 

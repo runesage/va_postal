@@ -19,6 +19,10 @@ Stops postal, pauses all queues, and leaves the postmen for the citizens API to 
 Restarts postal.
 ##### `chests`
 Lists all chests and locations _(only works when running)_
+##### `track <mail id | recent>`
+Shows a tracked letter's state, where it is, and its full history; `recent` lists the ten most recently changed letters.
+##### `testletter <from PostOffice> <to PostOffice> <address>`
+Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
 <br>
 #### `/go [PostOffice] [Address]` _`(No address defaults to central)`_
 Permissions: `postal.gotocentral, postal.gotolocal, postal.gotoaddr`
