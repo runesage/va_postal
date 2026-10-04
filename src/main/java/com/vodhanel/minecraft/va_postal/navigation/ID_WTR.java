@@ -315,7 +315,7 @@ public class ID_WTR {
             VA_postal.wtr_controller[id].setPaused(true);
         }
 
-        if ((VA_postal.wtr_nav[id] != null) && (!VA_postal.wtr_nav[id].isNavigating())) {
+        if ((VA_postal.wtr_nav[id] != null) && (VA_postal.wtr_nav[id].isNavigating())) {
             VA_postal.wtr_nav[id].cancelNavigation();
         }
     }

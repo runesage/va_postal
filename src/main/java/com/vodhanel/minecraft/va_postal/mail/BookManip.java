@@ -482,10 +482,10 @@ public class BookManip {
         if (sowner == null) {
             if (saddr.contains("[Local]")) {
                 if (C_Owner.is_local_po_owner_defined(stown)) {
-                    line_4 = Util.df(C_Owner.get_owner_local_po(stown).getDisplayName());
+                    line_4 = C_Owner.get_owner_local_po(stown).getName();
                 }
             } else if (C_Owner.is_address_owner_defined(stown, saddr)) {
-                line_4 = Util.df(C_Owner.get_owner_address(stown, saddr).getDisplayName());
+                line_4 = C_Owner.get_owner_address(stown, saddr).getName();
             }
         }
         //Util.dinform("sowner for "+stown+" "+saddr+" was "+sowner);

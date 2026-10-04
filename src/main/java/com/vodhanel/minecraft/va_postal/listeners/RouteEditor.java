@@ -913,11 +913,6 @@ public class RouteEditor implements Listener {
         }
     }
 
-    public static synchronized void startHighlighter(final Player player, final String stown, final String sadress) {
-        highlighttask = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, () -> highlightWorker(player, stown, sadress), 0L, 10);
-        block_highlighttask = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, () -> Blockhighlightworker(player, stown, sadress), 0L, 20);
-    }
-
     public static synchronized void startHighlighter() {
         highlighttask = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, RouteEditor::highlightWorker, 0L, 10);
         block_highlighttask = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, RouteEditor::Blockhighlightworker, 0L, 20);

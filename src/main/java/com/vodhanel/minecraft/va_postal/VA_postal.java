@@ -376,6 +376,7 @@ public class VA_postal extends JavaPlugin {
     }
 
     public void onDisable() {
+        com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         SHUTDOWN();
         PostalEconomy.shutdown();
     }
