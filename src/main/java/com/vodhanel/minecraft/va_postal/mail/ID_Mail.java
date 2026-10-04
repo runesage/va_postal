@@ -720,6 +720,7 @@ public class ID_Mail {
 
                             NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
                             mail_delivered = true;
+                            com.vodhanel.minecraft.va_postal.economy.EconomyState.add_delivery(stown);
                             C_Address.set_address_newmail(stown, this_address, true);
                         }
                         mail_found = true;

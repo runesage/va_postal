@@ -19,9 +19,10 @@ Stops postal, pauses all queues, and leaves the postmen for the citizens API to 
 Restarts postal.
 ##### `chests`
 Lists all chests and locations _(only works when running)_
-##### `bank [newday]`
-Central's balance, what it owes and its target, and every office's owner, balance, reserve and
-withdrawable amount. `newday` runs a Postal economy day now. See `docs/economy.md`.
+##### `bank [newday | report [days] | policy [<setting> <value>]]`
+Central's balance, what it owes and its target, and every office's owner, balance, reserve,
+withdrawable amount and arrears. `newday` runs a Postal economy day now; `report` shows the daily flow
+log; `policy` shows or changes the economy settings at runtime. See `docs/economy.md`.
 <br>
 #### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all>]`
 Permissions: owner of the post office (admins may view any)

@@ -4,6 +4,7 @@ import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.config.C_Arrays;
 import com.vodhanel.minecraft.va_postal.config.C_Economy;
 import com.vodhanel.minecraft.va_postal.config.C_Owner;
+import com.vodhanel.minecraft.va_postal.economy.EconomyState;
 import com.vodhanel.minecraft.va_postal.economy.PostalEconomy;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -95,12 +96,12 @@ public class P_Economy {
         if (!VA_postal.economy_configured) {
             return;
         }
+        // Only creates the account. v4 also deposited an office price into Central here when the office had
+        // an owner, minting money each time the account was (re)created; Central's refund money comes
+        // only from the purchase itself (closed economy, docs/design/economy.md).
         if (!does_the_bank_exist(stown)) {
             create_bank(stown);
-            // Central funds the refund an owner gets when the office changes hands; back it on creation.
-            if (C_Owner.get_owner_local_po_id(stown) != null) {
-                deposit_to_central(C_Economy.po_purchase_price());
-            }
+            P_Day.seed_server_office(stown);
         }
     }
 
@@ -278,6 +279,7 @@ public class P_Economy {
         if (withdraw_from_player(player, price)) {
             Util.pinform(player, "&6Thank you for your payment.");
             deposit_to_central(price);
+            EconomyState.record(EconomyState.Flow.DISTRIBUTION, price);
         } else {
             Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(player) + " for distribution.");
         }
@@ -310,15 +312,16 @@ public class P_Economy {
             return;
         }
         Util.pinform(player, "&6Thank you for your payment.");
+        EconomyState.record(shipment ? EconomyState.Flow.SHIPPING : EconomyState.Flow.POSTAGE, price);
         if (local) {
             double dist = price / 2.0D;
             deposit_to_central(price - dist);
-            deposit_to_local(loc_po, dist);
+            if (deposit_to_local(loc_po, dist)) EconomyState.add_revenue(loc_po, dist);
         } else {
             double dist = price / 3.0D;
             deposit_to_central(price - 2.0D * dist);
-            deposit_to_local(loc_po, dist);
-            deposit_to_local(dest_po, dist);
+            if (deposit_to_local(loc_po, dist)) EconomyState.add_revenue(loc_po, dist);
+            if (deposit_to_local(dest_po, dist)) EconomyState.add_revenue(dest_po, dist);
         }
     }
 
@@ -329,9 +332,11 @@ public class P_Economy {
         double price = C_Economy.cod_surchg();
         if (withdraw_from_player(player, price)) {
             Util.pinform(player, "&6Thank you for your payment.");
+            EconomyState.record(EconomyState.Flow.COD_SURCHARGE, price);
             double dist = price / 2.0D;
             deposit_to_central(price - dist);
-            deposit_to_local(get_local(player), dist);
+            String loc_po = get_local(player);
+            if (deposit_to_local(loc_po, dist)) EconomyState.add_revenue(loc_po, dist);
         }
     }
 
@@ -373,9 +378,16 @@ public class P_Economy {
         double price = C_Economy.po_purchase_price();
         if (withdraw_from_player(subject, price)) {
             Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from player " + name(subject));
-            deposit_to_central(price);
-            Util.cinform("\033[0;32m[Postal] Deposited " + ef(price) + " to Central");
+            EconomyState.record(EconomyState.Flow.OFFICE_PURCHASE, price);
+            // Settle the previous owner first (that empties the office down to its address escrow), then
+            // seed the office with its floor and give Central the rest, which it holds for the refund.
             synchronize_bank_owner(player, dest_po, subject);
+            double seed = com.vodhanel.minecraft.va_postal.economy.Reserves.office_seed(price, C_Economy.office_floor());
+            if (!deposit_to_local(dest_po, seed)) {
+                seed = 0.0D;
+            }
+            deposit_to_central(price - seed);
+            Util.cinform("\033[0;32m[Postal] Seeded " + Util.df(dest_po) + " with " + ef(seed) + ", deposited " + ef(price - seed) + " to Central");
             return price;
         }
         Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(subject) + " for PO purchase.");
@@ -395,6 +407,7 @@ public class P_Economy {
         }
         if (new_owner == null) {
             C_Owner.del_owner_local_po(stown);
+            P_Day.seed_server_office(stown);
             inform(player, "Owner removed from: " + Util.df(stown));
         } else {
             C_Owner.set_owner_local_po(stown, owner);
@@ -419,10 +432,13 @@ public class P_Economy {
             return;
         }
 
-        double existing_balance = Math.max(0.0D, local_balance(stown));
+        // The office keeps the escrow it holds for its player-owned addresses' refunds; the rest is settled.
+        double escrow = P_Bank.office(stown).liability;
+        double existing_balance = Math.max(0.0D, local_balance(stown) - escrow);
         if (existing_owner == null) {
             if (existing_balance > 0.0D && PostalEconomy.office_to_central(stown, existing_balance)) {
-                Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central for distribution");
+                EconomyState.record(EconomyState.Flow.SWEEP, existing_balance);
+                Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central");
             }
             return;
         }
@@ -431,17 +447,21 @@ public class P_Economy {
         create_player_account(previous);
         if (existing_balance > 0.0D && withdraw_from_local(stown, existing_balance)) {
             if (deposit_to_player(previous, existing_balance)) {
+                EconomyState.record(EconomyState.Flow.WITHDRAWAL, existing_balance);
                 Util.cinform("\033[0;33m[Postal] Balance of " + ef(existing_balance) + " from " + Util.df(stown) + " paid to " + name(previous));
             } else {
                 deposit_to_central(existing_balance);
-                Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central for distribution");
+                Util.cinform("\033[0;32m[Postal] Balance of " + ef(existing_balance) + " moved to Central");
             }
         }
 
-        double price = C_Economy.po_purchase_price();
+        // Central's share of the price; the seed came back with the office balance above.
+        double price = C_Economy.po_purchase_price()
+                - com.vodhanel.minecraft.va_postal.economy.Reserves.office_seed(C_Economy.po_purchase_price(), C_Economy.office_floor());
         if (price > 0.0D) {
             if (withdraw_from_central(price)) {
                 if (deposit_to_player(previous, price)) {
+                    EconomyState.record(EconomyState.Flow.REFUND, price);
                     Util.cinform("\033[0;32m[Postal] Purchase price of " + ef(price) + " refunded to " + name(previous));
                 } else {
                     deposit_to_central(price);
@@ -471,6 +491,7 @@ public class P_Economy {
         double price = C_Economy.addr_purchase_price();
         if (withdraw_from_player(subject, price)) {
             Util.cinform("\033[0;33m[Postal] Withdrawn " + ef(price) + " from player " + name(subject));
+            EconomyState.record(EconomyState.Flow.ADDRESS_PURCHASE, price);
             double dist = price / 2.0D;
             deposit_to_central(price - dist);
             Util.cinform("\033[0;32m[Postal] Deposited " + ef(price - dist) + " to Central");
@@ -525,6 +546,7 @@ public class P_Economy {
         OfflinePlayer previous = Bukkit.getOfflinePlayer(existing_owner);
         create_player_account(previous);
         if (deposit_to_player(previous, price)) {
+            EconomyState.record(EconomyState.Flow.REFUND, price);
             Util.cinform("\033[0;32m[Postal] Address price of " + ef(price) + " refunded to " + name(previous));
         } else {
             deposit_to_central(price - dist);

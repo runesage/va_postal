@@ -378,6 +378,7 @@ public class VA_postal extends JavaPlugin {
 
     public void onDisable() {
         com.vodhanel.minecraft.va_postal.economy.PostalDay.stop();
+        com.vodhanel.minecraft.va_postal.economy.EconomyState.save();
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         SHUTDOWN();
         PostalEconomy.shutdown();
@@ -411,8 +412,11 @@ public class VA_postal extends JavaPlugin {
         }
         economy_configured = PostalEconomy.setup(this);
         if (economy_configured) {
-            com.vodhanel.minecraft.va_postal.economy.PostalDay.on_new_day(() -> Util.cinform(
-                    "[Postal] Postal day: Central " + P_Economy.ef(P_Economy.central_balance())));
+            P_Bank.choose_central_account();
+            com.vodhanel.minecraft.va_postal.economy.EconomyState.load(getDataFolder(), getLogger());
+            com.vodhanel.minecraft.va_postal.economy.PostalDay.on_new_day(P_Day::run);
+            getServer().getScheduler().scheduleSyncRepeatingTask(this,
+                    com.vodhanel.minecraft.va_postal.economy.EconomyState::save_if_dirty, 6000L, 6000L);
             com.vodhanel.minecraft.va_postal.economy.PostalDay.start(this, C_Economy::day_seconds,
                     C_Economy::last_day, C_Economy::set_last_day);
         }

@@ -5,6 +5,7 @@ import com.vodhanel.minecraft.va_postal.config.C_Arrays;
 import com.vodhanel.minecraft.va_postal.config.C_Economy;
 import com.vodhanel.minecraft.va_postal.config.C_Owner;
 import com.vodhanel.minecraft.va_postal.config.GetConfig;
+import com.vodhanel.minecraft.va_postal.economy.EconomyState;
 import com.vodhanel.minecraft.va_postal.economy.PostalDay;
 import com.vodhanel.minecraft.va_postal.economy.Reserves;
 import org.bukkit.Bukkit;
@@ -44,9 +45,14 @@ public final class P_Bank {
             this.reserve = reserve;
         }
 
-        /** What the owner may take out now (0 for server-owned offices, whose surplus goes to Central). */
+        /** Unpaid upkeep. While any is owed the owner can't withdraw. */
+        public double arrears() {
+            return EconomyState.arrears(name);
+        }
+
+        /** What the owner may take out now: 0 for server-owned offices (their surplus goes to Central) or in arrears. */
         public double withdrawable() {
-            return owner == null ? 0.0D : Reserves.withdrawable(balance, reserve);
+            return owner == null || arrears() > 0.0D ? 0.0D : Reserves.withdrawable(balance, reserve);
         }
     }
 
@@ -96,12 +102,34 @@ public final class P_Bank {
             }
             owned_addresses += player_owned_addresses(office);
         }
-        return Reserves.central_liability(owned_offices, C_Economy.po_purchase_price(),
+        return Reserves.central_liability(owned_offices, C_Economy.po_purchase_price(), C_Economy.office_floor(),
                 owned_addresses, C_Economy.addr_purchase_price());
     }
 
     public static double central_target() {
         return Reserves.central_target(central_liability(), C_Economy.central_buffer());
+    }
+
+    /** Applies Economy.Central_account: Postal's own Central, or (opt-in) Towny's server account. */
+    public static void choose_central_account() {
+        com.vodhanel.minecraft.va_postal.economy.PostalEconomy.use_postal_central();
+        if (!"towny".equals(C_Economy.central_account())) {
+            return;
+        }
+        String problem;
+        if (Bukkit.getPluginManager().getPlugin("Towny") == null || !Bukkit.getPluginManager().isPluginEnabled("Towny")) {
+            problem = "Towny is not installed";
+        } else {
+            try {
+                problem = P_TownyTreasury.use_towny_server_account();
+            } catch (LinkageError | RuntimeException e) {
+                problem = "Towny's API is not available (" + e + ")";
+            }
+        }
+        if (problem != null) {
+            Util.cinform(AnsiColor.RED + "[Postal] Economy.Central_account is towny, but " + problem
+                    + "; using postal-central.");
+        }
     }
 
     // ---- Owner transfers -------------------------------------------------------------------
@@ -131,6 +159,7 @@ public final class P_Bank {
             P_Economy.deposit_to_local(office, amount);
             return Result.ECONOMY_ERROR;
         }
+        EconomyState.record(EconomyState.Flow.WITHDRAWAL, amount);
         return Result.DONE;
     }
 
@@ -152,6 +181,8 @@ public final class P_Bank {
             P_Economy.deposit_to_player(owner, amount);
             return Result.ECONOMY_ERROR;
         }
+        EconomyState.record(EconomyState.Flow.DEPOSIT, amount);
+        P_Day.settle_arrears(office);
         return Result.DONE;
     }
 
@@ -261,7 +292,8 @@ public final class P_Bank {
                 + " (owes " + money(o.liability) + " for " + o.player_owned_addresses + " player-owned address"
                 + (o.player_owned_addresses == 1 ? "" : "es") + " + floor " + money(C_Economy.office_floor()) + ")"
                 + (o.owner == null ? "" : ", withdrawable &f" + money(o.withdrawable()))
-                + (o.owner != null && o.balance < o.reserve ? " &c(below reserve: withdrawals blocked)" : ""));
+                + (o.owner != null && o.balance < o.reserve ? " &c(below reserve: withdrawals blocked)" : "")
+                + (o.arrears() > 0.0D ? " &c(upkeep arrears " + money(o.arrears()) + ": withdrawals blocked)" : ""));
     }
 
     /** A positive amount rounded to cents, or 0 if {@code text} isn't one. */
@@ -285,16 +317,24 @@ public final class P_Bank {
             send(sender, "&7Economy is not enabled (Economy.Use in config.yml).");
             return;
         }
-        if (args.length > 1 && "newday".equalsIgnoreCase(args[1])) {
-            send(sender, "&7Running a Postal day now.");
-            PostalDay.run_now();
-            return;
+        String sub = args.length > 1 ? args[1].toLowerCase() : "";
+        switch (sub) {
+            case "":
+                report(sender);
+                return;
+            case "newday":
+                send(sender, "&7Running a Postal day now.");
+                PostalDay.run_now();
+                return;
+            case "report":
+                flow_report(sender, args.length > 2 ? Math.max(1, (int) parse_amount(args[2])) : 7);
+                return;
+            case "policy":
+                policy(sender, args);
+                return;
+            default:
+                send(sender, "&7Usage: /postal bank [newday | report [days] | policy [<setting> <value>]]");
         }
-        if (args.length > 1) {
-            send(sender, "&7Usage: /postal bank [newday]");
-            return;
-        }
-        report(sender);
     }
 
     public static void report(CommandSender sender) {
@@ -316,10 +356,169 @@ public final class P_Bank {
             String withdrawable = o.owner == null ? "-" : money(o.withdrawable());
             // For server-owned offices the floor is only what they keep before the daily sweep, not a requirement.
             String flag = (o.owner != null && o.balance < o.reserve) ? " &c(below reserve)" : "";
+            if (o.arrears() > 0.0D) {
+                flag += " &c(arrears " + money(o.arrears()) + ")";
+            }
             send(sender, "&e" + Util.df(o.name) + "&7: " + owner + " | &f" + money(o.balance) + "&7 | "
                     + money(o.reserve) + " (" + money(o.liability) + " + " + money(C_Economy.office_floor()) + ") | &f"
                     + withdrawable + flag);
         }
+    }
+
+    // ---- /postal bank report ---------------------------------------------------------------
+
+    private static void flow_report(CommandSender sender, int days) {
+        send(sender, "&6[Postal] Flows &7(in: paid by players; out: paid to players; internal: between Postal accounts)");
+        send(sender, "&eToday so far&7: " + flow_line(new java.util.LinkedHashMap<>(EconomyState.flows_today())));
+        List<java.util.Map<String, Object>> history = EconomyState.history();
+        if (history.isEmpty()) {
+            send(sender, "&7No Postal days closed yet.");
+        }
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm");
+        for (int i = 0; i < Math.min(days, history.size()); i++) {
+            java.util.Map<String, Object> day = history.get(i);
+            java.util.Map<EconomyState.Flow, Double> flows = new java.util.LinkedHashMap<>();
+            for (EconomyState.Flow f : EconomyState.Flow.values()) {
+                Object v = day.get(f.key());
+                if (v instanceof Number) {
+                    flows.put(f, ((Number) v).doubleValue());
+                }
+            }
+            String closed = java.time.Instant.ofEpochSecond(number(day.get("closed")).longValue())
+                    .atZone(java.time.ZoneId.systemDefault()).format(fmt);
+            send(sender, "&eDay to " + closed + "&7: " + flow_line(flows));
+            send(sender, "&7   Central " + money(num(day.get("central_end"))) + " (owes " + money(num(day.get("central_owes")))
+                    + ", target " + money(num(day.get("central_target"))) + "), dividend pool " + money(num(day.get("pool")))
+                    + ", carry " + money(num(day.get("carry"))) + ", arrears " + money(num(day.get("arrears"))));
+        }
+    }
+
+    private static String flow_line(java.util.Map<EconomyState.Flow, Double> flows) {
+        double in = 0, out = 0;
+        StringBuilder internal = new StringBuilder();
+        StringBuilder detail = new StringBuilder();
+        for (java.util.Map.Entry<EconomyState.Flow, Double> e : flows.entrySet()) {
+            double v = e.getValue();
+            switch (e.getKey().direction) {
+                case "in":
+                    in += v;
+                    detail.append(" ").append(e.getKey().key()).append(" ").append(money(v));
+                    break;
+                case "out":
+                    out += v;
+                    detail.append(" ").append(e.getKey().key()).append(" ").append(money(v));
+                    break;
+                default:
+                    internal.append(" ").append(e.getKey().key()).append(" ").append(money(v));
+            }
+        }
+        return "in &f" + money(in) + "&7, out &f" + money(out) + "&7, net &f" + money(in - out) + "&7 |"
+                + (detail.length() == 0 ? " no player payments" : detail.toString())
+                + (internal.length() == 0 ? "" : " | internal:" + internal);
+    }
+
+    private static double num(Object o) {
+        return number(o).doubleValue();
+    }
+
+    private static Number number(Object o) {
+        return o instanceof Number ? (Number) o : Double.valueOf(0.0D);
+    }
+
+    // ---- /postal bank policy ---------------------------------------------------------------
+
+    /** A runtime-adjustable setting: its config path and allowed range (or choices). */
+    private static final class Setting {
+        final String path;
+        final double min;
+        final double max;
+        final String[] choices;
+
+        Setting(String path, double min, double max) {
+            this.path = path;
+            this.min = min;
+            this.max = max;
+            this.choices = null;
+        }
+
+        Setting(String path, String... choices) {
+            this.path = path;
+            this.min = 0;
+            this.max = 0;
+            this.choices = choices;
+        }
+    }
+
+    private static final java.util.Map<String, Setting> SETTINGS = new java.util.LinkedHashMap<>();
+
+    static {
+        SETTINGS.put("dividend.basis", new Setting("economy.dividend.basis", "revenue", "deliveries"));
+        SETTINGS.put("dividend.release_rate", new Setting("economy.dividend.release_rate", 0, 1));
+        SETTINGS.put("dividend.cap", new Setting("economy.dividend.cap", 0, com.vodhanel.minecraft.va_postal.economy.DailyMath.MAX_CAP));
+        SETTINGS.put("upkeep.base", new Setting("economy.upkeep.base", 0, Double.MAX_VALUE));
+        SETTINGS.put("upkeep.per_address", new Setting("economy.upkeep.per_address", 0, Double.MAX_VALUE));
+        SETTINGS.put("upkeep.per_waypoint", new Setting("economy.upkeep.per_waypoint", 0, Double.MAX_VALUE));
+        SETTINGS.put("upkeep.revenue_rate", new Setting("economy.upkeep.revenue_rate", 0, 1));
+        SETTINGS.put("office_floor", new Setting("economy.office_floor", 0, Double.MAX_VALUE));
+        SETTINGS.put("central_buffer", new Setting("economy.central_buffer", 0, Double.MAX_VALUE));
+        SETTINGS.put("day_seconds", new Setting("economy.day_seconds", 60, 7 * 86400));
+    }
+
+    /** {@code /postal bank policy [<setting> <value>]}: show or change the economy dials, saved to config. */
+    private static void policy(CommandSender sender, String[] args) {
+        if (args.length < 4) {
+            send(sender, "&6[Postal] Economy policy &7(/postal bank policy <setting> <value>)");
+            for (java.util.Map.Entry<String, Setting> e : SETTINGS.entrySet()) {
+                String value = VA_postal.plugin.getConfig().getString(GetConfig.path_format(e.getValue().path));
+                Setting st = e.getValue();
+                String range = st.choices != null ? String.join(" | ", st.choices)
+                        : (st.max == Double.MAX_VALUE ? ">= " + trim(st.min) : trim(st.min) + " to " + trim(st.max));
+                send(sender, "&e" + e.getKey() + "&7: &f" + value + " &7(" + range + ")");
+            }
+            return;
+        }
+        String key = args[2].toLowerCase();
+        Setting st = SETTINGS.get(key);
+        if (st == null) {
+            send(sender, "&7Unknown setting '" + args[2] + "'. Settings: " + String.join(", ", SETTINGS.keySet()));
+            return;
+        }
+        String value = args[3].trim();
+        if (st.choices != null) {
+            String chosen = null;
+            for (String c : st.choices) {
+                if (c.equalsIgnoreCase(value)) {
+                    chosen = c;
+                }
+            }
+            if (chosen == null) {
+                send(sender, "&7" + key + " must be one of: " + String.join(", ", st.choices));
+                return;
+            }
+            value = chosen;
+        } else {
+            double v;
+            try {
+                v = Double.parseDouble(value);
+            } catch (NumberFormatException e) {
+                send(sender, "&7" + key + " needs a number.");
+                return;
+            }
+            if (Double.isNaN(v) || v < st.min || v > st.max) {
+                send(sender, "&7" + key + " must be " + (st.max == Double.MAX_VALUE ? "at least " + trim(st.min)
+                        : "between " + trim(st.min) + " and " + trim(st.max)) + ".");
+                return;
+            }
+            value = trim(v);
+        }
+        VA_postal.plugin.getConfig().set(GetConfig.path_format(st.path), value);
+        VA_postal.plugin.saveConfig();
+        send(sender, "&6" + key + " set to " + value + ".");
+        Util.cinform("[Postal] Economy policy: " + key + " = " + value + " (by " + sender.getName() + ")");
+    }
+
+    private static String trim(double v) {
+        return v == Math.rint(v) ? Long.toString((long) v) : Double.toString(v);
     }
 
     private static String next_day() {

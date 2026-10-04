@@ -1,6 +1,7 @@
 # Postal economy design
 
-Status: **agreed design, not yet implemented.** Items marked *(decided)* were settled in review.
+Status: **implemented** on `claude/economy` (Towny sharing untested in CI). Items marked *(decided)* were
+settled in review; "Changes in implementation" at the end lists where the build refined the design.
 User-facing behaviour of what ships today is in [`docs/economy.md`](../economy.md).
 
 ## 1. Goals
@@ -245,3 +246,20 @@ money it doesn't hold creates money, which is exactly the inflation this is mean
   postage, shipping, COD surcharge, `/distr`, purchases, upkeep), money out (refunds, dividends,
   withdrawals), escrow held, Central's balance and target.
 - Postal stays closed: it never destroys money itself.
+
+## Changes in implementation
+
+- **Office purchases seed the office.** The office's floor `F` (at most the price) goes into the office
+  account, the rest to Central; Central's liability per player-owned office is `P − F`. A player-owned
+  office therefore never sits at zero (which also keeps EssentialsX from purging it as an empty NPC
+  account). On a change of owner the previous owner gets the office balance minus its address escrow,
+  plus `P − F` from Central.
+- **Upkeep is paid only from above the reserve** (not from the floor, as §6 first proposed): the seed is
+  never spent, and an office that doesn't earn goes into arrears instead of draining.
+- **Server-owned offices** are topped up to their reserve from Central's money above `L_c` (on creation and
+  each day), as well as swept down to it.
+- **Revenue** for the dividend and the revenue-rate upkeep is the office's own shares of postage, shipping
+  and COD surcharges. With that definition the self-mailing bound is `⅔ (1 + cap) < 1`, so the cap's hard
+  maximum is **0.45** (at 0.5 mailing between two offices you own breaks even).
+- **Removed a money leak inherited from v4:** creating a player-owned office's account deposited an office
+  price into Central from nowhere, and could repeat whenever the account was recreated.
