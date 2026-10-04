@@ -1,6 +1,6 @@
 # Postal economy design
 
-Status: **draft for review**. Decisions taken so far are marked *(decided)*; the rest are proposals.
+Status: **agreed design, not yet implemented.** Items marked *(decided)* were settled in review.
 User-facing behaviour of what ships today is in [`docs/economy.md`](../economy.md).
 
 ## 1. Goals
@@ -72,13 +72,20 @@ profit, and full reserve simply keeps it from being spent.
 - Refunds keep today's rule: paid only if the paying account can cover them (with full reserve it always
   can, unless an admin or another plugin moved money out).
 
-## 6. Daily upkeep (Towny-style)
+## 6. Daily upkeep (Towny-style) *(decided: configurable)*
 
-Once per Postal day, every **player-owned** office pays upkeep to Central:
+Once per Postal day, every **player-owned** office pays upkeep to Central. Admins choose the shape by
+setting any of the terms (unused ones are 0):
 
 ```
-upkeep_o = upkeep.base + upkeep.per_address × (addresses at o)
+upkeep_o = Upkeep.Base
+         + Upkeep.Per_address  × (addresses at o)
+         + Upkeep.Per_waypoint × (route waypoints at o)      (size of the network the office runs)
+         + Upkeep.Revenue_rate × revenue_o                   (an income tax on the day's postage + shipping)
 ```
+
+A flat `Base` is what makes an idle office cost something; the per-size terms scale it with the office;
+`Revenue_rate` taxes activity instead of size.
 
 - Paid from `B_o`, and allowed to dip into the floor `F` (that's what `F` is for), never into `L_o`.
 - If it can't pay: the office is marked **in arrears**, withdrawals stay blocked, and the debt is
@@ -93,7 +100,7 @@ time, which is why §8 exists.
 
 They keep up to `F` as working balance; each Postal day everything above `F` is swept to Central.
 
-## 8. Service dividend (proposal)
+## 8. Service dividend *(decided: basis configurable)*
 
 Central returns its surplus to players, in proportion to work done.
 
@@ -102,10 +109,17 @@ Once per Postal day:
 ```
 surplus  = max(0, B_c − T)
 pool     = k × surplus + carry                       (k = release rate, 0..1)
-share_o  = pool × revenue_o / Σ revenue              (revenue_o = postage + shipping the office handled that day)
+share_o  = pool × work_o / Σ work                    (work_o: see Dividend.Basis)
 paid_o   = min(share_o, cap × revenue_o)             (cap < ½ so self-mailing stays a loss)
 carry    = pool − Σ paid_o                           (rolls to tomorrow)
 ```
+
+`Dividend.Basis` picks what counts as work:
+
+- `revenue`: postage + shipping the office handled that day (rewards high-value traffic);
+- `deliveries`: letters and parcels its postman actually delivered that day (rewards service).
+
+The cap is on revenue either way, so neither basis can be farmed by mailing yourself.
 
 - Only **player-owned** offices receive it (server-owned ones would just sweep it back).
 - An office with no mail handled gets nothing, and still pays upkeep: money moves from idle offices to
@@ -130,6 +144,9 @@ paid out.
 
 **Levers:** `buffer` (how much slack Central keeps above `L_c`), `k` (how fast surplus returns), `cap`
 (how much of the dividend activity can earn), `upkeep.*` (cost of holding an office), and prices.
+Admins can change `k`, `cap`, `buffer` and the upkeep terms at runtime (`/postal bank policy`, §12), so
+policy can follow the server rather than wait for a restart; later the bank plugin can steer the same
+dials through that command (§14).
 
 ## 9. Towny shared Central *(decided: opt-in)*
 
@@ -164,6 +181,9 @@ longer than a day runs a single catch-up day rather than one per missed day.
 
 - `/postal bank` (admin): Central's `B_c`, `L_c`, `T`; every office's owner, `B_o`, `R_o`, withdrawable,
   arrears.
+- `/postal bank policy [<setting> <value>]` (admin): show or change the dividend and upkeep settings at
+  runtime (saved to config).
+- `/postal bank report [days]` (admin): the daily flow log (§14).
 - `/pobank <office> [balance | deposit <amount> | withdraw <amount>]` (owner; name to be decided).
 
 ## 13. Config (proposed)
@@ -177,7 +197,10 @@ Economy:
   Upkeep:
     Base: 50
     Per_address: 5
+    Per_waypoint: 0
+    Revenue_rate: 0                # 0..1
   Dividend:
+    Basis: revenue                 # revenue | deliveries
     Release_rate: 0.5              # k
     Cap: 0.4                       # of the revenue an office handled
 ```
@@ -185,7 +208,39 @@ Economy:
 Defaults are placeholders, to be tuned against the existing prices (postage 4/6, shipping 10/15,
 office 5000, address 500).
 
-## Open questions
+## 14. Server-wide economy
 
-1. The service dividend (§8): right mechanism? Pro-rata by revenue handled, or by deliveries completed?
-2. Upkeep shape: flat + per address, as above?
+Postal is one of up to three plugins moving money (with Towny and the planned bank plugin). The aim is a
+server economy that admins can keep from inflating or deflating.
+
+**Where inflation comes from.** *Faucets* create money (selling to server shops, jobs, mob payouts,
+starting balances, unfunded interest); *sinks* destroy it (buying from server shops, fees that vanish);
+*transfers* move it and change nothing (postage, Towny taxes in a closed economy, player trades).
+Faucets ahead of sinks means inflation, sinks ahead means players slowly get poorer.
+
+**One treasury, many contributors, one policy owner.**
+
+1. One treasury account: Towny's closed-economy server account when Towny is used (Postal's Central
+   can share it, §9), which the bank plugin would use too.
+2. No plugin mints or destroys money on its own. Towny (closed economy), Postal and the bank plugin only
+   transfer, so the money supply is set only by the server's faucets and the treasury's release policy.
+3. The treasury holds what it owes plus a buffer and releases the rest to active players (Postal's
+   dividend; later bank interest; possibly Towny grants). Release less when money runs hot, more when
+   players are getting poorer, and in the extreme destroy surplus. That last decision belongs to the
+   policy owner, never to Postal.
+4. Measure: money supply per active player, the treasury balance, each plugin's daily flows, and prices
+   of staple goods in player shops.
+
+**Roles.** Towny is the main collector (taxes, upkeep). Postal collects fees and upkeep, returns money to
+offices that work through the dividend, and holds purchase escrow. The bank plugin is the natural policy
+owner: it measures the money supply and sets rates, including Postal's dividend dials, through Postal's
+commands or config, with no shared code. If it lends, it lends only from deposits or the treasury: lending
+money it doesn't hold creates money, which is exactly the inflation this is meant to prevent.
+
+**Postal's part:**
+
+- The dividend dials are runtime-adjustable (`/postal bank policy`).
+- A daily flow log, kept with the Postal day's run and shown by `/postal bank report`: money in (by kind:
+  postage, shipping, COD surcharge, `/distr`, purchases, upkeep), money out (refunds, dividends,
+  withdrawals), escrow held, Central's balance and target.
+- Postal stays closed: it never destroys money itself.
