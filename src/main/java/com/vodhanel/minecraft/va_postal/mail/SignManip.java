@@ -246,14 +246,31 @@ public class SignManip {
                 return false;
             }
         }
-        if (line4 != null) {
-            line4 = line4.toLowerCase().trim();
-            if (!sign.getLine(3).toLowerCase().contains(line4)) {
-                return false;
-            }
+        if ((line4 != null) && !owner_line_matches(sign.getLine(3), line4)) {
+            return false;
         }
         return true;
     }
+
+    /**
+     * Whether a sign's owner line names {@code owner}. Signs hold at most {@link #OWNER_LINE_MAX}
+     * characters of the name (Minecraft names go to 16) and may carry colour codes; v4 compared the
+     * full name against the truncated line, so owners with 16-character names never matched.
+     */
+    static boolean owner_line_matches(String sign_line, String owner) {
+        if (sign_line == null || owner == null) {
+            return false;
+        }
+        String wanted = owner.toLowerCase().trim();
+        if (wanted.length() > OWNER_LINE_MAX) {
+            wanted = wanted.substring(0, OWNER_LINE_MAX);
+        }
+        String line = org.bukkit.ChatColor.stripColor(sign_line);
+        return line != null && line.toLowerCase().contains(wanted);
+    }
+
+    /** Longest owner name written on a mailbox sign's last line. */
+    public static final int OWNER_LINE_MAX = 15;
 
     public static synchronized void create_sign_id_chest(Block block, String line1, String line2, String line3, String line4) {
         if (block == null) {

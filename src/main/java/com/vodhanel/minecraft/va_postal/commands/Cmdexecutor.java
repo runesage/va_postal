@@ -5,6 +5,7 @@ import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
 import com.vodhanel.minecraft.va_postal.listeners.RouteEditor;
+import com.vodhanel.minecraft.va_postal.listeners.RouteView;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
 import org.bukkit.Location;
@@ -728,7 +729,7 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public static boolean closeaddr_con(boolean console, CommandSender sender, String cmd, String[] args) {
-        if (args.length < 1) {
+        if (args.length < 2) {
             Util.con_type("Usage: closeaddr <PostOffice> <Address> Close a local address.");
             return true;
         }
@@ -806,7 +807,7 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public static boolean openaddr_con(boolean console, CommandSender sender, String cmd, String[] args) {
-        if (args.length < 1) {
+        if (args.length < 2) {
             Util.con_type("Usage: openaddr <PostOffice> <Address> Open a local address.");
             return true;
         }
@@ -1100,8 +1101,8 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
-        if ((args.length == 1) && ("?".equals(args[0]))) {
-            Util.pinform(player, "&7&oUsage: &f&r/setroute <PostOffice> <Player>");
+        if ((args.length == 1) || (args.length > 2)) {
+            Util.pinform(player, "&7&oUsage: &f&r/setroute <PostOffice> <Address>");
             return true;
         }
 
@@ -2443,7 +2444,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oThe route editor is being used by: " + VA_postal.plistener_player.getName());
             return true;
         }
-        if ((args.length == 1) && ("?".equals(args[0]))) {
+        if ((args.length == 1) || (args.length > 2)) {
             Util.pinform(player, "&7&oUsage: &f&r/showroute <PostOffice> <Address> &7&oto highlite waypoints on a route");
             return true;
         }
@@ -2494,11 +2495,9 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
 
-        RouteEditor.startHighlighter(player, stown, saddress);
-        RouteEditor.place_route_markers(stown, saddress);
+        RouteView.show(player, stown, saddress);
         Util.pinform(player, "Waypoints have been highlighted for: " + Util.df(stown) + ", " + Util.df(saddress));
 
-        VA_Timers.hideroute(player);
         deregister_player_comfirmation(player);
         return true;
     }
@@ -2525,10 +2524,9 @@ public class Cmdexecutor implements CommandExecutor {
 
 
         if (is_player_comfirmation_registered(null)) {
-            RouteEditor.place_route_markers(stown, saddress);
-            Util.con_type("Waypoints have been highlighted for: " + Util.df(stown) + ", " + Util.df(saddress));
+            RouteView.show(null, stown, saddress);
+            Util.con_type("Waypoints have been highlighted for everyone online: " + Util.df(stown) + ", " + Util.df(saddress));
 
-            VA_Timers.hideroute(VA_postal.plistener_player);
             deregister_player_comfirmation(null);
         } else {
             Util.cinform("Ready to highlight waypoints for: " + Util.df(stown) + ", " + Util.df(saddress));
