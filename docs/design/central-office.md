@@ -17,8 +17,7 @@ The split of responsibilities: **Central owns the network and anything that need
 own their residents.** Addresses stay with their local office.
 
 Out of scope here: Towny integration (its own branch); a dead letter office (dropped); PO boxes (a later
-local-office feature, §9); and the
-insurance fund, which comes with parcels in persistent-state phase P2.
+local-office feature, §9); and the insurance fund, which comes with parcels in persistent-state phase P2.
 
 ## 2. The clerk: the Postmaster General
 
