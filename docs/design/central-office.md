@@ -16,20 +16,22 @@ there and players have no reason to go. This design makes Central the place that
 The split of responsibilities: **Central owns the network and anything that needs authority; local offices
 own their residents.** Addresses stay with their local office.
 
-Out of scope here: a dead letter office (dropped); PO boxes (a later local-office feature, §9); and the
+Out of scope here: Towny integration (its own branch); a dead letter office (dropped); PO boxes (a later
+local-office feature, §9); and the
 insurance fund, which comes with parcels in persistent-state phase P2.
 
-## 2. The clerk
+## 2. The clerk: the Postmaster General
 
 A Citizens NPC who stays at Central's counter. It doesn't walk routes, and it uses the bundled skin and
 naming like the other Postal NPCs.
 
 - **Spawn:** spawned with the dispatcher at Central's location (or a `Clerk_location` set with
   `/postal clerk here`), and removed on stop, like the other Postal NPCs. It is never saved by Citizens.
+- **Name:** the Postmaster General.
 - **Look:** it faces the nearest player within a few blocks, and holds a book and quill.
 - **Counter menu:** right-clicking the clerk opens an inventory menu of Central's services. A service is
   only available through the clerk, so the player has to be at Central:
-  - **Charter a post office** (§3);
+  - **Charters:** buy one, collect an approved one, reissue a lost note, refund an expired one (§3);
   - **Sign a transfer** (§3);
   - **Postage rates:** the current base rates and every office's discount;
   - **Network map** (§6).
@@ -39,30 +41,45 @@ naming like the other Postal NPCs.
 
 ### Chartering a new office
 
-Today a staff member places an office with `/setlocal` and gives it an owner with `/setowner`. With charters
-a player can found an office themselves, but only through Central:
+Today a staff member places an office by running `/setlocal` in front of its chest, and gives it an owner
+with `/setowner`. That stays as the admin way. Charters add a way for players to found an office
+themselves, through Central:
 
-1. **Apply on site.** At the spot for the new office, the player runs `/postal charter <name>`. This checks
-   that the name is free, that the spot is far enough from other offices, and that the player may build
-   there (Towny plot or WorldGuard region, when they're installed). It records a pending application with
-   the location. Nothing is charged yet.
-2. **Sign at Central.** At the counter, the player picks the application and pays the post office purchase
-   price, which seeds the office as in `docs/economy.md`. The office is created at the recorded location
-   and the player becomes its owner.
-3. **Admin approval (optional).** With `Charter.Require_approval: true`, a signed charter waits for
-   `/postal charter approve <name>` before the office opens. Until then the payment is held by Central and
-   refunded if it's rejected.
+1. **Buy a charter at Central.** At the counter, the player picks a name for the office and pays the post
+   office purchase price. The name is checked and reserved there, so name clashes are settled at Central.
+   They get a **charter note**: a written item naming the office and its holder, carrying a charter id.
+   Central holds the payment until the charter is used.
+2. **Open the office with it.** Holding the note, the player right-clicks the chest that will be the office's
+   chest. Postal checks that:
+   - the player is the charter's holder;
+   - the chest isn't already a Postal chest;
+   - it's far enough from other offices (`Charter.Min_distance`).
 
-A pending application expires after `Charter.Application_days` (default 7). `/setlocal` stays as the
-admin way to place a server-owned office.
+   The office is then created at that chest. Postal places the office sign on it, the player becomes the
+   owner, and the payment seeds the office as in `docs/economy.md`. The note is used up.
+3. **Admin approval (optional).** With `Charter.Require_approval: true`, a charter is only sold after
+   `/postal charter approve <player> <name>`; the player applies at the counter and collects the note
+   there once it's approved.
+
+**Protection plugins** decide where an office may go without Postal knowing about them: if the player isn't
+allowed to open the chest (a claim, a region), the right-click never reaches Postal.
+
+**Charter notes:**
+- **Bound to the buyer.** Only the holder named on it can use it, so Central always knows who it chartered.
+  A charter for someone else is bought in their name. That keeps ownership changes at Central (see
+  Transfers).
+- **Expiry.** An unused charter expires after `Charter.Expiry_days` (default 14). The name is released, and
+  the holder can collect a refund at the counter, minus `Charter.Expiry_fee` (default 10%).
+- **Lost notes.** The counter reissues a note for the same charter, and the old one stops working (the
+  charter id is checked when it's used).
 
 ### Transfers
 
 An owner can't hand an office over informally; the change of hands is signed at Central:
 
 1. The owner offers it from anywhere: `/postal office <office> transfer <player> [price]`.
-2. The buyer accepts at the counter. They pay the agreed price to the seller and a transfer fee
-   (`Charter.Transfer_fee`) to Central.
+2. The buyer accepts at the counter. They pay the agreed price to the seller, and a transfer fee of
+   `Charter.Transfer_rate` (default 5%) of that price to Central.
 3. The office keeps its account, balance and escrow. A sale is between players, so the system refund for
    an office changing hands (`docs/economy.md`) does **not** apply.
 
@@ -138,7 +155,7 @@ into a `office_stats` table.
 
 | Phase | Scope | Needs |
 |---|---|---|
-| **C1** | The clerk and the counter menu, charters (apply, sign, optional approval), transfers | Economy (#6) |
+| **C1** | The clerk and the counter menu, charter notes (buy, open, expiry, optional approval), transfers | Economy (#6) |
 | **C2** | Base rates as policy, branch discounts, courier notices | C1 |
 | **C3** | Stats module, notice board, maps, Branch of the Month | Persistent state P1 (#7) |
 | **C4** | Inspector and reports | C3 |
@@ -159,10 +176,13 @@ into a `office_stats` table.
 4. Central's first functions are the clerk and charters (including transfers). Notice boards, maps and
    Branch of the Month follow as flavour.
 5. No dead letter office. PO boxes are a later local-office feature.
+6. Offices are chartered with a charter note bought at Central and used on a chest. `/setlocal` stays
+   for admins.
+7. The transfer fee is a percentage of the sale price.
+8. The clerk is the Postmaster General.
+9. Towny integration is out of scope here; it comes in its own branch.
 
 ## 11. Open questions
 
-- Should chartering require Towny, where it's installed (an office only inside a town, and maybe only by its
-  mayor)?
-- Should the transfer fee be a flat amount or a share of the sale price?
-- What should the clerk be called (for example "Postmaster General")?
+- Should a charter note be tradeable instead of bound to its buyer? That would allow a market in charters,
+  but then whoever opens the office becomes its owner without Central signing it off.
