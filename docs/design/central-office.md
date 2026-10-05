@@ -65,24 +65,32 @@ allowed to open the chest (a claim, a region), the right-click never reaches Pos
 
 **Charter notes:**
 - **Bound to the buyer.** Only the holder named on it can use it, so Central always knows who it chartered.
-  A charter for someone else is bought in their name. That keeps ownership changes at Central (see
-  Transfers).
+  A charter for someone else is bought in their name. That keeps ownership changes at Central (see Selling an office).
 - **Expiry.** An unused charter expires after `Charter.Expiry_days` (default 14). The name is released, and
   the holder can collect a refund at the counter, minus `Charter.Expiry_fee` (default 10%).
 - **Lost notes.** The counter reissues a note for the same charter, and the old one stops working (the
   charter id is checked when it's used).
 
-### Transfers
+### Selling an office
 
-An owner can't hand an office over informally; the change of hands is signed at Central:
+An office only ever changes hands through Central, in one of two ways. There is no informal handover.
 
-1. The owner offers it from anywhere: `/postal office <office> transfer <player> [price]`.
-2. The buyer accepts at the counter. They pay the agreed price to the seller, and a transfer fee of
+**Selling back to Central.** At the counter, the owner sells the office back to Central and gets the
+refund an office changing hands already pays (`docs/economy.md`): its balance minus the address refunds it
+holds in escrow, plus Central's share of the purchase price. The office stays open as a server-owned office,
+so its addresses and residents aren't affected.
+
+**Selling to another player through Central.**
+
+1. The owner offers it from anywhere: `/postal office <office> sell <player> <price>`.
+2. The buyer accepts at the counter. They pay the agreed price to the seller, and a transaction fee of
    `Charter.Transfer_rate` (default 5%) of that price to Central.
-3. The office keeps its account, balance and escrow. A sale is between players, so the system refund for
-   an office changing hands (`docs/economy.md`) does **not** apply.
+3. The office keeps its account, balance and escrow. The buyer pays the seller directly, so the system
+   refund does **not** apply on top of the sale.
 
 An offer expires after `Charter.Offer_days` (default 3), and the owner can withdraw it.
+
+`/setowner` stays as an admin override.
 
 ## 4. Rates
 
@@ -154,7 +162,7 @@ into a `office_stats` table.
 
 | Phase | Scope | Needs |
 |---|---|---|
-| **C1** | The clerk and the counter menu, charter notes (buy, open, expiry, optional approval), transfers | Economy (#6) |
+| **C1** | The clerk and the counter menu, charter notes (buy, open, expiry, optional approval), selling offices | Economy (#6) |
 | **C2** | Base rates as policy, branch discounts, courier notices | C1 |
 | **C3** | Stats module, notice board, maps, Branch of the Month | Persistent state P1 (#7) |
 | **C4** | Inspector and reports | C3 |
@@ -172,16 +180,13 @@ into a `office_stats` table.
 1. Branches may discount but not surcharge, for now.
 2. Inspections are reports only, with no penalties.
 3. Rate disputes are dropped.
-4. Central's first functions are the clerk and charters (including transfers). Notice boards, maps and
+4. Central's first functions are the clerk and charters (including office sales). Notice boards, maps and
    Branch of the Month follow as flavour.
 5. No dead letter office. PO boxes are a later local-office feature.
 6. Offices are chartered with a charter note bought at Central and used on a chest. `/setlocal` stays
    for admins.
-7. The transfer fee is a percentage of the sale price.
+7. An office is only ever sold back to Central or to another player through Central, with a transaction
+   fee that is a percentage of the sale price.
 8. The clerk is the Postmaster General.
 9. Towny integration is out of scope here; it comes in its own branch.
-
-## 11. Open questions
-
-- Should a charter note be tradeable instead of bound to its buyer? That would allow a market in charters,
-  but then whoever opens the office becomes its owner without Central signing it off.
+10. Charter notes are bound to their buyer and can't be traded.
