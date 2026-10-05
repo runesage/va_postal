@@ -55,6 +55,8 @@
 
 ## 3. Central Office Redesign
 
+Design: [`docs/design/central-office.md`](../design/central-office.md) (clerk, charters, rates, inspections, notice board, maps).
+
 - Sets base postage rate; local offices discount only within an admin-defined band
 - Congestion mechanic — heavy routing volume slows delivery server-wide, admin-tunable
 - **Failure insurance fund** (not "expected loss") — pays out only on verified custody failures: griefed chest, NPC death mid-route, crash-interrupted transaction. Normal operation should never lose mail.
