@@ -31,7 +31,7 @@ naming like the other Postal NPCs.
 - **Counter menu:** right-clicking the clerk opens an inventory menu of Central's services. A service is
   only available through the clerk, so the player has to be at Central:
   - **Charters:** buy one, collect an approved one, reissue a lost note, refund an expired one (§3);
-  - **Sign a transfer** (§3);
+  - **Sell an office:** back to Central, or accept a sale from another player (§3);
   - **Postage rates:** the current base rates and every office's discount;
   - **Network map** (§6).
 - Admin commands keep working from anywhere. The counter rule applies only to players.
