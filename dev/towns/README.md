@@ -83,6 +83,20 @@ pathfinding can't handle yet; after a change, an address that used to be walked 
 
 It isn't part of CI: it takes too long. Run it before and after a change to pathfinding.
 
+### Baseline (October 2026, manual routes, Citizens 2.0.44)
+
+A 10-minute soak on today's code. 11 of the 14 walkable addresses are walked cleanly. These need rescuing:
+
+| Address | Rescues | Stuck at | What |
+|---|---|---|---|
+| Doorstep | 4 | waypoints 4 and 5 | the closed door (Postal's door handling soft-resets, then teleports) |
+| Alley | 2 | waypoint 3 | entering the one-wide alley |
+| Tunnel | 1 | waypoint 7 | inside the one-wide, two-high tunnel |
+| Loft | 72 | waypoint 11 | the ladder: never climbed, teleported up every time (expected) |
+
+Stairs, slab ramps, the L-shaped stair, both bridges, the fence gate, the hedge maze and the forest paths
+are all walked without help.
+
 ## Changing the towns
 
 The buildings come from `World.building` (walls, windows, door, gabled roof, chimney) and
