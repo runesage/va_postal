@@ -18,6 +18,9 @@ import java.util.logging.Logger;
 public final class PostalEconomy {
     private static EconomyBackend backend;
     private static Logger log = Logger.getLogger("Postal");
+    /** Central's account: Postal's own by default, or a shared treasury (Towny's server account). */
+    private static UUID central_id = OfficeAccounts.central_id();
+    private static String central_name = OfficeAccounts.central_name();
 
     private PostalEconomy() {
     }
@@ -67,6 +70,23 @@ public final class PostalEconomy {
 
     public static synchronized void shutdown() {
         backend = null;
+        use_postal_central();
+    }
+
+    /** Makes Central another existing account, e.g. Towny's closed-economy server account. */
+    public static synchronized void use_central_account(UUID id, String name) {
+        central_id = id;
+        central_name = name;
+        log.info("Central uses the shared account " + name + " (" + id + ").");
+    }
+
+    public static synchronized void use_postal_central() {
+        central_id = OfficeAccounts.central_id();
+        central_name = OfficeAccounts.central_name();
+    }
+
+    public static synchronized String central_account_name() {
+        return central_name;
     }
 
     public static boolean is_enabled() {
@@ -81,7 +101,7 @@ public final class PostalEconomy {
     // ---- Office accounts -------------------------------------------------------------------
 
     public static boolean ensure_central() {
-        return ensure_npc(OfficeAccounts.central_id(), OfficeAccounts.central_name());
+        return ensure_npc(central_id, central_name);
     }
 
     public static boolean ensure_office(String office) {
@@ -94,7 +114,7 @@ public final class PostalEconomy {
     }
 
     public static double central_balance() {
-        return npc_balance(OfficeAccounts.central_id(), OfficeAccounts.central_name());
+        return npc_balance(central_id, central_name);
     }
 
     public static double office_balance(String office) {
@@ -103,7 +123,7 @@ public final class PostalEconomy {
 
     public static boolean central_has(double amount) {
         EconomyBackend b = backend;
-        return b != null && b.has(OfficeAccounts.central_id(), OfficeAccounts.central_name(), false, amount);
+        return b != null && b.has(central_id, central_name, false, amount);
     }
 
     public static boolean office_has(String office, double amount) {
@@ -112,11 +132,11 @@ public final class PostalEconomy {
     }
 
     public static boolean deposit_central(double amount) {
-        return move(OfficeAccounts.central_id(), OfficeAccounts.central_name(), false, amount, true);
+        return move(central_id, central_name, false, amount, true);
     }
 
     public static boolean withdraw_central(double amount) {
-        return move(OfficeAccounts.central_id(), OfficeAccounts.central_name(), false, amount, false);
+        return move(central_id, central_name, false, amount, false);
     }
 
     public static boolean deposit_office(String office, double amount) {

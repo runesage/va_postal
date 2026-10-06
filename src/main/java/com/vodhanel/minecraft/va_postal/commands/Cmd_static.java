@@ -12,6 +12,7 @@ import com.vodhanel.minecraft.va_postal.listeners.RouteEditor;
 import com.vodhanel.minecraft.va_postal.mail.Book;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
+import com.vodhanel.minecraft.va_postal.mail.HoldTag;
 import com.vodhanel.minecraft.va_postal.mail.SignManip;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -66,6 +67,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/expedite <PostOffice> <address> &7&o(alias: /ex)");
         Util.pinform(player, " &7&oSet the central post office");
         Util.pinform(player, " &f&r/setcentral");
+        Util.pinform(player, " &7&oPostal accounts: Central and every office; run a Postal day now");
+        Util.pinform(player, " &f&r/postal bank [newday]");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oSet a town address");
@@ -118,6 +121,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/gps <PostOffice> [Address] &7&o(alias: /gpsp)");
         Util.pinform(player, " &7&oPush a route schedule forward");
         Util.pinform(player, " &f&r/expedite <PostOffice> <address> &7&o(alias: /ex)");
+        Util.pinform(player, " &7&oYour post offices' money: balance, deposit, withdraw (down to the reserve)");
+        Util.pinform(player, " &f&r/postal office [PostOffice] [balance|deposit <amt>|withdraw <amt|all>]");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oDefine route from local post office to address");
@@ -274,9 +279,12 @@ public class Cmd_static {
         }
         ItemStack stamped = stamp_cod(stack, cod_price);
         if (stamped == null) return;
-        stack = null;
+        if (!no_charge) {
+            // Held with the label's postage; settled on delivery (half to Central, half to the sending office).
+            stamped = P_Economy.hold_cod_surcharge(player, stamped);
+            if (stamped == null) return;
+        }
         player.getInventory().setItemInMainHand(stamped);
-        if (!no_charge) P_Economy.charge_cod_surcharge(player);
     }
 
     public static ItemStack stamp_cod(ItemStack ind_item, double price) {
@@ -292,7 +300,7 @@ public class Cmd_static {
         pages[0] = "";
         for (String part : parts) pages[0] = (pages[0] + part + "\n");
         Book stamped_book = new Book(title, author, pages);
-        return stamped_book.generateItemStack();
+        return HoldTag.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static double cod_amount(ItemStack ind_item) {
@@ -387,12 +395,14 @@ public class Cmd_static {
         if (splayer.length() > 15) splayer = splayer.substring(0, 15);
         Book new_book = new Book("[shipping label]", splayer, pages);
         ItemStack new_stack = new_book.generateItemStack();
-        addr_worker(player, inventory, new_stack, attention, Attention, stown, saddress);
+        if (!addr_worker(player, inventory, new_stack, attention, Attention, stown, saddress)) {
+            return false;
+        }
         BookManip.standard_addr_sign(slocation, 2, stown, saddress, splayer);
         return true;
     }
 
-    public static void addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress) {
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress) {
         Book book = new Book(stack);
         String title;
         String author;
@@ -428,6 +438,12 @@ public class Cmd_static {
 
         Book new_book = new Book(town, address, existing_pages);
         ItemStack new_stack = new_book.generateItemStack();
+        // Postage is held now and settled on delivery by the offices that handle it (re-addressing keeps the hold).
+        boolean parcel = (inventory != null) || title.equalsIgnoreCase(Util.df("[shipping label]"));
+        new_stack = P_Economy.hold_postage(player, stack, new_stack, parcel);
+        if (new_stack == null) {
+            return false;
+        }
         if ((inventory != null) &&
                 (title.equals(Util.df("[shipping label]")))) {
 
@@ -439,13 +455,10 @@ public class Cmd_static {
         }
 
         player.getInventory().setItemInMainHand(new_stack);
-        if (VA_postal.economy_configured)
-            if (inventory == null) if (!re_address) P_Economy.charge_postage(player, stown);
-            else Util.pinform(player, "&6There is no charge for re-addressing.");
-            else P_Economy.charge_shipping(player, stown);
         Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
         Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(saddress) + " &7&otown of &9&o" + Util.df(stown));
         Util.pinform(player, "&7&oAttention: &9&o" + attention);
+        return true;
     }
 
     public static void distr_worker(Player player, ItemStack stack, String sdistribution, String srch_stown, int iexpiration) {
@@ -664,7 +677,7 @@ public class Cmd_static {
             spage = spage + "§7" + fdate + "\n";
             existing_pages[0] = spage;
             Book new_book = new Book(town, address, existing_pages);
-            ItemStack new_stack = new_book.generateItemStack();
+            ItemStack new_stack = HoldTag.carry(stack, new_book.generateItemStack());
             player.getInventory().setItemInMainHand(new_stack);
             Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
             Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(address) + " &7&otown of &9&o" + Util.df(town));

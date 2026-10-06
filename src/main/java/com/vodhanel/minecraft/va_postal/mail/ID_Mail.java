@@ -2,6 +2,7 @@ package com.vodhanel.minecraft.va_postal.mail;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
+import com.vodhanel.minecraft.va_postal.common.P_Economy;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.config.C_Address;
 import com.vodhanel.minecraft.va_postal.config.C_Dispatcher;
@@ -544,6 +545,10 @@ public class ID_Mail {
                         if (page1.contains("[not-processed]")) {
                             mail_found = true;
                             if (!mail_address.equals(this_address)) {
+                                // The first office to pick mail up is its sending office (postage escrow).
+                                if (!P_Economy.postage_collected(ind_item, VA_postal.wtr_poffice[id])) {
+                                    continue;
+                                }
                                 ItemStack stamped_mail = stamp_pickup(id, ind_item);
                                 add_to_postoffice_chest(id, stamped_mail);
 
@@ -602,7 +607,7 @@ public class ID_Mail {
 
         Book stamped_book = new Book(title, author, pages);
 
-        return stamped_book.generateItemStack();
+        return HoldTag.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void npc_start_route(int id) {
@@ -627,6 +632,10 @@ public class ID_Mail {
                         String[] spage = book.getPages();
                         String page1 = spage[0].toLowerCase();
                         if (page1.contains("[not-processed]")) {
+                            if (!P_Economy.postage_collected(ind_item, VA_postal.wtr_poffice[id])) {
+                                index++;
+                                continue;
+                            }
                             ItemStack stamped_mail = stamp_po_pickup(id, ind_item);
                             replace_slot_by_index_po(id, index, stamped_mail);
 
@@ -688,7 +697,7 @@ public class ID_Mail {
 
         Book stamped_book = new Book(title, author, pages);
 
-        return stamped_book.generateItemStack();
+        return HoldTag.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void npc_deliver_mail(int id) {
@@ -714,12 +723,18 @@ public class ID_Mail {
                     String mail_address = book.getAuthor().toLowerCase().trim();
                     String this_address = VA_postal.wtr_address[id].toLowerCase().trim();
                     if (mail_address.equals(this_address)) {
+                        // Never picked up because its postage expired: it waits to be re-addressed.
+                        if (book.getPages()[0].contains("[not-processed]") && P_Economy.postage_expired(ind_item)) {
+                            continue;
+                        }
                         ItemStack stamped_mail = stamp_deliver(id, ind_item);
                         if (add_to_residence_chest(id, stamped_mail)) {
                             item_itr.set(null);
 
                             NpcLook.hold(VA_postal.wtr_npc[id], (ItemStack) null);
                             mail_delivered = true;
+                            com.vodhanel.minecraft.va_postal.economy.EconomyState.add_delivery(stown);
+                            P_Economy.settle_postage(ind_item, stown);
                             C_Address.set_address_newmail(stown, this_address, true);
                         }
                         mail_found = true;
@@ -765,7 +780,7 @@ public class ID_Mail {
             }
         }
         Book stamped_book = new Book(title, author, pages);
-        return stamped_book.generateItemStack();
+        return HoldTag.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void postmaster_service_postoffice(int id, String spostoffice) {
@@ -794,6 +809,9 @@ public class ID_Mail {
                     String mail_to_town = book.getTitle().toLowerCase().trim();
                     String this_town = spostoffice.toLowerCase().trim();
                     if ((!mail_to_town.equals(this_town)) && (!mail_to_town.contains("postal log"))) {
+                        if (!P_Economy.postage_collected(ind_item, spostoffice)) {
+                            continue;
+                        }
                         C_Dispatcher.promote_central(mail_to_town, 5000);
                         Util.dinform("Schedule promotion - CENTRAL " + mail_to_town);
                         String[] spage = book.getPages();
@@ -915,7 +933,7 @@ public class ID_Mail {
 
         Book stamped_book = new Book(title, author, pages);
 
-        return stamped_book.generateItemStack();
+        return HoldTag.carry(ind_item, stamped_book.generateItemStack());
     }
 
     public static synchronized void SetPostoffice_Chest_nTP_point(int id) {

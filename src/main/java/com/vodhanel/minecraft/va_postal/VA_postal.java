@@ -5,6 +5,7 @@ import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.vodhanel.minecraft.va_postal.commands.Cmdexecutor;
 import com.vodhanel.minecraft.va_postal.economy.PostalEconomy;
 import com.vodhanel.minecraft.va_postal.common.*;
+import com.vodhanel.minecraft.va_postal.config.C_Economy;
 import com.vodhanel.minecraft.va_postal.config.Config;
 import com.vodhanel.minecraft.va_postal.config.GetConfig;
 import com.vodhanel.minecraft.va_postal.listeners.BukkitListener;
@@ -376,6 +377,8 @@ public class VA_postal extends JavaPlugin {
     }
 
     public void onDisable() {
+        com.vodhanel.minecraft.va_postal.economy.PostalDay.stop();
+        com.vodhanel.minecraft.va_postal.economy.EconomyState.save();
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         SHUTDOWN();
         PostalEconomy.shutdown();
@@ -409,7 +412,13 @@ public class VA_postal extends JavaPlugin {
         }
         economy_configured = PostalEconomy.setup(this);
         if (economy_configured) {
-            P_Economy.init_economy();
+            P_Bank.choose_central_account();
+            com.vodhanel.minecraft.va_postal.economy.EconomyState.load(getDataFolder(), getLogger());
+            com.vodhanel.minecraft.va_postal.economy.PostalDay.on_new_day(P_Day::run);
+            getServer().getScheduler().scheduleSyncRepeatingTask(this,
+                    com.vodhanel.minecraft.va_postal.economy.EconomyState::save_if_dirty, 6000L, 6000L);
+            com.vodhanel.minecraft.va_postal.economy.PostalDay.start(this, C_Economy::day_seconds,
+                    C_Economy::last_day, C_Economy::set_last_day);
         }
     }
 
