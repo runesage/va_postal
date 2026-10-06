@@ -159,8 +159,9 @@ public final class Letters {
         try {
             Optional<MailRecord> found = store.get(id);
             if (found.isEmpty()) {
-                Util.cinform("[Postal] A book carries an unknown mail id " + id + "; not routing it.");
-                return new Move(Move.Result.STALE, null);
+                // Not ours to destroy (e.g. the mail store was reset but the world wasn't): leave it where it is.
+                Util.cinform("[Postal] A book carries an unknown mail id " + id + "; leaving it where it is, not routing it.");
+                return new Move(Move.Result.SKIP, null);
             }
             MailRecord r = found.get();
             if (r.moving()) {

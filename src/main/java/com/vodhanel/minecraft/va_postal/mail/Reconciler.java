@@ -190,7 +190,7 @@ public final class Reconciler {
                 if (looks_like_mail(item)) {
                     report.forged++;
                     Util.cinform("[Postal] An untracked postal-looking book is in the chest at " + key
-                            + "; it was not posted through Postal and won't be routed.");
+                            + "; it has no mail id, so it isn't tracked (it is routed the old way).");
                 }
                 continue;
             }
