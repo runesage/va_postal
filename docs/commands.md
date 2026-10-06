@@ -23,6 +23,14 @@ Lists all chests and locations _(only works when running)_
 Shows a tracked letter's state, where it is, and its full history; `recent` lists the ten most recently changed letters.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
+##### `bank [newday | report [days] | policy [<setting> <value>]]`
+Central's balance, what it owes and its target, and every office's owner, balance, reserve,
+withdrawable amount and arrears. `newday` runs a Postal economy day now; `report` shows the daily flow
+log; `policy` shows or changes the economy settings at runtime. See `docs/economy.md`.
+<br>
+#### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all>]`
+Permissions: owner of the post office (admins may view any)
+An office owner's account: see the balance, deposit, or withdraw down to the reserve.
 <br>
 #### `/go [PostOffice] [Address]` _`(No address defaults to central)`_
 Permissions: `postal.gotocentral, postal.gotolocal, postal.gotoaddr`
@@ -116,6 +124,8 @@ Subcommands:
 ```
 `/setowner` resolves in `/setaddr` or `/setlocal` first, depending on the arguments.
 Both give the ownership of the postal object in question (`address` or `PostOffice`) to `player`
+With the economy on, a player without these permissions can still buy an **unowned** post office or address,
+but only for themselves: the player named pays the purchase price, so only they can agree to it.
 <br>
 #### `/showroute [[PostOffice] <address>]`
 Permissions: `postal.showroute`

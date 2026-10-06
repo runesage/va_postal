@@ -144,6 +144,19 @@ public class Config {
 
         VA_postal.plugin.getConfig().addDefault(path_format("storage.type"), "sqlite");
         VA_postal.plugin.getConfig().addDefault(path_format("network.server_id"), "main");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.day_seconds"), "86400");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.office_floor"), "500");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.central_buffer"), "5000");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.central_account"), "postal");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.base"), "50");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.per_address"), "5");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.per_waypoint"), "0");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.revenue_rate"), "0");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.basis"), "revenue");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.release_rate"), "0.5");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.cap"), "0.4");
 
         VA_postal.plugin.getConfig().addDefault(lossy, true);
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);

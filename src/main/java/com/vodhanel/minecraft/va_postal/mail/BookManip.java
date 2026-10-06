@@ -209,6 +209,17 @@ public class BookManip {
         return false;
     }
 
+    /** True if {@code item} is a shipping label (addressed or not). */
+    public static boolean is_shipping_label(ItemStack item) {
+        if (item == null || item.getType() != Material.WRITTEN_BOOK) {
+            return false;
+        }
+        Book book = new Book(item);
+        String[] pages = book.is_valid() ? book.getPages() : null;
+        return pages != null && pages.length > 0 && pages[0] != null
+                && pages[0].toLowerCase().contains("[shipping label]");
+    }
+
     public static synchronized String[] parcel_list(Inventory inventory) {
         if (inventory == null) {
             return null;
