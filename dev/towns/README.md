@@ -13,8 +13,22 @@ checks that every route is walkable from the blocks it places:
 
 ## The towns
 
-Central is at the origin (0, -60, 0). Central's postman teleports between offices, so only routes inside
-each town are walked.
+Each town has its own architecture, and every office and address is a building with its mailbox against
+the front wall, beside the door, and a name sign above the door:
+- **Central** (origin): a white quartz civic post office with a columned portico and two flagpoles.
+- **Hillcrest** (east), alpine: stone ground courses, spruce walls, dark slate roofs, stone chimneys.
+- **Riverside** (south), Tudor: brick base, white plaster, dark oak timber framing and roofs, brick chimneys.
+- **Woodvale** (west), log cabins: horizontal oak logs on cobblestone, spruce roofs, cobblestone chimneys,
+  in a forest.
+
+Each post office is larger than the houses and flies a flag in its town's colour.
+
+![Central](images/central.png) ![Hillcrest](images/hillcrest.png)
+![Riverside](images/riverside.png) ![Woodvale](images/woodvale.png)
+
+![Map of the towns and routes](images/map.png)
+
+Central's postman teleports between offices, so only routes inside each town are walked.
 
 | Town | Office | Address | What the route crosses |
 |---|---|---|---|
@@ -54,16 +68,34 @@ SOAK_SECONDS=1800 dev/towns/soak.sh
 The soak builds a throwaway server, builds the towns and lets the postmen run every route. The default run
 is 15 minutes, with fast pacing. It then prints a table of every address:
 - whether it was expected to be reached;
-- the recorded round trip in seconds (blank or 0 means a postman never completed it).
+- the recorded round trip in seconds;
+- how many times a stuck postman had to be **rescued** on that route (teleported on by Postal's stuck-NPC
+  handling, with the waypoint it was stuck at);
+- the result: **walked** (completed with no rescues), **rescued** (completed only because it was
+  teleported past something) or **never** (no round trip completed).
 
-It also prints how many stuck-NPC recoveries were logged. It exits non-zero if an address doesn't behave as
-expected. That's a regression if an address that used to be reached isn't; it's news if Loft suddenly is.
+A round trip alone doesn't prove the route works: Postal teleports stuck postmen on, so even Loft, which no
+postman can climb to, gets "completed". The rescue count is what tells them apart.
+
+It exits non-zero if an address doesn't behave as expected: one that should be walked was rescued or never
+completed, or Loft was walked. Against today's code that's a list of what manual routes and Citizens'
+pathfinding can't handle yet; after a change, an address that used to be walked and isn't is a regression.
 
 It isn't part of CI: it takes too long. Run it before and after a change to pathfinding.
 
 ## Changing the towns
 
-Edit `build_towns.py`; the functions `hillcrest`, `riverside` and `woodvale` each place their blocks with
+The buildings come from `World.building` (walls, windows, door, gabled roof, chimney) and
+`World.postal_building` (a building behind its mailbox), styled by the `THEMES` table. The generator fails
+if a building overlaps anything already placed or isn't on level ground.
+
+After changing the towns, regenerate the pictures:
+
+```
+python3 dev/towns/build_towns.py --iso dev/towns/images --map dev/towns/images/map.png
+```
+
+Edit `build_towns.py`. The functions `hillcrest`, `riverside` and `woodvale` each place their blocks with
 `fill`/`set` and return their office location and routes. Run it with no arguments to check the routes
 without writing anything:
 

@@ -73,7 +73,8 @@ import re, sys
 path = sys.argv[1]
 text = open(path).read()
 text = re.sub(r"(?m)^(  Debug: )'false'", r"\1'true'", text)
-for key, value in {"Postman_cool_sec": "10", "Central_cool_sec": "10", "Residence_cool_ticks": "40",
+# Report_nav_probs: log every time a stuck postman is teleported on, and for which address.
+for key, value in {"Report_nav_probs": "true", "Postman_cool_sec": "10", "Central_cool_sec": "10", "Residence_cool_ticks": "40",
                    "Heart_beat_ticks": "40", "Heart_beat_auto": "false"}.items():
     line = "  %s: '%s'" % (key, value)
     text, n = re.subn(r"(?m)^  %s: .*$" % key, line, text)
@@ -90,24 +91,35 @@ run_server "$WORK_DIR/soak.log" "$((SOAK_SECONDS + 600))" \
 echo "== Results"
 python3 - "$ROUTES" "$WORK_DIR/soak.log" <<'PY'
 import json, re, sys
+from collections import Counter, defaultdict
 routes = json.load(open(sys.argv[1]))
 log = re.sub(r"\x1b\[[0-9;]*m", "", open(sys.argv[2], errors="replace").read())
 seconds = {}
 for m in re.finditer(r"(?m)^\[[^\]]*\]: (?:\[Postal\] \[STDOUT\] )?\s+(\S+)\s+\S+\s+Seconds: (\d+)", log):
     seconds[m.group(1).lower()] = int(m.group(2))
-stuck = len(re.findall(r"Teleport Reset|stuck", log, re.I))
+# A rescue: the postman got stuck and Postal teleported it on (or reset it at a door).
+rescues = Counter()
+where = defaultdict(Counter)
+for m in re.finditer(r"(Teleport Reset|Soft Reset).*?While servicing\s*:\s*(\S+).*?Waypoint sequence:\s*(\d+)", log, re.S):
+    rescues[m.group(2).lower()] += 1
+    where[m.group(2).lower()][int(m.group(3))] += 1
 bad = 0
-print("%-10s %-10s %-9s %-9s %s" % ("Town", "Address", "Expected", "Seconds", "Route"))
+print("%-10s %-10s %-9s %-8s %-8s %-9s %s" % ("Town", "Address", "Expected", "Seconds", "Rescues", "Result", "Route"))
 for town, addrs in routes.items():
     for addr, info in addrs.items():
-        secs = seconds.get(addr.lower())
-        reached = bool(secs)
-        expected = "reach" if info["reachable"] else "fail"
-        ok = reached == info["reachable"]
+        key = addr.lower()
+        secs, n = seconds.get(key), rescues.get(key, 0)
+        result = "never" if not secs else ("rescued" if n else "walked")
+        ok = (result == "walked") == info["reachable"]
         bad += not ok
-        print("%-10s %-10s %-9s %-9s %s%s" % (town, addr, expected, "-" if secs is None else secs,
-                                             info["what"], "" if ok else "   <-- UNEXPECTED"))
-print("\nStuck-NPC recoveries logged: %d" % stuck)
+        note = ""
+        if n:
+            note = "  (stuck at waypoint %s)" % ", ".join("%d x%d" % (wp, c) for wp, c in sorted(where[key].items()))
+        print("%-10s %-10s %-9s %-8s %-8s %-9s %s%s%s" % (
+            town, addr, "walk" if info["reachable"] else "fail", "-" if secs is None else secs, n, result,
+            info["what"], note, "" if ok else "   <-- UNEXPECTED"))
+print("\nwalked: completed with no rescues; rescued: completed only because a stuck postman was teleported on;")
+print("never: no round trip completed.")
 print("All addresses behaved as expected." if not bad else "%d address(es) did not behave as expected." % bad)
 sys.exit(1 if bad else 0)
 PY
