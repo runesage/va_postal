@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Route soak on the "towns" test world: builds the three test towns (dev/towns/build_towns.py) on a
+# throwaway Paper server, lets the postmen run every route for a while, then reports, per address,
+# whether a postman completed the round trip and how long it took.
+#
+# Usage: dev/towns/soak.sh [postal.jar]     (default: the newest target/va_postal-*.jar)
+# Env:   JAVA (Java 25+; default: java), WORK_DIR (default: ./towns-soak),
+#        SOAK_SECONDS (how long the postmen run; default 900)
+#
+# Exits non-zero if an address expected to be reachable was never reached (or the reverse).
+# Running this accepts the Minecraft EULA for a throwaway test server.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+JAR="${1:-$(ls -t "$REPO"/target/va_postal-*.jar 2>/dev/null | head -1)}"
+[ -n "$JAR" ] && [ -f "$JAR" ] || { echo "no Postal jar; build first (./mvnw package)" >&2; exit 2; }
+JAR="$(realpath "$JAR")"
+JAVA="${JAVA:-java}"
+WORK_DIR="${WORK_DIR:-towns-soak}"
+SOAK_SECONDS="${SOAK_SECONDS:-900}"
+# shellcheck source=ci/lib.sh
+source "$REPO/ci/lib.sh"
+
+mkdir -p "$WORK_DIR/cache"
+WORK_DIR="$(realpath "$WORK_DIR")"
+CACHE="$WORK_DIR/cache"
+SERVER="$WORK_DIR/server"
+CONFIG="$SERVER/plugins/Postal/config.yml"
+ROUTES="$WORK_DIR/routes.json"
+
+download_server_jars "$CACHE"
+rm -rf "$SERVER"
+install_server "$CACHE" "$SERVER"
+cp "$JAR" "$SERVER/plugins/Postal.jar"
+echo "eula=true" > "$SERVER/eula.txt"
+cat > "$SERVER/server.properties" <<'EOF'
+online-mode=false
+level-type=minecraft\:flat
+generate-structures=false
+view-distance=6
+simulation-distance=6
+spawn-protection=0
+max-players=1
+EOF
+mkdir -p "$SERVER/world/datapacks"
+python3 "$REPO/dev/towns/build_towns.py" --datapack "$SERVER/world/datapacks/postal_towns" --routes "$ROUTES"
+
+# run_server <log> <timeout> <command>...: boots the server, feeds console commands once it's up, stops it.
+run_server() {
+    local log="$1" limit="$2"; shift 2
+    rm -f "$SERVER/logs/latest.log"
+    (
+        for _ in $(seq 1 300); do
+            grep -q 'Done (' "$SERVER/logs/latest.log" 2>/dev/null && break
+            sleep 1
+        done
+        sleep 5
+        for cmd in "$@"; do
+            if [[ "$cmd" == sleep:* ]]; then sleep "${cmd#sleep:}"; else echo "$cmd"; sleep 2; fi
+        done
+        echo stop
+    ) | (cd "$SERVER" && timeout "$limit" "$JAVA" -Xms1G -Xmx2G -jar paper.jar nogui) > "$log" 2>&1 || true
+}
+
+echo "== Building the towns"
+run_server "$WORK_DIR/build.log" 600 "function postal_towns:build" "sleep:10" "save-all flush" "sleep:5"
+grep -q "Postal test towns built" "$WORK_DIR/build.log" || { echo "the towns weren't built; see $WORK_DIR/build.log" >&2; exit 1; }
+
+# The towns' offices, addresses and routes, plus quick postman pacing so every route runs several times.
+python3 "$REPO/dev/towns/build_towns.py" --config "$CONFIG"
+python3 - "$CONFIG" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+text = re.sub(r"(?m)^(  Debug: )'false'", r"\1'true'", text)
+for key, value in {"Postman_cool_sec": "10", "Central_cool_sec": "10", "Residence_cool_ticks": "40",
+                   "Heart_beat_ticks": "40", "Heart_beat_auto": "false"}.items():
+    line = "  %s: '%s'" % (key, value)
+    text, n = re.subn(r"(?m)^  %s: .*$" % key, line, text)
+    if n == 0:
+        text = re.sub(r"(?m)^Settings:$", "Settings:\n" + line, text, count=1)
+open(path, "w").write(text)
+PY
+
+echo "== Running the postmen for ${SOAK_SECONDS}s"
+run_server "$WORK_DIR/soak.log" "$((SOAK_SECONDS + 600))" \
+    "postal start" "sleep:$SOAK_SECONDS" "alist Hillcrest" "alist Riverside" "alist Woodvale" \
+    "postal stop" "sleep:5"
+
+echo "== Results"
+python3 - "$ROUTES" "$WORK_DIR/soak.log" <<'PY'
+import json, re, sys
+routes = json.load(open(sys.argv[1]))
+log = re.sub(r"\x1b\[[0-9;]*m", "", open(sys.argv[2], errors="replace").read())
+seconds = {}
+for m in re.finditer(r"(?m)^\[[^\]]*\]: (?:\[Postal\] \[STDOUT\] )?\s+(\S+)\s+\S+\s+Seconds: (\d+)", log):
+    seconds[m.group(1).lower()] = int(m.group(2))
+stuck = len(re.findall(r"Teleport Reset|stuck", log, re.I))
+bad = 0
+print("%-10s %-10s %-9s %-9s %s" % ("Town", "Address", "Expected", "Seconds", "Route"))
+for town, addrs in routes.items():
+    for addr, info in addrs.items():
+        secs = seconds.get(addr.lower())
+        reached = bool(secs)
+        expected = "reach" if info["reachable"] else "fail"
+        ok = reached == info["reachable"]
+        bad += not ok
+        print("%-10s %-10s %-9s %-9s %s%s" % (town, addr, expected, "-" if secs is None else secs,
+                                             info["what"], "" if ok else "   <-- UNEXPECTED"))
+print("\nStuck-NPC recoveries logged: %d" % stuck)
+print("All addresses behaved as expected." if not bad else "%d address(es) did not behave as expected." % bad)
+sys.exit(1 if bad else 0)
+PY

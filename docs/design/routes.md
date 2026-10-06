@@ -113,6 +113,13 @@ speed, or the recorded round-trip time).
 | R2 | Option C (self-healing) and option E (out-of-sight travel) |
 | R3 | Option D (road network, multi-stop delivery) |
 
-## 6. Decisions
+## 6. Test world
+
+`dev/towns/` builds three small towns (hills with stairs and a slab ramp, a river with two kinds of bridge, a
+fence gate, a door, an alley, a tunnel, a hedge maze, trees and a ladder-only loft) with a route to each of
+15 addresses, and `dev/towns/soak.sh` reports which addresses the postmen actually reach. It's the baseline
+for today's manual routes and the test bed for any of the options above. See `dev/towns/README.md`.
+
+## 7. Decisions
 
 None yet.
