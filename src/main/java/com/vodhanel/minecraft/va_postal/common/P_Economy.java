@@ -5,10 +5,14 @@ import com.vodhanel.minecraft.va_postal.config.C_Arrays;
 import com.vodhanel.minecraft.va_postal.config.C_Economy;
 import com.vodhanel.minecraft.va_postal.config.C_Owner;
 import com.vodhanel.minecraft.va_postal.economy.EconomyState;
+import com.vodhanel.minecraft.va_postal.economy.Hold;
+import com.vodhanel.minecraft.va_postal.economy.Postage;
+import com.vodhanel.minecraft.va_postal.mail.HoldTag;
 import com.vodhanel.minecraft.va_postal.economy.PostalEconomy;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.UUID;
 
@@ -175,22 +179,6 @@ public class P_Economy {
 
     // ---- Prices ----------------------------------------------------------------------------
 
-    public static double has_price_of_postage(Player player, String dest_po) {
-        if (!VA_postal.economy_configured) {
-            return 0.0D;
-        }
-        double price = C_Economy.postage_price(dest_po.equalsIgnoreCase(get_local(player)));
-        return does_player_have_amount(player, price) ? price : -1.0D;
-    }
-
-    public static double has_price_of_shipping(Player player, String dest_po) {
-        if (!VA_postal.economy_configured) {
-            return 0.0D;
-        }
-        double price = C_Economy.ship_price(dest_po.equalsIgnoreCase(get_local(player)));
-        return does_player_have_amount(player, price) ? price : -1.0D;
-    }
-
     public static double has_price_of_cod(Player player) {
         if (!VA_postal.economy_configured) {
             return 0.0D;
@@ -285,59 +273,182 @@ public class P_Economy {
         }
     }
 
-    /** Letter postage: split between Central and the sending office, plus the destination office if different. */
-    public static void charge_postage(Player player, String dest_po) {
-        if (VA_postal.economy_configured) {
-            charge_and_split(player, dest_po, false);
+    // ---- Postage escrow (docs/economy.md) -------------------------------------------------
+
+    /**
+     * What addressing {@code item} will hold: the out-of-town price for its kind, or 0 if postage is already
+     * held for it (re-addressing is free) or there's no economy.
+     */
+    public static double postage_to_hold(ItemStack item, boolean parcel) {
+        if (!VA_postal.economy_configured || active_hold(item) != null) {
+            return 0.0D;
         }
+        return parcel ? C_Economy.ship_price(false) : C_Economy.postage_price(false);
     }
 
-    /** Parcel shipping: same split as postage, at shipping prices. */
-    public static void charge_shipping(Player player, String dest_po) {
-        if (VA_postal.economy_configured) {
-            charge_and_split(player, dest_po, true);
-        }
+    /** The postage hold for {@code item}, or null if it has none (or it was settled or expired). */
+    public static Hold active_hold(ItemStack item) {
+        return EconomyState.hold(HoldTag.read(item));
     }
 
-    private static void charge_and_split(Player player, String dest_po, boolean shipment) {
-        String loc_po = get_local(player);
-        if (loc_po == null) {
-            loc_po = dest_po;
+    /**
+     * Takes postage for newly addressed mail: the out-of-town price, held at Central until the mail is
+     * delivered, when it's settled by the offices that actually handled it ({@link #settle_postage}). Mail
+     * that already has postage held ({@code old_item}, when re-addressing) keeps its hold.
+     *
+     * @return {@code new_item} tagged with its hold, or null if the sender couldn't pay
+     */
+    public static ItemStack hold_postage(Player player, ItemStack old_item, ItemStack new_item, boolean parcel) {
+        if (!VA_postal.economy_configured) {
+            return new_item;
         }
-        boolean local = loc_po.equalsIgnoreCase(dest_po);
-        double price = shipment ? C_Economy.ship_price(local) : C_Economy.postage_price(local);
-
+        Hold existing = active_hold(old_item);
+        if (existing != null) {
+            Util.pinform(player, "&6There is no charge for re-addressing.");
+            return HoldTag.write(new_item, existing.id);
+        }
+        double price = parcel ? C_Economy.ship_price(false) : C_Economy.postage_price(false);
+        if (price <= 0.0D) {
+            return HoldTag.write(new_item, null);
+        }
         if (!withdraw_from_player(player, price)) {
-            Util.cinform(AnsiColor.RED + "[Postal] Problem charging " + name(player) + (shipment ? " for shipping." : " for postage."));
-            return;
+            Util.pinform(player, "&f&oYou don't have enough money to cover " + (parcel ? "shipping." : "postage."));
+            return null;
+        }
+        deposit_to_central(price);
+        EconomyState.record(parcel ? EconomyState.Flow.SHIPPING : EconomyState.Flow.POSTAGE, price);
+        Hold hold = new Hold(UUID.randomUUID().toString(), player.getUniqueId(), parcel, price, 0.0D, now(), null);
+        EconomyState.put_hold(hold);
+        Util.pinform(player, "&6Thank you for your payment. &7&o(Held until delivery; local mail gets the difference back.)");
+        return HoldTag.write(new_item, hold.id);
+    }
+
+    /**
+     * Takes a COD surcharge for {@code label}, held with its postage until delivery.
+     *
+     * @return the label tagged with its hold, or null if the sender couldn't pay
+     */
+    public static ItemStack hold_cod_surcharge(Player player, ItemStack label) {
+        double price = C_Economy.cod_surchg();
+        if (!VA_postal.economy_configured || price <= 0.0D) {
+            return label;
+        }
+        if (!withdraw_from_player(player, price)) {
+            Util.pinform(player, "&f&oYou don't have enough money to cover the COD surcharge.");
+            return null;
+        }
+        deposit_to_central(price);
+        EconomyState.record(EconomyState.Flow.COD_SURCHARGE, price);
+        Hold hold = active_hold(label);
+        if (hold == null) {
+            hold = new Hold(UUID.randomUUID().toString(), player.getUniqueId(), true, 0.0D, price, now(), null);
+            EconomyState.put_hold(hold);
+        } else {
+            hold.cod += price;
+            EconomyState.touch_hold();
         }
         Util.pinform(player, "&6Thank you for your payment.");
-        EconomyState.record(shipment ? EconomyState.Flow.SHIPPING : EconomyState.Flow.POSTAGE, price);
-        if (local) {
-            double dist = price / 2.0D;
-            deposit_to_central(price - dist);
-            if (deposit_to_local(loc_po, dist)) EconomyState.add_revenue(loc_po, dist);
-        } else {
-            double dist = price / 3.0D;
-            deposit_to_central(price - 2.0D * dist);
-            if (deposit_to_local(loc_po, dist)) EconomyState.add_revenue(loc_po, dist);
-            if (deposit_to_local(dest_po, dist)) EconomyState.add_revenue(dest_po, dist);
+        return HoldTag.write(label, hold.id);
+    }
+
+    /**
+     * A postman is picking {@code item} up at {@code office}. The first office to pick mail up is its sending
+     * office. Returns false if the mail's postage has expired (it was refunded): it stays where it is until
+     * it's re-addressed.
+     */
+    public static boolean postage_collected(ItemStack item, String office) {
+        String id = HoldTag.read(item);
+        if (id == null || !VA_postal.economy_configured) {
+            return true;
+        }
+        Hold hold = EconomyState.hold(id);
+        if (hold == null) {
+            Util.dinform("[Postal] Mail with expired postage left at " + Util.df(office) + "; it must be re-addressed.");
+            return false;
+        }
+        if (hold.origin == null && office != null) {
+            hold.origin = office.toLowerCase().trim();
+            EconomyState.touch_hold();
+        }
+        return true;
+    }
+
+    /** True if {@code item} had postage held that expired (and was refunded) before it was picked up. */
+    public static boolean postage_expired(ItemStack item) {
+        return VA_postal.economy_configured && HoldTag.read(item) != null && active_hold(item) == null;
+    }
+
+    /**
+     * {@code item} was delivered by {@code dest_office}: pays the offices their shares of the postage held for
+     * it and refunds the sender whatever was held beyond the price of the route it actually took.
+     */
+    public static void settle_postage(ItemStack item, String dest_office) {
+        if (!VA_postal.economy_configured || dest_office == null) {
+            return;
+        }
+        Hold hold = EconomyState.remove_hold(HoldTag.read(item));
+        if (hold == null) {
+            return;
+        }
+        String origin = hold.origin == null ? dest_office : hold.origin;
+        boolean local = origin.equalsIgnoreCase(dest_office);
+        double price = hold.parcel ? C_Economy.ship_price(local) : C_Economy.postage_price(local);
+        Postage.Split split = Postage.settle(hold.base, hold.cod, price, local);
+        pay_office_from_central(origin, split.origin);
+        if (!local) {
+            pay_office_from_central(dest_office, split.dest);
+        }
+        if (split.refund > 0.005D) {
+            refund_postage(hold.payer, split.refund, "&6Postal refunded " + ef(split.refund)
+                    + " of your postage: your mail was delivered by its local office.");
         }
     }
 
-    public static void charge_cod_surcharge(Player player) {
+    /** Refunds postage held for mail that was never picked up within the expiry. Run each Postal day. */
+    public static int expire_holds() {
         if (!VA_postal.economy_configured) {
+            return 0;
+        }
+        long cutoff = now() - (long) C_Economy.hold_expiry_days() * C_Economy.day_seconds();
+        int expired = 0;
+        for (Hold hold : EconomyState.holds()) {
+            if (hold.origin == null && hold.created < cutoff) {
+                EconomyState.remove_hold(hold.id);
+                refund_postage(hold.payer, hold.total(), "&6Postal refunded " + ef(hold.total())
+                        + " for mail you addressed but never posted. Re-address it to send it.");
+                expired++;
+            }
+        }
+        return expired;
+    }
+
+    private static void pay_office_from_central(String office, double amount) {
+        if (amount <= 0.0D) {
             return;
         }
-        double price = C_Economy.cod_surchg();
-        if (withdraw_from_player(player, price)) {
-            Util.pinform(player, "&6Thank you for your payment.");
-            EconomyState.record(EconomyState.Flow.COD_SURCHARGE, price);
-            double dist = price / 2.0D;
-            deposit_to_central(price - dist);
-            String loc_po = get_local(player);
-            if (deposit_to_local(loc_po, dist)) EconomyState.add_revenue(loc_po, dist);
+        if (withdraw_from_central(amount) && deposit_to_local(office, amount)) {
+            EconomyState.add_revenue(office, amount);
         }
+    }
+
+    private static void refund_postage(UUID payer, double amount, String message) {
+        OfflinePlayer player = Bukkit.getOfflinePlayer(payer);
+        create_player_account(player);
+        if (withdraw_from_central(amount)) {
+            if (deposit_to_player(player, amount)) {
+                EconomyState.record(EconomyState.Flow.POSTAGE_REFUND, amount);
+                Player online = player.getPlayer();
+                if (online != null) {
+                    Util.pinform(online, message);
+                }
+            } else {
+                deposit_to_central(amount);
+            }
+        }
+    }
+
+    private static long now() {
+        return System.currentTimeMillis() / 1000L;
     }
 
     /** Charges a player directly (used for COD). Returns true only if the money was actually taken. */
@@ -555,19 +666,6 @@ public class P_Economy {
     }
 
     // ---- Helpers ---------------------------------------------------------------------------
-
-    /** Nearest local post office to the player, or null if none could be determined. */
-    public static String get_local(Player player) {
-        String[] list = C_Arrays.geo_po_list_sorted(player);
-        if ((list != null) && (list.length > 0)) {
-            String[] parts = list[0].split(",");
-            if (parts.length > 1) {
-                return parts[1].trim();
-            }
-        }
-        Util.cinform(AnsiColor.RED + "[Postal] Problem splitting local PO geo list to calculate postage. ");
-        return null;
-    }
 
     private static String name(OfflinePlayer player) {
         if (player == null) {

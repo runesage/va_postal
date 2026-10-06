@@ -142,6 +142,8 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.texture"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.signature"), "");
 
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.day_seconds"), "86400");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.office_floor"), "500");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.central_buffer"), "5000");

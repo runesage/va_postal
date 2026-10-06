@@ -22,6 +22,7 @@ import java.util.logging.Logger;
  *       deliveries;</li>
  *   <li>today's money flows by kind (the flow log);</li>
  *   <li>the dividend carry-over and each office's upkeep arrears;</li>
+ *   <li>postage held in escrow for mail not yet delivered ({@link Hold});</li>
  *   <li>the last {@link #HISTORY_DAYS} closed days.</li>
  * </ul>
  * Saved when a day closes, on shutdown and, if something changed, every few minutes.
@@ -33,7 +34,7 @@ public final class EconomyState {
     public enum Flow {
         POSTAGE("in"), SHIPPING("in"), COD_SURCHARGE("in"), DISTRIBUTION("in"), OFFICE_PURCHASE("in"),
         ADDRESS_PURCHASE("in"), DEPOSIT("in"),
-        REFUND("out"), WITHDRAWAL("out"),
+        REFUND("out"), WITHDRAWAL("out"), POSTAGE_REFUND("out"),
         UPKEEP("internal"), SWEEP("internal"), SEED("internal"), DIVIDEND("internal");
 
         public final String direction;
@@ -58,6 +59,7 @@ public final class EconomyState {
     private static double carry;
     private static long day_started;
     private static final List<Map<String, Object>> history = new ArrayList<>();
+    private static final Map<String, Hold> holds = new LinkedHashMap<>();
 
     private EconomyState() {
     }
@@ -92,6 +94,16 @@ public final class EconomyState {
         read_doubles(y.getConfigurationSection("arrears"), arrears);
         carry = y.getDouble("carry", 0.0D);
         day_started = y.getLong("today.started", now());
+        ConfigurationSection h = y.getConfigurationSection("holds");
+        if (h != null) {
+            for (String k : h.getKeys(false)) {
+                ConfigurationSection hs = h.getConfigurationSection(k);
+                Hold hold = hs == null ? null : Hold.from_map(k, hs.getValues(false));
+                if (hold != null) {
+                    holds.put(k, hold);
+                }
+            }
+        }
         for (Map<?, ?> m : y.getMapList("history")) {
             Map<String, Object> copy = new LinkedHashMap<>();
             for (Map.Entry<?, ?> e : m.entrySet()) {
@@ -120,6 +132,9 @@ public final class EconomyState {
             y.set("arrears." + e.getKey(), e.getValue());
         }
         y.set("carry", carry);
+        for (Hold hold : holds.values()) {
+            y.set("holds." + hold.id, hold.to_map());
+        }
         y.set("history", history);
         try {
             y.save(file);
@@ -157,6 +172,43 @@ public final class EconomyState {
             deliveries.merge(key(office), 1, Integer::sum);
             dirty = true;
         }
+    }
+
+    // ---- Postage holds ---------------------------------------------------------------------
+
+    public static synchronized void put_hold(Hold hold) {
+        holds.put(hold.id, hold);
+        dirty = true;
+    }
+
+    public static synchronized Hold hold(String id) {
+        return id == null ? null : holds.get(id);
+    }
+
+    public static synchronized Hold remove_hold(String id) {
+        Hold hold = id == null ? null : holds.remove(id);
+        if (hold != null) {
+            dirty = true;
+        }
+        return hold;
+    }
+
+    /** Marks a hold changed (after editing its fields), so it's saved. */
+    public static synchronized void touch_hold() {
+        dirty = true;
+    }
+
+    public static synchronized List<Hold> holds() {
+        return new ArrayList<>(holds.values());
+    }
+
+    /** All postage held in escrow: Central owes it back until the mail is delivered. */
+    public static synchronized double held_total() {
+        double total = 0.0D;
+        for (Hold hold : holds.values()) {
+            total += hold.total();
+        }
+        return total;
     }
 
     // ---- Reading ---------------------------------------------------------------------------
@@ -236,6 +288,7 @@ public final class EconomyState {
         flows.clear();
         arrears.clear();
         history.clear();
+        holds.clear();
         carry = 0.0D;
         dirty = false;
     }

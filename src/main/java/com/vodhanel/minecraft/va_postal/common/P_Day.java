@@ -26,6 +26,8 @@ public final class P_Day {
         if (!VA_postal.economy_configured) {
             return;
         }
+        // 0. Postage held for mail that was never posted goes back to its senders.
+        int holds_expired = P_Economy.expire_holds();
         double swept = 0.0D;
         double seeded = 0.0D;
         double upkeep_collected = 0.0D;
@@ -96,6 +98,10 @@ public final class P_Day {
         summary.put("pool", pool);
         summary.put("carry", EconomyState.carry());
         summary.put("arrears", DailyMath.round2(arrears_total));
+        summary.put("postage_held", DailyMath.round2(EconomyState.held_total()));
+        if (holds_expired > 0) {
+            summary.put("holds_expired", holds_expired);
+        }
         EconomyState.close_day(summary);
 
         Util.cinform("[Postal] Postal day: Central " + P_Economy.ef(central_end) + " (owes " + P_Economy.ef(owes)

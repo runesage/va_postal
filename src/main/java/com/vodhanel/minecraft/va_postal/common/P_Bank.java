@@ -92,7 +92,10 @@ public final class P_Bank {
         return new Office(name, owner, owned, balance, liability, reserve);
     }
 
-    /** Central's refunds: office prices of player-owned offices plus its half of player-owned addresses. */
+    /**
+     * Central's refunds: office prices of player-owned offices plus its half of player-owned addresses, plus
+     * all postage held in escrow for mail not yet delivered.
+     */
     public static double central_liability() {
         int owned_offices = 0;
         int owned_addresses = 0;
@@ -103,7 +106,7 @@ public final class P_Bank {
             owned_addresses += player_owned_addresses(office);
         }
         return Reserves.central_liability(owned_offices, C_Economy.po_purchase_price(), C_Economy.office_floor(),
-                owned_addresses, C_Economy.addr_purchase_price());
+                owned_addresses, C_Economy.addr_purchase_price()) + EconomyState.held_total();
     }
 
     public static double central_target() {
@@ -344,6 +347,11 @@ public final class P_Bank {
         send(sender, "&eCentral &7balance &f" + money(central_balance) + " &7owes &f" + money(central_liability)
                 + " &7target &f" + money(Reserves.central_target(central_liability, C_Economy.central_buffer()))
                 + (central_balance < central_liability ? " &c(below what it owes)" : ""));
+        int holds = EconomyState.holds().size();
+        if (holds > 0) {
+            send(sender, "&7  Postage held in escrow: &f" + money(EconomyState.held_total()) + " &7for " + holds
+                    + " piece" + (holds == 1 ? "" : "s") + " of mail not yet delivered (included in what Central owes)");
+        }
         List<String> offices = offices();
         if (offices.isEmpty()) {
             send(sender, "&7No local post offices.");

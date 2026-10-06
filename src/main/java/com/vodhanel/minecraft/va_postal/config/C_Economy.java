@@ -116,6 +116,11 @@ public class C_Economy {
         return Math.max(60L, (long) config_double("economy.day_seconds", 86400.0D));
     }
 
+    /** Postage held for mail that's never picked up is refunded after this many Postal days. */
+    public static synchronized int hold_expiry_days() {
+        return Math.max(1, (int) config_double("economy.postage.hold_expiry_days", 7.0D));
+    }
+
     /** Epoch second the last Postal day ran (0: never). */
     public static synchronized long last_day() {
         return (long) config_double("economy.last_day", 0.0D);

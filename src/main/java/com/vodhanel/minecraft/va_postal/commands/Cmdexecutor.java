@@ -1288,6 +1288,28 @@ public class Cmdexecutor implements CommandExecutor {
         return true;
     }
 
+    /**
+     * Mail can only be addressed near a post office in the player's world, so it can't be addressed from a
+     * world or place no office serves (docs/economy.md).
+     */
+    private static boolean near_post_office(Player player) {
+        int max = GetConfig.mail_office_distance();
+        if (max <= 0) {
+            return true;
+        }
+        String[] offices = C_Arrays.geo_po_list_sorted(player);
+        if ((offices != null) && (offices.length > 0)) {
+            try {
+                if (Integer.parseInt(offices[0].split(",")[0].trim()) <= max) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        Util.pinform(player, "&7&oYou need to be within " + max + " blocks of a post office to address mail.");
+        return false;
+    }
+
     public static boolean address(boolean console, CommandSender sender, String cmd, String[] args) {
         if ((!hasPermission(player, "postal.addr")) && (VA_postal.using_towny()) && (!P_Towny.is_towny_resident_by_tvrs(player))) {
             Util.pinform(player, "&7&oRequired permission not present.");
@@ -1310,13 +1332,13 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for post office. See list:");
             return true;
         }
-        double price = 0.0D;
-        if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_postage(player, stown);
-            if (price < 0.0D) {
-                Util.pinform(player, "&f&oYou don't have enough money to cover postage.");
-                return true;
-            }
+        if (!near_post_office(player)) {
+            return true;
+        }
+        double price = P_Economy.postage_to_hold(stack, BookManip.is_shipping_label(stack));
+        if ((price > 0.0D) && (!P_Economy.does_player_have_amount(player, price))) {
+            Util.pinform(player, "&f&oYou don't have enough money to cover postage.");
+            return true;
         }
         String saddress = C_Address.addresses_complete(stown, args[1]);
         if ("null".equals(saddress)) {
@@ -1343,7 +1365,7 @@ public class Cmdexecutor implements CommandExecutor {
             deregister_player_comfirmation(player);
         } else {
             Util.pinform(player, "&7&oReady to address to: &9&o" + Util.df(stown) + ", " + Util.df(saddress) + ", " + Util.df(attention));
-            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage.");
+            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage, held until delivery; local mail gets the difference back.");
 
             String scommand = "/addr " + stown + " " + saddress + " " + attention;
             register_player_comfirmation(player, scommand);
@@ -1546,13 +1568,13 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for post office. See list:");
             return true;
         }
-        double price = 0.0D;
-        if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_shipping(player, stown);
-            if (price < 0.0D) {
-                Util.pinform(player, "&f&oYou don't have enough money to cover shipping.");
-                return true;
-            }
+        if (!near_post_office(player)) {
+            return true;
+        }
+        double price = P_Economy.postage_to_hold(null, true);
+        if ((price > 0.0D) && (!P_Economy.does_player_have_amount(player, price))) {
+            Util.pinform(player, "&f&oYou don't have enough money to cover shipping.");
+            return true;
         }
         String saddress = C_Address.addresses_complete(stown, args[1]);
         if ("null".equals(saddress)) {
@@ -1579,7 +1601,7 @@ public class Cmdexecutor implements CommandExecutor {
         } else {
             Util.pinform(player, "&7&oReady create shipping label");
             Util.pinform(player, "&7&oAddressed to: &9&o" + Util.df(stown) + ", " + Util.df(saddress) + ", " + Util.df(attention));
-            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for shipping.");
+            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for shipping, held until delivery; local shipments get the difference back.");
 
             String scommand = "/package " + stown + " " + saddress + " " + attention;
             register_player_comfirmation(player, scommand);

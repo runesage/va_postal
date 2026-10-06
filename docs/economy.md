@@ -47,6 +47,30 @@ when the pool holds less than Postal owes in refunds.
 
 An office's shares of postage, shipping and COD surcharges are its **revenue** for the day.
 
+### Postage escrow
+
+Postage, shipping and COD surcharges are paid **up front** but split **on delivery**, by the offices that
+actually handled the mail:
+
+1. **Addressing** (`/addr`, `/package`, `/cod`): the sender pays the **out-of-town** price (plus the COD
+   surcharge), which Central holds. The letter or shipping label carries the hold. Re-addressing keeps its
+   hold and costs nothing more.
+2. **Pickup:** the office whose postman first picks the mail up (from an address chest or its own office
+   chest) is its **sending office**. Where the sender stood when addressing it doesn't matter.
+3. **Delivery:** the delivering office is the destination. If it's the sending office the mail was local:
+   the local price is split ½ Central, ½ the office, and the difference goes back to the sender. Otherwise
+   the out-of-town price is split in thirds. A COD surcharge goes ½ Central, ½ the sending office. Refunds
+   reach senders who are offline.
+4. **Never posted:** postage held for mail no postman picks up within `Postage.Hold_expiry_days` Postal days
+   (default 7) is refunded. That mail stays where it is until it's re-addressed (and paid for again).
+
+Held postage counts toward what **Central owes**, so it's never swept, paid out as a dividend or used to
+seed offices. `/postal bank` shows the total held.
+
+Mail can only be addressed within `Settings.Mail_office_distance` blocks (default 200, 0 for anywhere) of a
+post office **in the same world**. There's one Central per server, in charge of every dimension; an office
+in the nether is an ordinary local office.
+
 **When a place changes hands**, the previous player owner gets back what they put in, if the accounts can
 cover it (Postal never creates money for a refund):
 
@@ -62,7 +86,7 @@ Postal runs a full reserve: every account keeps enough to pay every refund it co
   that plus the floor (`Economy.Office_floor`, default 500), which a purchase seeds, so a player-owned
   office never runs dry. The owner may take out anything above the reserve.
 - **Central owes**, for each player-owned office, the office price less the seed, plus the other half of
-  every player-owned address. Its **target** is that plus `Economy.Central_buffer` (default 5000).
+  every player-owned address, plus all postage held in escrow. Its **target** is that plus `Economy.Central_buffer` (default 5000).
 - Server-owned offices are kept at their reserve: topped up from Central's spare money when created or
   short, and swept back to Central when above it.
 
@@ -119,5 +143,8 @@ All under `Economy:` in `config.yml`; the ones marked *policy* can be changed li
 | `Dividend.Release_rate` | 0.5 | share of Central's surplus released per day, 0–1 (*policy*: `dividend.release_rate`) |
 | `Dividend.Cap` | 0.4 | per-office dividend cap as a share of its revenue, 0–0.45 (*policy*: `dividend.cap`) |
 
+| `Postage.Hold_expiry_days` | 7 | postage held for mail never picked up is refunded after this many Postal days |
+
 Prices (`Postoffice.Purchase_price`, `Address.Purchase_price`, `Postage.*`) are unchanged. Daily counters,
-carry, arrears and the last 30 days of flows are kept in `plugins/Postal/economy.yml`.
+carry, arrears, postage holds and the last 30 days of flows are kept in `plugins/Postal/economy.yml`.
+`Settings.Mail_office_distance` (default 200) is under `Settings:`.
