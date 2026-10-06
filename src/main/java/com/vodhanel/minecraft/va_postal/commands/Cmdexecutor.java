@@ -1868,10 +1868,17 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
 
-        if (((!VA_postal.economy_configured) || (C_Owner.is_address_owner_defined(stown, saddress))) &&
-                (!hasPermission_ext(player, "postal.owneraddr", stown, saddress))) {
-            Util.pinform(player, "&7&oRequired permission not present.");
-            return true;
+        // Without the permission, a player may only buy an unowned address for themselves (see ownerlocal).
+        if (!hasPermission_ext(player, "postal.owneraddr", stown, saddress)) {
+            boolean for_sale = VA_postal.economy_configured && !C_Owner.is_address_owner_defined(stown, saddress);
+            if (!for_sale) {
+                Util.pinform(player, "&7&oRequired permission not present.");
+                return true;
+            }
+            if ((psubject == null) || (!psubject.getUniqueId().equals(player.getUniqueId()))) {
+                Util.pinform(player, "&7&oYou can only buy an address for yourself.");
+                return true;
+            }
         }
 
         double price = 0.0D;
@@ -1994,10 +2001,18 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
 
-        if (((!VA_postal.economy_configured) || (C_Owner.is_local_po_owner_defined(stown))) &&
-                (!hasPermission_ext(player, "postal.ownerlocal", stown, "null"))) {
-            Util.pinform(player, "&7&oRequired permission not present.");
-            return true;
+        // Without the permission, a player may only buy an unowned office for themselves: the buyer pays, so
+        // only the buyer can agree to it (v4 let anyone charge any online player).
+        if (!hasPermission_ext(player, "postal.ownerlocal", stown, "null")) {
+            boolean for_sale = VA_postal.economy_configured && !C_Owner.is_local_po_owner_defined(stown);
+            if (!for_sale) {
+                Util.pinform(player, "&7&oRequired permission not present.");
+                return true;
+            }
+            if ((subject == null) || (!subject.getUniqueId().equals(player.getUniqueId()))) {
+                Util.pinform(player, "&7&oYou can only buy a post office for yourself.");
+                return true;
+            }
         }
 
         double price = 0.0D;

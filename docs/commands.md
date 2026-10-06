@@ -120,6 +120,8 @@ Subcommands:
 ```
 `/setowner` resolves in `/setaddr` or `/setlocal` first, depending on the arguments.
 Both give the ownership of the postal object in question (`address` or `PostOffice`) to `player`
+With the economy on, a player without these permissions can still buy an **unowned** post office or address,
+but only for themselves: the player named pays the purchase price, so only they can agree to it.
 <br>
 #### `/showroute [[PostOffice] <address>]`
 Permissions: `postal.showroute`

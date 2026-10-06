@@ -45,6 +45,9 @@ when the pool holds less than Postal owes in refunds.
 | Post office purchase | new owner | the office's floor seeds the office; the rest to Central (held for the refund) |
 | Address purchase | new owner | ½ Central, ½ the address's office (each holds its half of the refund) |
 
+A player can buy an unowned office or address for themselves with `/setowner`. Only admins (or players with
+`postal.ownerlocal` / `postal.owneraddr`) can make someone else the owner, which charges that player.
+
 An office's shares of postage, shipping and COD surcharges are its **revenue** for the day.
 
 ### Postage escrow
