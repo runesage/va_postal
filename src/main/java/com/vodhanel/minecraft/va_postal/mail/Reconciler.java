@@ -72,9 +72,6 @@ public final class Reconciler {
             }
             Set<String> inspected = new HashSet<>();
             for (MailRecord r : store.held_here()) {
-                if (r.kind != MailKind.LETTER) {
-                    continue; // parcels are tracked from phase P2
-                }
                 report.checked++;
                 settle(store, r, startup, report);
                 if (r.custody.kind == Custody.Kind.CHEST) {
@@ -293,16 +290,26 @@ public final class Reconciler {
         }
     }
 
-    /** A letter written to look like Postal mail. Shipping labels are untracked until P2, so they don't count. */
+    /** A book written to look like Postal mail (letters and shipping labels both start "To: ... Mailed from:"). */
     private static boolean looks_like_mail(ItemStack item) {
         Book book = new Book(item);
         String[] pages = book.getPages();
-        return book.is_valid() && pages != null && pages.length > 0 && pages[0].contains("Mailed from:")
-                && !pages[0].toLowerCase().contains("[shipping label]");
+        return book.is_valid() && pages != null && pages.length > 0 && pages[0].contains("Mailed from:");
     }
 
     private static void warn_missing(MailRecord r, String why) {
-        Util.cinform(AnsiColor.RED + "[Postal] Letter " + r.id + " for " + r.dest_office + ", " + r.dest_address
-                + " is MISSING (" + why + " at " + r.custody + ").");
+        missing(r, why);
+    }
+
+    /** Reports a record just marked MISSING: the log, and {@link MailMissingEvent} for claim handlers. */
+    static void missing(MailRecord r, String why) {
+        Util.cinform(AnsiColor.RED + "[Postal] " + (r.kind == MailKind.PARCEL ? "Parcel " : "Letter ") + r.id + " for "
+                + r.dest_office + ", " + r.dest_address + " is MISSING (" + why + " at " + r.custody + ").");
+        try {
+            Bukkit.getPluginManager().callEvent(new com.vodhanel.minecraft.va_postal.api.MailMissingEvent(r.id, r.kind.name(),
+                    r.sender, r.dest_office, r.dest_address, r.custody.toString(), why, r.cod_amount));
+        } catch (RuntimeException e) {
+            Util.cinform("[Postal] A MailMissingEvent listener failed: " + e);
+        }
     }
 }

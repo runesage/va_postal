@@ -574,7 +574,7 @@ public class ID_Mail {
                                 if (page1.contains("[shipping label]")) {
                                     shipper_found = true;
 
-                                    ChestManip.parcel_remove_origen_chest(ind_item);
+                                    Parcels.collect(ind_item); // a courier collects the emptied, locked chest
                                 }
                                 item_itr.set(null);
                             }
@@ -662,7 +662,7 @@ public class ID_Mail {
                             replace_slot_by_index_po(id, index, stamped_mail);
 
                             if (page1.contains("[shipping label]")) {
-                                ChestManip.parcel_remove_origen_chest(ind_item);
+                                Parcels.collect(ind_item); // a courier collects the emptied, locked chest
                             } else {
                                 mail_found = true;
                             }
@@ -866,7 +866,7 @@ public class ID_Mail {
                             ChestManip.add_to_central_chest(stamped_mail, move);
 
                             if (spage[0].contains("[shipping label]")) {
-                                ChestManip.parcel_remove_origen_chest(ind_item);
+                                Parcels.collect(ind_item); // a courier collects the emptied, locked chest
                                 ItemStack chest_in_hand = new ItemStack(Material.CHEST);
 
                                 NpcLook.hold(VA_postal.central_route_npc, chest_in_hand);

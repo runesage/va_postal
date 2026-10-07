@@ -238,39 +238,9 @@ public class Cmd_static {
         }
     }
 
+    /** {@code /accept}: the parcel's items from its record, exactly once (see Parcels). */
     public static boolean accept_worker(Player player, ItemStack stack, double price) {
-        String splayer = player.getName().trim();
-        Block block = ChestManip.parcel_place_chest_accept(player);
-        if (block == null) {
-            Util.pinform(player, "&7&oUnable to place parcel here.");
-            return false;
-        }
-
-        if (price > 0.0D) {
-            java.util.UUID sender = new Book(stack).extractEmbeddedAuthorId();
-            if (sender == null) {
-                Util.cinform("[Postal] Unable charge for COD.");
-                Util.pinform(player, "&7&oUnable to collect COD for this parcel.");
-                block.setType(org.bukkit.Material.AIR);
-                return false;
-            }
-            if (!P_Economy.charge_player(player, price)) {
-                Util.pinform(player, "&7&oUnable to collect COD payment.");
-                block.setType(org.bukkit.Material.AIR);
-                return false;
-            }
-            P_Economy.pay_player(Bukkit.getOfflinePlayer(sender), price);
-        }
-
-        Inventory inventory = BookManip.parcel_fill_chest(block, stack);
-        if (inventory == null) {
-            Util.pinform(player, "&7&oUnable to complete shipment.");
-            return false;
-        }
-
-        ItemStack stamped = BookManip.stamp_parcel_statement(player, stack, true);
-        player.getInventory().setItemInMainHand(stamped);
-        return true;
+        return com.vodhanel.minecraft.va_postal.mail.Parcels.accept(player, stack);
     }
 
     public static void cod_worker(Player player, ItemStack stack, double cod_price) {
@@ -286,6 +256,7 @@ public class Cmd_static {
             stamped = P_Economy.hold_cod_surcharge(player, stamped);
             if (stamped == null) return;
         }
+        com.vodhanel.minecraft.va_postal.mail.Parcels.set_cod(stamped, cod_price, player);
         player.getInventory().setItemInMainHand(stamped);
     }
 
@@ -355,7 +326,7 @@ public class Cmd_static {
             Util.pinform(player, "&7&oNothing in the chest to ship.");
             return false;
         }
-        String[] pages = new String[49];
+        String[] pages = new String[12];
         pages[0] = ("§7" + sworld + "\n");
         pages[0] = (pages[0] + scoords + "," + c_data + "\n\n");
         int line = 3;
@@ -386,19 +357,15 @@ public class Cmd_static {
             if (page >= 9) break;
         }
 
-        while (page < pages.length) {
-            pages[page] = "";
-            page++;
-        }
-
-        System.arraycopy(item_list, 50, pages, 9, 27);
+        // The items themselves go into the parcel's record (Parcels.packaged); the label only lists them.
+        pages = java.util.Arrays.copyOf(pages, Math.max(1, page));
 
 
         String splayer = player.getName().trim();
         if (splayer.length() > 15) splayer = splayer.substring(0, 15);
         Book new_book = new Book("[shipping label]", splayer, pages);
         ItemStack new_stack = new_book.generateItemStack();
-        if (!addr_worker(player, inventory, new_stack, attention, Attention, stown, saddress)) {
+        if (!addr_worker(player, inventory, new_stack, attention, Attention, stown, saddress, block)) {
             return false;
         }
         BookManip.standard_addr_sign(slocation, 2, stown, saddress, splayer);
@@ -406,6 +373,11 @@ public class Cmd_static {
     }
 
     public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress) {
+        return addr_worker(player, inventory, stack, attention, OriginalPlayerAttention, stown, saddress, null);
+    }
+
+    /** {@code parcel_chest}: the chest a new parcel is being packed from (null when addressing a letter). */
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress, Block parcel_chest) {
         Book book = new Book(stack);
         String title;
         String author;
@@ -443,12 +415,26 @@ public class Cmd_static {
         ItemStack new_stack = new_book.generateItemStack();
         // Postage is held now and settled on delivery by the offices that handle it (re-addressing keeps the hold).
         boolean parcel = (inventory != null) || title.equalsIgnoreCase(Util.df("[shipping label]"));
+        if (parcel && parcel_chest == null) {
+            // A parcel's destination is part of its record; re-addressing would leave the two disagreeing.
+            Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
+            return false;
+        }
         new_stack = P_Economy.hold_postage(player, stack, new_stack, parcel);
         if (new_stack == null) {
             return false;
         }
-        if (!parcel) {
-            // A letter (parcels are tracked from phase P2): record it and tag the book with its mail id.
+        if (parcel) {
+            ItemStack recorded = com.vodhanel.minecraft.va_postal.mail.Parcels.packaged(new_stack, player, parcel_chest,
+                    Letters.nearest_office(player), stown, saddress,
+                    OriginalPlayerAttention == null ? null : OriginalPlayerAttention.getUniqueId());
+            if (recorded == null) {
+                P_Economy.cancel_hold(HoldTag.read(new_stack)); // nothing was shipped: give the postage back
+                return false;
+            }
+            new_stack = recorded;
+        } else {
+            // A letter: record it and tag the book with its mail id.
             new_stack = Letters.posted(MailIds.carry(stack, new_stack), player.getUniqueId(), Letters.nearest_office(player),
                     stown, saddress, OriginalPlayerAttention == null ? null : OriginalPlayerAttention.getUniqueId());
         }

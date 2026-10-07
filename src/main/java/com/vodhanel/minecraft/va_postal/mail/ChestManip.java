@@ -253,46 +253,6 @@ public class ChestManip {
         return null;
     }
 
-    public static synchronized void parcel_remove_origen_chest(ItemStack ind_item) {
-        Book book;
-        try {
-            book = new Book(ind_item);
-        } catch (Exception e) {
-            return;
-        }
-        String[] spage = book.getPages();
-        String[] parts = spage[1].split("\n");
-        String sworld = parts[0].substring(2).trim();
-        String scoords = parts[1].trim();
-        String[] parts_c = scoords.split(",");
-        String X;
-        String Y;
-        String Z;
-        try {
-            X = parts_c[0].trim();
-            Y = parts_c[1].trim();
-            Z = parts_c[2].trim();
-        } catch (Exception e) {
-            return;
-        }
-        String slocation = sworld + "," + X + "," + Y + "," + Z;
-        Location location = Util.str2location(slocation);
-        World w = location.getWorld();
-        Block block = w.getBlockAt(location);
-        if (block == null) {
-            return;
-        }
-        if (!(block.getState() instanceof Chest)) {
-            return;
-        }
-        Chest chest = (Chest) block.getState();
-
-        chest.getInventory().clear();
-
-        SignManip.remove_sign_id_chest(block);
-        block.setType(Material.AIR);
-    }
-
     public static synchronized void add_to_central_chest(ItemStack book_item) {
         add_to_central_chest(book_item, Letters.Move.UNTRACKED);
     }

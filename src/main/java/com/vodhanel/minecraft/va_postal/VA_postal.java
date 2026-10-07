@@ -386,6 +386,7 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.economy.PostalDay.stop();
         com.vodhanel.minecraft.va_postal.economy.EconomyState.save();
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
+        com.vodhanel.minecraft.va_postal.mail.Courier.shutdown();
         SHUTDOWN();
         PostalEconomy.shutdown();
         com.vodhanel.minecraft.va_postal.store.MailStores.close();
