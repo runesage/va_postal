@@ -92,7 +92,10 @@ A 10-minute soak on today's code. 11 of the 14 walkable addresses are walked cle
 | Doorstep | 4 | waypoints 4 and 5 | the closed door (Postal's door handling soft-resets, then teleports) |
 | Alley | 2 | waypoint 3 | entering the one-wide alley |
 | Tunnel | 1 | waypoint 7 | inside the one-wide, two-high tunnel |
-| Loft | 72 | waypoint 11 | the ladder: never climbed, teleported up every time (expected) |
+| Loft | 6 | waypoint 11 | the ladder: never climbed, teleported up, and down to the door (expected) |
+
+Loft's count is after the stuck-loop fix. Before it, a postman stuck coming back down to the door retried the
+door forever, jumping on the mailbox: 72 door resets in the last 5.5 minutes of the soak, with no teleport.
 
 Stairs, slab ramps, the L-shaped stair, both bridges, the fence gate, the hedge maze and the forest paths
 are all walked without help.
