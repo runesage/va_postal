@@ -21,12 +21,12 @@ public class Stuck_NPC implements StuckAction {
         }
 
         if (id >= 0) {
-            Util.dinform("STUCKACTION FOR " + id);
-
             long interval = System.currentTimeMillis() - VA_postal.wtr_last_stuck_stamp[id];
             if (interval < 750L) {
+                // Citizens asks again every tick while the postman is stuck: only act (and log) every 750 ms.
                 return true;
             }
+            Util.dinform("STUCKACTION FOR " + id);
 
 
             if (!ID_WTR.npc_should_run(id)) {
@@ -42,8 +42,25 @@ public class Stuck_NPC implements StuckAction {
             }
 
 
+            String stuck_action = VA_postal.wtr_poffice[id] + "," + VA_postal.wtr_address[id] + "," + Util.int2str(VA_postal.wtr_pos[id]);
+            String door_given_up = "DOOR_TP," + stuck_action;
+
+            // Stuck on the way to a door: open it and soft-reset, up to five times. v4 then cleared its marker and
+            // started the five again, forever (each try also reset the watchdog), so a postman who couldn't reach
+            // the door at all, say coming down Loft's ladder, jumped in place for good. Now the sixth time he's
+            // teleported to the door and goes on through it.
+            if ("DOOR5".equals(VA_postal.wtr_last_stuck_action[id])) {
+                ID_WTR.report_recovery(id, "Door Navigation, Teleport Reset");
+                ID_WTR.tp_npc(npc, VA_postal.wtr_waypoint[id].clone().add(0.5, 0, 0.5));
+                VA_postal.wtr_last_stuck_action[id] = door_given_up;
+                ID_WTR.open_door(id, true, true);
+                VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
+                return true;
+            }
+
             if ((VA_postal.wtr_door_nav[id]) && (!VA_postal.wtr_door_nav_enter[id]) &&
-                    (!"DOOR5".equals(VA_postal.wtr_last_stuck_action[id]))) {
+                    (!door_given_up.equals(VA_postal.wtr_last_stuck_action[id])) &&
+                    (!stuck_action.equals(VA_postal.wtr_last_stuck_action[id]))) {
                 if ("DOOR3".equals(VA_postal.wtr_last_stuck_action[id])) {
                     ID_WTR.report_recovery(id, "Door Navigation, Soft Reset");
                 }
@@ -56,9 +73,6 @@ public class Stuck_NPC implements StuckAction {
             if ((VA_postal.wtr_last_stuck_action[id] != null) && (VA_postal.wtr_last_stuck_action[id].contains("DOOR"))) {
                 VA_postal.wtr_last_stuck_action[id] = "";
             }
-
-            String stuck_action = VA_postal.wtr_poffice[id] + "," + VA_postal.wtr_address[id] + "," + Util.int2str(VA_postal.wtr_pos[id]);
-
 
             if ((VA_postal.wtr_last_stuck_action[id] != null) && (VA_postal.wtr_last_stuck_action[id].equals(stuck_action))) {
                 ID_WTR.report_recovery(id, "Route Navigation, Teleport Reset");
