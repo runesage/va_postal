@@ -178,6 +178,37 @@ class SqlMailStoreTest {
     }
 
     @Test
+    void parcelKeepsItsHoldAndTerms() {
+        MailRecord p = store.create(MailRecord.new_parcel(UUID.randomUUID(), "main", "Testville", "Testville", "Home",
+                UUID.randomUUID(), null, new byte[]{1, 2, 3}, 4440, 1L, "hold-1"), Actor.system("test"), "packaged");
+        assertEquals(MailKind.PARCEL, p.kind);
+        assertEquals("PARCEL_V1", p.payload_format);
+        assertEquals("hold-1", p.hold_id);
+        assertArrayEquals(new byte[]{1, 2, 3}, p.payload);
+
+        MailRecord cod = store.set_terms(p, 350.0D, "hold-2", Actor.player(p.sender), "COD set to 350");
+        assertEquals(350.0D, cod.cod_amount);
+        assertEquals("hold-2", cod.hold_id);
+        assertEquals(MailState.POSTED, cod.state);
+        assertEquals(p.version + 1, cod.version);
+        assertEquals(2, store.history(p.id).size());
+        assertThrows(ConflictException.class, () -> store.set_terms(p, 1.0D, null, Actor.system("test"), "stale"));
+    }
+
+    @Test
+    void acceptingADeliveredParcelHappensOnce() {
+        MailRecord p = store.create(MailRecord.new_parcel(UUID.randomUUID(), "main", "Testville", "Testville", "Home",
+                UUID.randomUUID(), null, new byte[0], 4440, 1L, null), Actor.system("test"), "packaged");
+        MailRecord delivered = store.transition(p, MailState.DELIVERED, Custody.chest("world,40,-60,0"), Actor.system("test"), null);
+        store.transition(delivered, MailState.ACCEPTED, Custody.NONE, Actor.system("test"), "accepted");
+        // A second accept from the same (now stale) record loses: items are handed over exactly once.
+        assertThrows(ConflictException.class,
+                () -> store.transition(delivered, MailState.ACCEPTED, Custody.NONE, Actor.system("test"), "again"));
+        assertTrue(MailState.ACCEPTED.terminal());
+        assertTrue(store.held_here().stream().noneMatch(r -> r.id.equals(p.id)));
+    }
+
+    @Test
     void migrationScriptSplitsAndDropsComments() {
         List<String> parts = SqlMailStore.statements("-- c\nCREATE TABLE a (x INT); -- trailing\nCREATE TABLE b (y INT);\n");
         assertEquals(List.of("CREATE TABLE a (x INT)", "CREATE TABLE b (y INT)"), parts);

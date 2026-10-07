@@ -135,6 +135,9 @@ public final class Reconciler {
                 }
                 return;
             }
+            if (r.state == MailState.MISSING) {
+                return; // already reported; if the book turns up again the dispatcher routes it from there
+            }
             if (r.custody.kind == Custody.Kind.CHEST) {
                 Inventory at = chest(r.custody, load);
                 if (at == null) {
