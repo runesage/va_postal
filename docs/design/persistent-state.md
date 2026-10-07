@@ -302,6 +302,12 @@ P1 follows this design, with these differences:
   `postal:packed` mark from packing; at the label's first pickup, a chest that has items and no mark means a
   rollback, so the parcel is cancelled (`RETURNED`, postage refunded), the label is never routed, and the chest
   is unlocked with the real items in it.
+- **Items removed from the game.** Paper upgrades an item's stored data when it's read back, so renamed ids
+  and changed components carry over between Minecraft versions. If an item no longer exists at all, the parcel
+  is still opened (accepted, refused, cancelled or recovered) with everything else in it. Whoever opens it is
+  told which item was left out (its old id is read from the stored bytes), and the log and the parcel's history
+  note it too. The record keeps the item's data, so nothing is erased. `/postal track` lists such an item as
+  "no longer in the game".
 - **`/package cancel`** (an unposted label in hand) puts the items back in the chest they were packed in
   (unlocking it), or a new chest in front of the sender, and refunds the postage.
 - **Claim hook.** `MailMissingEvent` (Bukkit event, `com.vodhanel.minecraft.va_postal.api`) fires whenever a
@@ -310,6 +316,6 @@ P1 follows this design, with these differences:
   closes it as `RECOVERED`, so the original (if it turns up) is never routed or accepted.
 - **Re-addressing a shipping label** is refused (the destination is part of the record); cancel and package
   again.
-- **Test helpers** (admin): `/postal testparcel`, `/postal accept|refuse <id>`, `/postal recover <id>`,
+- **Test helpers** (admin): `/postal testparcel` (with `retired` for an item gone from the game), `/postal accept|refuse <id>`, `/postal recover <id>`,
   `/postal setstate <id> <state>`; `last` stands for the newest mail id.
 - **Fixed from P1:** a letter already `MISSING` was marked `MISSING` again on every reconciliation pass.

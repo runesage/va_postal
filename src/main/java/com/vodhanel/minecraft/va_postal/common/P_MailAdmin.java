@@ -139,13 +139,14 @@ public final class P_MailAdmin {
     }
 
     /**
-     * {@code /postal testparcel <from office> <to office> <to address> [cod]}: packs a test parcel (an enchanted,
-     * renamed sword, logs, golden apples) in a chest beside the from-office, locks it, and hands its label in at
-     * that office, as a player would after /package.
+     * {@code /postal testparcel <from office> <to office> <to address> [cod] [retired]}: packs a test parcel (an
+     * enchanted, renamed sword, logs, golden apples) in a chest beside the from-office, locks it, and hands its
+     * label in at that office, as a player would after /package. With {@code retired}, it also carries an item
+     * recorded under an id this Minecraft doesn't have, as if an upgrade had removed it.
      */
     public static void testparcel(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, "&7Usage: /postal testparcel <from office> <to office> <to address> [cod]");
+            send(sender, "&7Usage: /postal testparcel <from office> <to office> <to address> [cod] [retired]");
             return;
         }
         String from = C_Postoffice.town_complete(args[1]);
@@ -159,7 +160,8 @@ public final class P_MailAdmin {
             send(sender, "&7Unknown address in " + to + ". See /alist " + to + ".");
             return;
         }
-        double cod = args.length > 4 ? Util.str2double(args[4]) : 0.0D;
+        boolean retired = args.length > 4 && "retired".equalsIgnoreCase(args[args.length - 1]);
+        double cod = args.length > 4 && !"retired".equalsIgnoreCase(args[4]) ? Util.str2double(args[4]) : 0.0D;
         Block office = office_chest(from);
         if (office == null) {
             send(sender, "&7Couldn't find " + from + "'s post office chest.");
@@ -170,7 +172,7 @@ public final class P_MailAdmin {
             send(sender, "&7No room for a parcel chest near " + from + "'s post office.");
             return;
         }
-        ItemStack label = com.vodhanel.minecraft.va_postal.mail.Parcels.test_parcel(spot.getBlock(), to, address, cod,
+        ItemStack label = com.vodhanel.minecraft.va_postal.mail.Parcels.test_parcel(spot.getBlock(), to, address, cod, retired,
                 com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()));
         if (label == null) {
             send(sender, "&7Couldn't record the test parcel (is the mail store open?).");
@@ -187,7 +189,7 @@ public final class P_MailAdmin {
         Block b = spot.getBlock();
         send(sender, "&6Test parcel " + id + " packed at " + b.getX() + "," + b.getY() + "," + b.getZ()
                 + " and handed in at " + Util.df(from) + " for " + Util.df(to) + ", " + Util.df(address)
-                + (cod > 0.0D ? " (COD " + cod + ")" : "") + ".");
+                + (cod > 0.0D ? " (COD " + cod + ")" : "") + (retired ? ", with a retired item" : "") + ".");
     }
 
     /**
@@ -211,7 +213,7 @@ public final class P_MailAdmin {
                 send(sender, "&7Give x y z for the chest (from the console).");
                 return;
             }
-            if (com.vodhanel.minecraft.va_postal.mail.Parcels.recover(r, at, actor)) {
+            if (com.vodhanel.minecraft.va_postal.mail.Parcels.recover(r, at, actor, sender)) {
                 send(sender, "&6Parcel " + r.id + " recovered into a chest at " + at.getBlockX() + "," + at.getBlockY() + "," + at.getBlockZ() + ".");
             } else {
                 send(sender, "&7Couldn't recover it there (the spot must be empty air).");
@@ -245,7 +247,7 @@ public final class P_MailAdmin {
             return;
         }
         if (com.vodhanel.minecraft.va_postal.mail.Parcels.admin_accept(r, at,
-                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()))) {
+                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()), sender)) {
             send(sender, "&6Parcel " + r.id + " accepted: its items are in a chest at " + at.getBlockX() + "," + at.getBlockY() + "," + at.getBlockZ() + ".");
         } else {
             send(sender, "&7Can't accept it: it must be a DELIVERED parcel, and the spot empty air (it's " + r.state + ").");
@@ -259,7 +261,7 @@ public final class P_MailAdmin {
             return;
         }
         if (com.vodhanel.minecraft.va_postal.mail.Parcels.admin_refuse(r,
-                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()))) {
+                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()), sender)) {
             send(sender, "&6Parcel " + r.id + " refused: its items went back to where it was packed.");
         } else {
             send(sender, "&7Can't refuse it: it must be a DELIVERED parcel whose packing spot is clear (it's " + r.state + ").");

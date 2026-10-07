@@ -19,6 +19,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -71,6 +72,16 @@ public final class Parcels {
      */
     static ItemStack record_parcel(ItemStack label, UUID sender, Block chest, String origin_office, String dest_office,
                                    String dest_address, UUID attention, Actor actor) {
+        return record_parcel(label, sender, chest, origin_office, dest_office, dest_address, attention, actor, -1);
+    }
+
+    /** An item id no version of Minecraft has: {@code /postal testparcel ... retired} ships one. */
+    static final String RETIRED_ID = "minecraft:postal_retired_item";
+
+    /** As above; the item in {@code retire_slot} (testing; -1 for none) is recorded as {@link #RETIRED_ID}. */
+    private static ItemStack record_parcel(ItemStack label, UUID sender, Block chest, String origin_office,
+                                           String dest_office, String dest_address, UUID attention, Actor actor,
+                                           int retire_slot) {
         MailStore store = store();
         if (store == null || !(chest.getState() instanceof Chest)) {
             return null;
@@ -82,7 +93,8 @@ public final class Parcels {
             ItemStack item = inv.getItem(slot);
             if (item != null && !item.getType().isAir()) {
                 slots.add(slot);
-                items.add(item.serializeAsBytes());
+                byte[] bytes = item.serializeAsBytes();
+                items.add(slot == retire_slot ? ParcelPayload.with_item_id(bytes, RETIRED_ID) : bytes);
             }
         }
         Book book = new Book(label);
@@ -159,8 +171,9 @@ public final class Parcels {
             block.setType(Material.AIR);
             return false;
         }
+        MailRecord done;
         try {
-            store().transition(r, MailState.ACCEPTED, Custody.NONE, Actor.player(player.getUniqueId()),
+            done = store().transition(r, MailState.ACCEPTED, Custody.NONE, Actor.player(player.getUniqueId()),
                     "accepted" + (cod > 0.0D ? ", COD " + cod + " paid" : ""));
         } catch (StoreException | ConflictException e) {
             // Someone else accepted or refused it first (or the store failed): hand nothing over.
@@ -171,7 +184,7 @@ public final class Parcels {
             Util.pinform(player, "&c&oThis order has already been filled.");
             return false;
         }
-        fill(block, ParcelPayload.decode(r.payload));
+        fill(block, done, ParcelPayload.decode(r.payload), player);
         if (cod > 0.0D && r.sender != null) {
             P_Economy.pay_player(Bukkit.getOfflinePlayer(r.sender), cod);
         }
@@ -190,15 +203,16 @@ public final class Parcels {
             Util.pinform(player, "&7&oUnable to place parcel at origin.");
             return false;
         }
+        MailRecord done;
         try {
-            store().transition(r, MailState.REFUSED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
+            done = store().transition(r, MailState.REFUSED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
                     Actor.player(player.getUniqueId()), "refused; returned to " + block.getX() + "," + block.getY() + "," + block.getZ());
         } catch (StoreException | ConflictException e) {
             block.setType(Material.AIR);
             Util.pinform(player, "&c&oThis order has already been filled.");
             return false;
         }
-        Inventory inv = fill(block, ParcelPayload.decode(r.payload));
+        Inventory inv = fill(block, done, ParcelPayload.decode(r.payload), player);
         ItemStack statement = BookManip.stamp_parcel_statement(player, label, false);
         player.getInventory().setItemInMainHand(null);
         BookManip.parcel_stmnt_to_chest(inv, statement, block, 4);
@@ -259,8 +273,9 @@ public final class Parcels {
                 return false;
             }
         }
+        MailRecord done;
         try {
-            store().transition(r, MailState.RETURNED, Custody.NONE, Actor.player(player.getUniqueId()), "cancelled by the sender");
+            done = store().transition(r, MailState.RETURNED, Custody.NONE, Actor.player(player.getUniqueId()), "cancelled by the sender");
         } catch (StoreException | ConflictException e) {
             if (!reused) {
                 block.setType(Material.AIR);
@@ -268,7 +283,7 @@ public final class Parcels {
             Util.pinform(player, "&c&oThis parcel can't be cancelled now.");
             return false;
         }
-        fill(block, payload);
+        fill(block, done, payload, player);
         P_Economy.cancel_hold(r.hold_id != null ? r.hold_id : HoldTag.read(label));
         player.getInventory().setItemInMainHand(null);
         Util.pinform(player, "&7&oParcel cancelled: its items are back in the chest" + (reused ? " you packed it in." : " in front of you."));
@@ -338,42 +353,44 @@ public final class Parcels {
     }
 
     /** Admin recovery: rebuilds the parcel's items in a chest at {@code at} (and closes the record as RECOVERED). */
-    public static boolean recover(MailRecord r, Location at, Actor actor) {
+    public static boolean recover(MailRecord r, Location at, Actor actor, CommandSender who) {
         Block block = at.getBlock();
         if (!block.getType().isAir()) {
             return false;
         }
         block.setType(Material.CHEST);
+        MailRecord done;
         try {
-            store().transition(r, MailState.RECOVERED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
+            done = store().transition(r, MailState.RECOVERED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
                     actor, "recovered to " + block.getX() + "," + block.getY() + "," + block.getZ());
         } catch (StoreException | ConflictException e) {
             block.setType(Material.AIR);
             return false;
         }
-        fill(block, ParcelPayload.decode(r.payload));
+        fill(block, done, ParcelPayload.decode(r.payload), who);
         return true;
     }
 
     /** Admin accept (testing): hands the items over in a chest at {@code at}, without COD. */
-    public static boolean admin_accept(MailRecord r, Location at, Actor actor) {
+    public static boolean admin_accept(MailRecord r, Location at, Actor actor, CommandSender who) {
         Block block = at.getBlock();
         if (!block.getType().isAir() || r.state != MailState.DELIVERED || r.moving()) {
             return false;
         }
         block.setType(Material.CHEST);
+        MailRecord done;
         try {
-            store().transition(r, MailState.ACCEPTED, Custody.NONE, actor, "accepted by an admin (no COD collected)");
+            done = store().transition(r, MailState.ACCEPTED, Custody.NONE, actor, "accepted by an admin (no COD collected)");
         } catch (StoreException | ConflictException e) {
             block.setType(Material.AIR);
             return false;
         }
-        fill(block, ParcelPayload.decode(r.payload));
+        fill(block, done, ParcelPayload.decode(r.payload), who);
         return true;
     }
 
     /** Admin refuse (testing): the items go back to where the parcel was packed. */
-    public static boolean admin_refuse(MailRecord r, Actor actor) {
+    public static boolean admin_refuse(MailRecord r, Actor actor, CommandSender who) {
         if (r.state != MailState.DELIVERED || r.moving()) {
             return false;
         }
@@ -384,14 +401,15 @@ public final class Parcels {
         }
         Block block = at.getBlock();
         block.setType(Material.CHEST);
+        MailRecord done;
         try {
-            store().transition(r, MailState.REFUSED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
+            done = store().transition(r, MailState.REFUSED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
                     actor, "refused by an admin");
         } catch (StoreException | ConflictException e) {
             block.setType(Material.AIR);
             return false;
         }
-        fill(block, payload);
+        fill(block, done, payload, who);
         return true;
     }
 
@@ -400,7 +418,7 @@ public final class Parcels {
      * logs, golden apples), labels it to {@code to}/{@code address}, locks it with its [Postal_Ship] sign and
      * records the parcel. Returns the label carrying its mail id, or null.
      */
-    public static ItemStack test_parcel(Block chest, String to, String address, double cod, Actor actor) {
+    public static ItemStack test_parcel(Block chest, String to, String address, double cod, boolean retired, Actor actor) {
         chest.setType(Material.CHEST);
         BlockFacing.set_facing(chest, BlockFace.SOUTH);
         Inventory inv = ((Chest) chest.getState()).getInventory();
@@ -414,6 +432,10 @@ public final class Parcels {
         inv.setItem(0, sword);
         inv.setItem(4, new ItemStack(Material.OAK_LOG, 32));
         inv.setItem(13, new ItemStack(Material.GOLDEN_APPLE, 3));
+        if (retired) {
+            // Recorded under an id this Minecraft doesn't have, as if an upgrade had removed it.
+            inv.setItem(22, new ItemStack(Material.PAPER));
+        }
 
         String where = chest_key(chest);
         String[] parts = where.split(",");
@@ -424,7 +446,7 @@ public final class Parcels {
                 "§7" + parts[0] + "\n" + parts[1] + "," + parts[2] + "," + parts[3] + "," + parts[4] + "\n\n"
                         + "§201 §9diamond_sword\n§232 §9oak_log\n§203 §9golden_apple\n\n§2/accept\n§c/refuse\n"};
         ItemStack label = new Book(Util.df(to), Util.df(address), pages).generateItemStack();
-        label = record_parcel(label, null, chest, null, to, address, null, actor);
+        label = record_parcel(label, null, chest, null, to, address, null, actor, retired ? 22 : -1);
         if (label == null) {
             return null;
         }
@@ -445,7 +467,13 @@ public final class Parcels {
     public static String contents(MailRecord r) {
         try {
             List<String> names = new ArrayList<>();
-            for (ItemStack item : items(ParcelPayload.decode(r.payload))) {
+            ParcelPayload p = ParcelPayload.decode(r.payload);
+            for (byte[] bytes : p.items) {
+                ItemStack item = restore(bytes);
+                if (item == null) {
+                    names.add(describe(bytes) + " (no longer in the game)");
+                    continue;
+                }
                 String name = item.hasItemMeta() && item.getItemMeta().hasDisplayName()
                         ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                         .serialize(item.getItemMeta().displayName()) + " (" + item.getType().name().toLowerCase() + ")"
@@ -474,24 +502,20 @@ public final class Parcels {
         }
     }
 
-    static List<ItemStack> items(ParcelPayload p) {
-        List<ItemStack> out = new ArrayList<>();
-        for (byte[] bytes : p.items) {
-            out.add(ItemStack.deserializeBytes(bytes));
-        }
-        return out;
-    }
-
-    /** Puts the parcel's items back in their slots; anything that doesn't fit is dropped beside the chest. */
-    private static Inventory fill(Block block, ParcelPayload p) {
+    /**
+     * Puts the parcel's items back in their slots; anything that doesn't fit is dropped beside the chest. An item
+     * this version of Minecraft can no longer make (removed in an upgrade, say) is left out and everything else
+     * delivered: {@code who} is told what's missing, and the parcel's history and the log keep a note of it. The
+     * record's payload is untouched, so the item's data isn't lost.
+     */
+    private static Inventory fill(Block block, MailRecord r, ParcelPayload p, CommandSender who) {
         Inventory inv = ((Chest) block.getState()).getInventory();
         Location drop = block.getLocation().add(0.5D, 1.0D, 0.5D);
+        List<String> lost = new ArrayList<>();
         for (int i = 0; i < p.items.size(); i++) {
-            ItemStack item;
-            try {
-                item = ItemStack.deserializeBytes(p.items.get(i));
-            } catch (RuntimeException e) {
-                Util.cinform("[Postal] Could not restore a parcel item: " + e.getMessage());
+            ItemStack item = restore(p.items.get(i));
+            if (item == null) {
+                lost.add(describe(p.items.get(i)));
                 continue;
             }
             int slot = p.slots.get(i);
@@ -501,7 +525,45 @@ public final class Parcels {
                 inv.addItem(item).values().forEach(left -> block.getWorld().dropItemNaturally(drop, left));
             }
         }
+        if (!lost.isEmpty()) {
+            report_lost(r, lost, who);
+        }
         return inv;
+    }
+
+    /** The item these bytes hold, or null if this version of Minecraft can't make it. */
+    private static ItemStack restore(byte[] bytes) {
+        try {
+            ItemStack item = ItemStack.deserializeBytes(bytes);
+            return item == null || item.getType().isAir() ? null : item;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** What an unrestorable item was, as far as its stored id says. */
+    private static String describe(byte[] bytes) {
+        String id = ParcelPayload.item_id(bytes);
+        return id != null ? id : "an unreadable item";
+    }
+
+    private static void report_lost(MailRecord r, List<String> lost, CommandSender who) {
+        String count = lost.size() == 1 ? "1 item" : lost.size() + " items";
+        String list = String.join(", ", lost);
+        if (who != null) {
+            who.sendMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&e&o" + count + " in this parcel ("
+                    + list + ") no longer exist" + (lost.size() == 1 ? "s" : "") + " in this version of Minecraft, so "
+                    + (lost.size() == 1 ? "it" : "they") + " couldn't be delivered. Everything else is here; the post"
+                    + " office has kept a record of " + (lost.size() == 1 ? "it." : "them.")));
+        }
+        com.vodhanel.minecraft.va_postal.VA_postal.plugin.getLogger().warning("Parcel " + r.id + ": " + count
+                + " could not be restored and " + (lost.size() == 1 ? "was" : "were") + " left out: " + list
+                + " (the record keeps the item data).");
+        try {
+            store().set_terms(r, r.cod_amount, r.hold_id, Actor.system("restore"), count + " left out (no longer in the game): " + list);
+        } catch (StoreException | ConflictException e) {
+            Util.cinform("[Postal] Could not note the lost items on parcel " + r.id + ": " + e.getMessage());
+        }
     }
 
     /** The chest the parcel was packed in, if it's still there and still locked by its [Postal_Ship] sign. */

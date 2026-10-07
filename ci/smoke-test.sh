@@ -77,10 +77,10 @@ PY
 
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
-    "postal debug" "postal start" "sleep:5" "postal testletter testville testville home" "postal testparcel testville testville home" "sleep:263" "tlist" "alist Testville" "npc list" "showroute testville home" "/" "sleep:2" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
+    "postal debug" "postal start" "sleep:5" "postal testletter testville testville home" "postal testparcel testville testville home retired" "sleep:263" "tlist" "alist Testville" "npc list" "showroute testville home" "/" "sleep:2" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
     "data get block 40 -60 0 Items" "data get block 20 -60 0 Items" "data get block 0 -60 0 Items" "postal track recent" \
     "postal accept last 30 -60 5" "sleep:1" "data get block 30 -60 5 Items" "postal accept last 31 -60 5" \
-    "execute if block 20 -60 -4 minecraft:air run say parcel chest collected"
+    "postal track last" "execute if block 20 -60 -4 minecraft:air run say parcel chest collected"
 
 # Recorded now: on its next start EssentialsX may purge NPC accounts still at the starting balance
 # (Postal recreates them on demand).
@@ -229,6 +229,11 @@ parcel_items() { plain phase2 | grep -E "\]: 30, -60, 5 has the following block 
 check "phase2: the parcel's renamed sword arrives intact" grep -q "Test Blade" <(parcel_items)
 check "phase2: the parcel's enchantments arrive intact" grep -qE 'sharpness"?: ?5' <(parcel_items)
 check "phase2: the parcel's other stacks arrive" grep -qE 'oak_log.*count: ?32|count: ?32.*oak_log' <(parcel_items)
+# The parcel also carries an item recorded under an id this Minecraft doesn't have (as if an upgrade removed it).
+check "phase2: an item gone from the game is left out" no_match "minecraft:paper" <(parcel_items)
+check "phase2: the recipient is told what was left out" grep -q "(minecraft:postal_retired_item) no longer exists in this version of Minecraft" <(plain phase2)
+check "phase2: the log names the left-out item" grep -q "left out: minecraft:postal_retired_item" <(plain phase2)
+check "phase2: the parcel's history notes the left-out item" grep -q "left out (no longer in the game): minecraft:postal_retired_item" <(plain phase2)
 check "phase2: a parcel is accepted only once" grep -q "Can't accept it" <(plain phase2)
 check "phase2: the packed chest was collected" grep -q "parcel chest collected" <(plain phase2)
 letter_ids() { plain phase4 | grep -oE "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} testville, home: DELIVERED" | cut -d' ' -f1; }

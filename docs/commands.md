@@ -23,8 +23,8 @@ Lists all chests and locations _(only works when running)_
 Shows a tracked letter's state, where it is, and its full history; `recent` lists the ten most recently changed letters.
 ##### `reconcile`
 Runs the mail reconciliation check now (normally every 5 minutes), for loaded chunks: finishes interrupted moves, marks letters missing from their chests as MISSING, removes stale copies and flags forged postal books.
-##### `testparcel <from PostOffice> <to PostOffice> <address> [cod]`
-Packs a test parcel (an enchanted, renamed diamond sword, oak logs, golden apples) in a chest beside the from-office, locks it and hands its label in at that office, as a player would after `/package`. Optional COD amount.
+##### `testparcel <from PostOffice> <to PostOffice> <address> [cod] [retired]`
+Packs a test parcel (an enchanted, renamed diamond sword, oak logs, golden apples) in a chest beside the from-office, locks it and hands its label in at that office, as a player would after `/package`. Optional COD amount. With `retired`, the parcel also carries an item recorded under an id this Minecraft doesn't have, as if an upgrade had removed it: whoever opens the parcel gets everything else, plus a message naming what was left out.
 ##### `recover <mail id> [x y z]`
 Rebuilds lost mail from its record: a parcel's items in a new chest at x y z (or two blocks in front of you), a letter into your inventory. The record closes as RECOVERED, so the original is never routed or accepted.
 ##### `accept <mail id> [x y z]` / `refuse <mail id>`

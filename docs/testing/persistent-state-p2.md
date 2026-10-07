@@ -28,7 +28,7 @@ Run `/postal talk` to see the postmen's chatter.
 |---|---|
 | `/postal track recent` | the newest mail. Parcels show `[parcel]` |
 | `/postal track <id>` (or `last`) | a parcel's state, history, **Contents** (each stack, with its name and enchantment count) and COD |
-| `/postal testparcel <from> <to> <address> [cod]` | packs a test parcel (an enchanted, renamed "Test Blade", 32 oak logs and 3 golden apples) in a chest beside `<from>`'s office, locks it, and hands its label in |
+| `/postal testparcel <from> <to> <address> [cod] [retired]` | packs a test parcel (an enchanted, renamed "Test Blade", 32 oak logs and 3 golden apples) in a chest beside `<from>`'s office, locks it, and hands its label in. `retired` adds an item that's "gone from the game" |
 | `/postal accept <id> [x y z]` | accepts a **delivered** parcel for its recipient (items in a chest; no COD) |
 | `/postal refuse <id>` | refuses a delivered parcel (items go back where it was packed) |
 | `/postal recover <id> [x y z]` | rebuilds lost mail from its record |
@@ -120,6 +120,18 @@ up, and `/postal start` when a step says so.
 - [ ] A chest appears where the parcel was packed (beside Testville's office), with the items and the
   statement inside.
 - [ ] `/postal track last` shows `REFUSED`. A second `/accept` or `/refuse` is refused.
+
+**3f. An item removed from the game**
+1. `/postal testparcel Testville Testville Home retired`. This parcel also carries a paper recorded under an id
+   no version of Minecraft has, as if an upgrade had removed it. Wait for `DELIVERED`.
+2. `/postal track last`.
+- [ ] **Contents** lists `minecraft:postal_retired_item (no longer in the game)` beside the other stacks.
+3. `/accept` with the label.
+- [ ] You get the Test Blade, logs and apples, and **no** paper.
+- [ ] A message says 1 item (`minecraft:postal_retired_item`) no longer exists in this version of Minecraft
+  and couldn't be delivered.
+- [ ] The console logs a warning naming the item, and `/postal track last` shows `ACCEPTED` with a history
+  line "left out (no longer in the game): minecraft:postal_retired_item".
 
 ## 4. Crashes
 
