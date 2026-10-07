@@ -21,6 +21,8 @@ Restarts postal.
 Lists all chests and locations _(only works when running)_
 ##### `track <mail id | recent>`
 Shows a tracked letter's state, where it is, and its full history; `recent` lists the ten most recently changed letters.
+##### `reconcile`
+Runs the mail reconciliation check now (normally every 5 minutes), for loaded chunks: finishes interrupted moves, marks letters missing from their chests as MISSING, removes stale copies and flags forged postal books.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
 ##### `bank [newday | report [days] | policy [<setting> <value>]]`

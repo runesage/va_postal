@@ -106,9 +106,15 @@ public final class Reconciler {
         return report;
     }
 
+    /** A move younger than this may still be under way (the book is added a few ticks after it's recorded). */
+    static final long IN_FLIGHT_MILLIS = 30_000L;
+
     private static void settle(MailStore store, MailRecord r, boolean load, Report report) {
         try {
             if (r.moving()) {
+                if (!load && System.currentTimeMillis() - r.updated_at < IN_FLIGHT_MILLIS) {
+                    return; // the dispatcher is mid-move; leave it to finish (at startup nothing is mid-move)
+                }
                 Inventory to = chest(r.pending_custody, load);
                 Inventory from = r.custody.kind == Custody.Kind.CHEST ? chest(r.custody, load) : null;
                 if (to == null || (r.custody.kind == Custody.Kind.CHEST && from == null)) {

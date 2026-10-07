@@ -29,11 +29,12 @@ The economy is on and pacing is fast: a postman leaves every ~10 s.
 
 | Tool | What it shows |
 |---|---|
-| `/postal track recent` | the 10 most recently changed letters: id, destination, **state**, **where** (`CHEST@world,x,y,z`, or `ROUTE@…` while carried), and `(moving)` mid-move |
+| `/postal track recent` | the 10 most recently changed letters: id, destination, **state**, **where** (`CHEST@world,x,y,z`), and `(moving)` mid-move |
 | `/postal track <id>` | one letter's whole history: every state change, who made it (player, postman, central, reconcile, admin) and why |
 | `/postal testletter <from> <to> <address>` | hands in a tracked letter at `<from>`'s office chest without writing one (same flow as a player's letter) |
 | `/postal talk` | postman chatter, to see when a route starts and ends |
 | `/postal bypass` | lets you open Postal chests to look inside (5 min) |
+| `/postal reconcile` | runs the reconciliation check now (loaded chunks), instead of waiting for the 5-minute one |
 | Console | `[Postal] ...` lines: reconciliation results, stale copies removed, missing letters |
 
 Tip: copy a letter's id from `/postal track recent` (click the chat line or copy from the console). You'll
@@ -144,52 +145,80 @@ If any check in section 3 fails, stop and send me the report (below) before goin
 
 ## 4. Grief and duplication
 
+**How these tests work.** Postal only judges a chest when it looks at it:
+- at startup;
+- every 5 minutes, for chunks that are loaded;
+- at the end of a postman's route;
+- right away, with **`/postal reconcile`** (the 5-minute check, run now).
+
+Stay near the chests so their chunks are loaded. Run **`/postal stop`** before each test so no postman moves
+the letter while you set up, and `/postal start` only when a step says so.
+
+**One thing to know first:** `OUT_FOR_DELIVERY` is a record state only. The book stays in the office chest
+until the postman puts it in the mailbox. So "taking a letter that's out for delivery" means taking it from
+the office chest.
+
 **4a. Breaking a chest that holds mail**
-1. `/postal stop`, then hand in a letter at Testville (it waits in the office chest at (20, -60, 0)).
-2. With `/postal bypass`, break that office chest.
-3. Restart the server. A destroyed chest is only judged at startup, when Postal can load the chunk and be
-   sure the chest is really gone.
-- [ ] The console says `Letter <id> ... is MISSING (its chest is gone ...)`, and `/postal track <id>`
-  shows `MISSING`.
-- [ ] Put the office back exactly as it was, from the console. The sign must be on the chest's **front**,
-  with `[Postal_Mail]` / `Testville` / `[Local]`:
-  ```
-  setblock 20 -60 0 minecraft:chest[facing=south]
-  setblock 20 -60 1 minecraft:oak_wall_sign[facing=south]{front_text:{messages:["[Postal_Mail]","Testville","[Local]",""]}}
-  ```
-  Then `/postal testletter Testville Testville Home` is delivered as normal.
+1. `/postal stop`, then `/postal testletter Testville Testville Farm`. It waits in Testville's office chest
+   at (20, -60, 0). Note its id.
+2. With `/postal bypass`, break that chest.
+3. Restart the server (`stop`, then start). A destroyed chest is only judged at startup, when Postal can be
+   sure it's gone and not just in an unloaded chunk.
+- [ ] Startup logs `Letter <id> ... is MISSING (its chest is gone ...)`, and `/postal track <id>` shows
+  `MISSING`.
+4. Put the office back from the console. The sign goes on the chest's **front**, with the text
+   `[Postal_Mail]` / `Testville` / `[Local]`:
+   ```
+   setblock 20 -60 0 minecraft:chest[facing=south]
+   setblock 20 -60 1 minecraft:oak_wall_sign[facing=south]{front_text:{messages:["[Postal_Mail]","Testville","[Local]",""]}}
+   ```
+- [ ] `/postal start`, then `/postal testletter Testville Testville Home`, is delivered as normal.
 
-  If you rebuild it by hand instead, the chest faces you when you place it: put the sign on that face. If
-  Postal still can't find it, the console prints `Mailbox lookup for testville [Local] failed`, followed by
-  every chest it saw and what was in front of each one (repeated every 2 minutes).
+**4b. Taking a letter out of the office chest**
+1. `/postal stop`, then `/postal testletter Testville Testville Farm`. Note its id.
+2. With `/postal bypass`, take the letter out of Testville's office chest and keep it in your inventory.
+3. Run `/postal reconcile`.
+- [ ] The result counts `1 missing`, and `/postal track <id>` shows `MISSING` ("not in its chest").
 
-**4b. Removing a letter by hand**
-1. As 4a, but take the letter **out** of the office chest instead of breaking it (keep it in your
-   inventory). Stay nearby and wait up to 5 minutes for the periodic check, or restart.
-- [ ] It's marked `MISSING` ("not in its chest").
+**4c. Taking a letter while it's out for delivery**
+1. `/postal start`, then `/postal testletter Testville Testville Library`. Watch `/postal track recent` until
+   it's `OUT_FOR_DELIVERY`.
+2. Quickly take it out of Testville's office chest (with `/postal bypass`) before the postman reaches
+   Library.
+3. Wait for the postman to finish that route (`/postal talk` shows it).
+- [ ] The console says `Letter <id> ... is MISSING (not in the office chest when its route ended)`. The
+  history shows `MISSING`, not `AT_DEST_BRANCH`.
 
-**4c. A duplicated letter**
-1. `/postal stop`, then `/postal testletter Testville Testville Farm`, so it waits in the office chest.
-2. In creative, middle-click it in the chest to copy it. Put the copy in **Bakery's** chest, as if it had
-   been mailed from there.
-3. `/postal start`.
-- [ ] When the postman reaches Bakery, the console says `Removing a stale copy of letter <id>`, and the
-  copy is gone.
-- [ ] The original is still delivered, once.
+**4d. A copied letter**
 
-**4d. A delivered letter put back**
-1. Take a delivered letter out of its mailbox, then put it into another address's chest.
-- [ ] It isn't destroyed. The postman leaves it alone, since it's a delivered letter and now just the
-  player's book.
+Postal must never route a copy of a tracked letter.
+1. `/postal stop`. Then `/postal testletter Testville Testville Farm` (it waits in Testville's office) and
+   `/postal testletter Riverside Riverside Mill` (it waits in Riverside's office at (20, -60, 40)).
+2. In creative, open Testville's office chest (with `/postal bypass`) and middle-click the Farm letter to
+   copy it. Put the copy in **Riverside's** office chest.
+3. Run `/postal reconcile`.
+- [ ] The console says `Removed a stale copy of letter <id> from world,20,-60,40`, and the copy is gone from
+  Riverside's chest.
+- [ ] The original is still in Testville's chest. After `/postal start` it's delivered to Farm, once.
 
-**4e. A fake postal book**
-1. `/postal stop`, and hand in a tracked letter so one waits in Testville's office chest. Postal only
-   inspects chests that hold tracked mail.
-2. Write a book by hand that looks like mail (first page containing `Mailed from:`), and put it in that
-   office chest too.
-3. Restart, or wait up to 5 minutes nearby.
-- [ ] The console logs `An untracked postal-looking book ...`. Nothing is deleted: untracked books still
-  travel the old, untracked way.
+**4e. A copy placed in a mailbox**
+1. As 4d, but put the copy in **Bakery**'s mailbox chest (x=50) instead, then `/postal start`.
+- [ ] Whatever the postman does, the copy is **never delivered** to Farm. Farm ends with exactly one letter
+  with that id. If the postman visits Bakery while the original is still waiting, the console says
+  `Removing a stale copy of letter <id>` and the copy is gone. If the original is delivered first, the copy
+  is left in Bakery as an ordinary book and never routed. Both are correct.
+
+**4f. A delivered letter put back**
+1. Take a delivered letter out of its mailbox and put it into another address's mailbox chest.
+- [ ] It isn't deleted. The postman leaves it alone: it's the player's book now.
+
+**4g. A fake postal book**
+1. `/postal stop`, then `/postal testletter Testville Testville Farm`, so a tracked letter waits in
+   Testville's office chest. Postal inspects chests that hold tracked mail.
+2. Write and sign a book whose first page contains `Mailed from:`, and put it in that office chest too.
+3. Run `/postal reconcile`.
+- [ ] The console logs `An untracked postal-looking book is in the chest at world,20,-60,0 ...` and the
+  result counts `1 forged books flagged`. Nothing is deleted.
 
 ## 5. Load (optional)
 

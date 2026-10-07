@@ -246,7 +246,17 @@ public final class Letters {
         try {
             for (MailRecord r : store.by_destination(MailState.OUT_FOR_DELIVERY, run[1])) {
                 if (run[2].equalsIgnoreCase(r.dest_address) && !r.moving()) {
-                    store.transition(r, MailState.AT_DEST_BRANCH, r.custody, Actor.postman(run[1]), "run ended without delivering it");
+                    // The book waits in the office chest while it's out for delivery: if it isn't there now,
+                    // someone took it.
+                    org.bukkit.inventory.Inventory chest = Reconciler.chest(r.custody, false);
+                    if (chest != null && !Reconciler.holds(chest, r.id)) {
+                        store.transition(r, MailState.MISSING, r.custody, Actor.postman(run[1]),
+                                "not in the office chest when its route ended");
+                        Util.cinform("[Postal] Letter " + r.id + " for " + r.dest_office + ", " + r.dest_address
+                                + " is MISSING (not in the office chest when its route ended).");
+                    } else {
+                        store.transition(r, MailState.AT_DEST_BRANCH, r.custody, Actor.postman(run[1]), "run ended without delivering it");
+                    }
                 }
             }
             store.end_run(run[0]);

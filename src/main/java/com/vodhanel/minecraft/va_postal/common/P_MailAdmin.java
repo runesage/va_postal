@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Admin tools for tracked mail: {@code /postal track} and {@code /postal testletter}. */
+/** Admin tools for tracked mail: {@code /postal track}, {@code /postal testletter} and {@code /postal reconcile}. */
 public final class P_MailAdmin {
     private P_MailAdmin() {
     }
@@ -72,6 +72,16 @@ public final class P_MailAdmin {
                     + e.to_state + " by " + e.actor_kind + (e.actor_ref == null ? "" : " " + e.actor_ref)
                     + (e.detail == null ? "" : " (" + e.detail + ")"));
         }
+    }
+
+    /** {@code /postal reconcile}: a reconciliation pass now, over loaded chunks, as the periodic one does. */
+    public static void reconcile(CommandSender sender) {
+        if (MailStores.active() == null) {
+            send(sender, "&7The mail store isn't open; mail isn't being tracked.");
+            return;
+        }
+        com.vodhanel.minecraft.va_postal.mail.Reconciler.Report report = com.vodhanel.minecraft.va_postal.mail.Reconciler.run(false);
+        send(sender, "&6[Postal] Reconciliation: &7" + report);
     }
 
     /**
