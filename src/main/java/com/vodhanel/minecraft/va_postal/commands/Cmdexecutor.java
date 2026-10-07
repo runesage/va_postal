@@ -1496,8 +1496,9 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
+        // The parcel's record decides whether it can be accepted (delivered, not yet filled), not the label's text.
         ItemStack stack = player.getInventory().getItemInMainHand();
-        if (!BookManip.holding_valid_shipper(player, stack, true)) {
+        if (!BookManip.is_shipping_label(stack)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
         }
@@ -1544,8 +1545,8 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         ItemStack stack = player.getInventory().getItemInMainHand();
-        if (!BookManip.holding_valid_shipper(player, stack, true)) {
-            Util.pinform(player, "&7&oYou must have a valid parcel statement in your hand.");
+        if (!BookManip.is_shipping_label(stack)) {
+            Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
         }
 

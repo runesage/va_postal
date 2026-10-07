@@ -558,6 +558,9 @@ public class ID_Mail {
                                 if (!P_Economy.postage_collected(ind_item, VA_postal.wtr_poffice[id])) {
                                     continue;
                                 }
+                                if (page1.contains("[shipping label]") && Parcels.rolled_back(ind_item)) {
+                                    continue; // cancelled: its items are still in the chest it was packed in
+                                }
                                 Letters.Move move = Letters.begin(ind_item, VA_postal.wtr_schest_location[id],
                                         com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH,
                                         VA_postal.wtr_schest_location_postoffice[id], com.vodhanel.minecraft.va_postal.store.Actor.postman(VA_postal.wtr_poffice[id]));
@@ -651,7 +654,8 @@ public class ID_Mail {
                         String[] spage = book.getPages();
                         String page1 = spage[0].toLowerCase();
                         if (page1.contains("[not-processed]")) {
-                            if (!P_Economy.postage_collected(ind_item, VA_postal.wtr_poffice[id])) {
+                            if (!P_Economy.postage_collected(ind_item, VA_postal.wtr_poffice[id])
+                                    || page1.contains("[shipping label]") && Parcels.rolled_back(ind_item)) {
                                 index++;
                                 continue;
                             }
@@ -845,7 +849,8 @@ public class ID_Mail {
                     String mail_to_town = book.getTitle().toLowerCase().trim();
                     String this_town = spostoffice.toLowerCase().trim();
                     if ((!mail_to_town.equals(this_town)) && (!mail_to_town.contains("postal log"))) {
-                        if (!P_Economy.postage_collected(ind_item, spostoffice)) {
+                        if (!P_Economy.postage_collected(ind_item, spostoffice)
+                                || book.getPages()[0].toLowerCase().contains("[shipping label]") && Parcels.rolled_back(ind_item)) {
                             continue;
                         }
                         Letters.Move move = Letters.begin(ind_item, VA_postal.wtr_schest_location_postoffice[id],

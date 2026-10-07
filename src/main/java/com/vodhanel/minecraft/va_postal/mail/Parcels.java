@@ -99,8 +99,22 @@ public final class Parcels {
             Util.cinform("[Postal] Could not record a parcel: " + e.getMessage());
             return null;
         }
-        inv.clear(); // the items are the record's now
+        // Mark the chest as packed for this parcel, then empty it: the items are the record's now. If a crash
+        // rolls the world back past this, the chest comes back full and unmarked; collect() notices.
+        Chest state = (Chest) chest.getState();
+        state.getPersistentDataContainer().set(packed_key(), org.bukkit.persistence.PersistentDataType.STRING, id.toString());
+        state.update(true, false);
+        ((Chest) chest.getState()).getInventory().clear();
         return MailIds.write(label, id);
+    }
+
+    private static org.bukkit.NamespacedKey packed_key;
+
+    private static org.bukkit.NamespacedKey packed_key() {
+        if (packed_key == null) {
+            packed_key = new org.bukkit.NamespacedKey(com.vodhanel.minecraft.va_postal.VA_postal.plugin, "packed");
+        }
+        return packed_key;
     }
 
     /** Records a COD amount (and the hold now paying for it) on the parcel this label belongs to. */
@@ -278,6 +292,51 @@ public final class Parcels {
         }
     }
 
+    /**
+     * Before a shipping label's first pickup: true if its parcel was packed in a world a crash has since rolled
+     * back (see {@link #rolled_back(MailRecord, ParcelPayload)}), in which case it's cancelled and the label
+     * must be left where it is.
+     */
+    public static boolean rolled_back(ItemStack label) {
+        Optional<MailRecord> r = record(label);
+        if (r.isEmpty() || r.get().kind != MailKind.PARCEL || r.get().moving() || r.get().state != MailState.POSTED) {
+            return false;
+        }
+        return rolled_back(r.get(), ParcelPayload.decode(r.get().payload));
+    }
+
+    /**
+     * True if a crash rolled the world back past the packing: the chest at the packing spot has items again and
+     * no packed mark. The chest's items are then the real ones, so the parcel is cancelled (its label will
+     * never be routed or accepted) and the chest unlocked: the items exist once.
+     */
+    static boolean rolled_back(MailRecord r, ParcelPayload payload) {
+        Location at = location(payload.chest);
+        if (at == null || !(at.getBlock().getState() instanceof Chest)) {
+            return false;
+        }
+        Chest chest = (Chest) at.getBlock().getState();
+        String mark = chest.getPersistentDataContainer().get(packed_key(), org.bukkit.persistence.PersistentDataType.STRING);
+        boolean has_items = false;
+        for (ItemStack item : chest.getInventory().getContents()) {
+            has_items |= item != null && !item.getType().isAir();
+        }
+        if (mark != null || !has_items) {
+            return false;
+        }
+        try {
+            store().transition(r, MailState.RETURNED, r.custody, Actor.reconcile(),
+                    "cancelled: the world was rolled back past its packing, so its items are still in the chest");
+        } catch (StoreException | ConflictException e) {
+            return false;
+        }
+        SignManip.remove_sign_id_chest(at.getBlock());
+        P_Economy.cancel_hold(r.hold_id);
+        Util.cinform("[Postal] Parcel " + r.id + " cancelled: the world was rolled back past its packing (its items are"
+                + " still in the chest at " + at.getBlockX() + "," + at.getBlockY() + "," + at.getBlockZ() + ").");
+        return true;
+    }
+
     /** Admin recovery: rebuilds the parcel's items in a chest at {@code at} (and closes the record as RECOVERED). */
     public static boolean recover(MailRecord r, Location at, Actor actor) {
         Block block = at.getBlock();
@@ -445,7 +504,7 @@ public final class Parcels {
         return inv;
     }
 
-    /** The chest the parcel was packed in, if it's still there. */
+    /** The chest the parcel was packed in, if it's still there and still locked by its [Postal_Ship] sign. */
     private static Block origin_chest(ParcelPayload p) {
         Location at = location(p.chest);
         if (at == null || !at.getWorld().isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)
@@ -453,7 +512,13 @@ public final class Parcels {
             return null;
         }
         Block block = at.getBlock();
-        return block.getState() instanceof Chest ? block : null;
+        if (!(block.getState() instanceof Chest)) {
+            return null;
+        }
+        // Someone else's chest built on the same spot isn't the parcel's.
+        Block front = BlockFacing.front(block);
+        return front.getState() instanceof org.bukkit.block.Sign
+                && ((org.bukkit.block.Sign) front.getState()).getLine(0).contains("[Postal_Ship]") ? block : null;
     }
 
     static Location location(String key) {
