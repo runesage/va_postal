@@ -41,7 +41,7 @@ public final class P_MailAdmin {
             return;
         }
         if (args.length < 2) {
-            send(sender, "&7Usage: /postal track <mail id | recent>");
+            send(sender, "&7Usage: /postal track <mail id | last | recent>");
             return;
         }
         if ("recent".equalsIgnoreCase(args[1])) {
@@ -53,19 +53,11 @@ public final class P_MailAdmin {
             }
             return;
         }
-        UUID id;
-        try {
-            id = UUID.fromString(args[1].trim());
-        } catch (IllegalArgumentException e) {
-            send(sender, "&7That isn't a mail id.");
+        MailRecord r = target(sender, args, "track <mail id | last | recent>");
+        if (r == null) {
             return;
         }
-        Optional<MailRecord> found = store.get(id);
-        if (found.isEmpty()) {
-            send(sender, "&7No mail with id " + id + ".");
-            return;
-        }
-        MailRecord r = found.get();
+        UUID id = r.id;
         send(sender, "&6[Postal] " + r.kind + " " + r.id);
         send(sender, "&7To &f" + r.dest_office + ", " + r.dest_address + "&7 from &f" + r.origin_office + "&7: &e"
                 + r.state + "&7 at " + r.custody + (r.moving() ? " &c(moving to " + r.pending_state + " at " + r.pending_custody + ")" : ""));
