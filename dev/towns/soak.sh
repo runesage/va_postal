@@ -5,7 +5,8 @@
 #
 # Usage: dev/towns/soak.sh [postal.jar]     (default: the newest target/va_postal-*.jar)
 # Env:   JAVA (Java 25+; default: java), WORK_DIR (default: ./towns-soak),
-#        SOAK_SECONDS (how long the postmen run; default 900)
+#        SOAK_SECONDS (how long the postmen run; default 900),
+#        SURVEY=1 (throw the hand-made routes away and let Postal survey every route: /postal survey)
 #
 # Exits non-zero if an address expected to be reachable was never reached (or the reverse).
 # Running this accepts the Minecraft EULA for a throwaway test server.
@@ -18,6 +19,7 @@ JAR="$(realpath "$JAR")"
 JAVA="${JAVA:-java}"
 WORK_DIR="${WORK_DIR:-towns-soak}"
 SOAK_SECONDS="${SOAK_SECONDS:-900}"
+SURVEY="${SURVEY:-0}"
 # shellcheck source=ci/lib.sh
 source "$REPO/ci/lib.sh"
 
@@ -67,7 +69,13 @@ run_server "$WORK_DIR/build.log" 600 "function postal_towns:build" "sleep:10" "s
 grep -q "Postal test towns built" "$WORK_DIR/build.log" || { echo "the towns weren't built; see $WORK_DIR/build.log" >&2; exit 1; }
 
 # The towns' offices, addresses and routes, plus quick postman pacing so every route runs several times.
-python3 "$REPO/dev/towns/build_towns.py" --config "$CONFIG"
+if [ "$SURVEY" = 1 ]; then
+    python3 "$REPO/dev/towns/build_towns.py" --config "$CONFIG" --no-routes
+    SURVEY_CMDS=("postal survey Hillcrest" "postal survey Riverside" "postal survey Woodvale" "sleep:30")
+else
+    python3 "$REPO/dev/towns/build_towns.py" --config "$CONFIG"
+    SURVEY_CMDS=()
+fi
 python3 - "$CONFIG" <<'PY'
 import re, sys
 path = sys.argv[1]
@@ -85,9 +93,13 @@ PY
 
 echo "== Running the postmen for ${SOAK_SECONDS}s"
 run_server "$WORK_DIR/soak.log" "$((SOAK_SECONDS + 600))" \
-    "postal start" "sleep:$SOAK_SECONDS" "alist Hillcrest" "alist Riverside" "alist Woodvale" \
+    "${SURVEY_CMDS[@]}" "postal start" "sleep:$SOAK_SECONDS" "alist Hillcrest" "alist Riverside" "alist Woodvale" \
     "postal stop" "sleep:5"
 
+if [ "$SURVEY" = 1 ]; then
+    echo "== Surveys"
+    sed $'s/\x1b\\[[0-9;]*m//g' "$WORK_DIR/soak.log" | grep -aoE "Route [A-Za-z]+, [A-Za-z]+: .*" | sort -u || true
+fi
 echo "== Results"
 python3 - "$ROUTES" "$WORK_DIR/soak.log" <<'PY'
 import json, re, sys

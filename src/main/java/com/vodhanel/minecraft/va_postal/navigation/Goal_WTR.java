@@ -140,6 +140,11 @@ public class Goal_WTR implements Behavior {
         }
 
 
+        // A ladder: Postal climbs him (Citizens can't), and finishes the waypoint when he's there.
+        if (!VA_postal.wtr_waypoint_completed[id] && Climb.tick(id)) {
+            return;
+        }
+
         if (ID_WTR.at_waypoint(id)) {
             Util.dinform(AnsiColor.L_GREEN + id + " IS AT WAYPOINT");
             ID_WTR.invoke_next_waypoint(id);

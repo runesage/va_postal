@@ -151,6 +151,14 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         String sub = args[0].toLowerCase().trim();
+        if ("survey".equals(sub)) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(player, args);
+            return true;
+        }
         if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
@@ -298,7 +306,7 @@ public class Cmdexecutor implements CommandExecutor {
         if (args.length == 0) {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
-            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/track/testletter/reconcile>");
+            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/track/testletter/reconcile/survey>");
             return true;
         }
 
@@ -308,6 +316,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("office".equals(args[0].toLowerCase().trim())) {
             P_Bank.office_command(sender, args, true);
+            return true;
+        }
+        if ("survey".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(sender, args);
             return true;
         }
         if ("track".equals(args[0].toLowerCase().trim())) {

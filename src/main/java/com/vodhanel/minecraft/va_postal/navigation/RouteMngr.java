@@ -514,6 +514,11 @@ public class RouteMngr {
             VA_postal.wtr_nav[id].getDefaultParameters().stuckAction(VA_postal.wtr_stuck_npc);
             VA_postal.wtr_nav[id].getDefaultParameters().distanceMargin(cit_distanceMargin);
             VA_postal.wtr_nav[id].getDefaultParameters().stationaryTicks(cit_stationaryTicks);
+            // Plan paths through doors and gates (and open them on the way). Without it Citizens treats a door,
+            // even one Postal has opened, as solid, so a route through a door always got "stuck" there.
+            if (!VA_postal.wtr_nav[id].getDefaultParameters().hasExaminer(net.citizensnpcs.api.astar.pathfinder.DoorExaminer.class)) {
+                VA_postal.wtr_nav[id].getDefaultParameters().examiner(new net.citizensnpcs.api.astar.pathfinder.DoorExaminer());
+            }
 
             for (BlockExaminer examiner : VA_postal.wtr_nav[id].getDefaultParameters().examiners())
                 Util.dinform("EXAMINER: " + examiner);
@@ -590,7 +595,10 @@ public class RouteMngr {
     }
 
     private static synchronized void dynamic_waypoint_adjustment(int id) {
-        VA_postal.wtr_swaypoint[id] = Util.put_point_on_ground(VA_postal.wtr_swaypoint[id], cit_ground_waypoint);
+        // A waypoint on a ladder stays where it is: Climb takes him up or down to it.
+        if (!Climb.on_ladder(Util.str2location(VA_postal.wtr_swaypoint[id]))) {
+            VA_postal.wtr_swaypoint[id] = Util.put_point_on_ground(VA_postal.wtr_swaypoint[id], cit_ground_waypoint);
+        }
         VA_postal.wtr_waypoint[id] = Util.str2location(VA_postal.wtr_swaypoint[id]);
     }
 

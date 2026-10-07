@@ -268,6 +268,16 @@ class World:
                 return True
         return False
 
+    def check_ladders(self):
+        """Fails if a ladder has nothing solid behind it: in the game it would pop off and leave a gap."""
+        behind = {"north": (0, 1), "south": (0, -1), "east": (-1, 0), "west": (1, 0)}
+        for (x, y, z), b in self.blocks.items():
+            if b and "ladder" in b:
+                dx, dz = behind[b.split("facing=")[1].split("]")[0].split(",")[0]]
+                back = self.block_at(x + dx, y, z + dz)
+                if back is None or passable(back) or any(k in back for k in ("glass", "leaves", "fence")):
+                    raise SystemExit(f"the ladder at ({x}, {y}, {z}) has nothing to hang on ({back})")
+
     def check_route(self, name, points):
         problems = []
         for a, b in zip(points, points[1:]):
@@ -422,7 +432,7 @@ def riverside(w):
 
 def woodvale(w):
     """Log cabins in a forest: a winding glade, a tunnel through a mound, a hedge maze, a farm, and a loft
-    reachable only by ladder (postmen can't climb; that address is expected to fail)."""
+    reachable only by ladder (Postal climbs ladders for the postman)."""
     # Tunnel: a mound with a 1-wide, 2-high tunnel along z=10.
     w.fill(-118, G, 0, -112, G + 5, 20, "minecraft:dirt")
     w.fill(-118, G + 6, 0, -112, G + 6, 20, "minecraft:grass_block")
@@ -450,6 +460,9 @@ def woodvale(w):
                what="Woodvale/Loft")
     w.fill(-129, G + 4, -29, -125, G + 4, -25, "minecraft:spruce_planks")
     for y in range(G, G + 5):
+        # Solid wall behind every rung: a ladder can't hang on the window glass that was here, so one rung
+        # used to pop off and leave a gap nobody could climb.
+        w.set(-124, y, -28, "minecraft:oak_log[axis=y]")
         w.set(-125, y, -28, "minecraft:ladder[facing=west]")
     w.mailbox(-127, G + 5, -27, "south", "Woodvale", "Loft")
 
@@ -466,15 +479,15 @@ def woodvale(w):
                      (-83, G, 45), (-91, G, 42), (-99, G, 39), (-104, G, 35), (-106, G, 30)],
             "Loft": [(-70, G, 2), (-78, G, 3), (-84, G, -4), (-90, G, -12), (-94, G, -18), (-94, G, -25),
                      (-96, G, -31), (-104, G, -31), (-112, G, -31), (-118, G, -28), (-123, G, -27),
-                     (-125, G, -27), (-127, G + 5, -25)],
+                     (-125, G, -27), (-125, G, -28), (-125, G + 5, -28), (-126, G + 5, -27), (-127, G + 5, -25)],
         },
-        "expect_unreachable": ["Loft"],
+        "expect_unreachable": [],
         "notes": {
             "Glade": "a path winding between trees",
             "Tunnel": "a one-wide, two-high tunnel through a mound",
             "Hedge": "a zigzag corridor between hedges",
             "Farm": "around a wheat field",
-            "Loft": "upstairs, only by ladder (expected to fail: postmen can't climb)",
+            "Loft": "upstairs, only by ladder (Postal climbs it)",
         },
     }
     plant_trees(w, info)
@@ -523,6 +536,7 @@ def build():
         for addr, points in info.get("addresses", {}).items():
             if addr not in info["expect_unreachable"]:
                 w.check_route(f"{town}/{addr}", points)
+    w.check_ladders()
     return w, towns
 
 
@@ -546,7 +560,7 @@ def loc(p):
     return f"world,{p[0]}.0,{p[1]}.0,{p[2]}.0"
 
 
-def write_config(towns, path):
+def write_config(towns, path, routes=True):
     lines = ["Postoffice:", "  Central:", f"    Location: {loc(towns['Central']['location'])}", "  Local:"]
     for town, info in towns.items():
         if town != "Central":
@@ -557,7 +571,10 @@ def write_config(towns, path):
             continue
         lines.append(f"  {town}:")
         for addr, points in info["addresses"].items():
-            lines += [f"    {addr}:", "      Residence:", f"        Location: {loc(points[-1])}", "      Route:"]
+            lines += [f"    {addr}:", "      Residence:", f"        Location: {loc(points[-1])}"]
+            if not routes:
+                continue  # left for Postal to survey
+            lines.append("      Route:")
             for n, p in enumerate(points):
                 lines += [f"        '{n}':", f"          Location: {loc(p)}"]
     with open(path, "a") as f:
@@ -674,6 +691,7 @@ def main():
     ap.add_argument("--datapack")
     ap.add_argument("--config")
     ap.add_argument("--routes")
+    ap.add_argument("--no-routes", action="store_true", help="write the config without routes (for /postal survey)")
     ap.add_argument("--map", help="write a top-down PNG of the towns and routes (needs Pillow)")
     ap.add_argument("--iso", help="write an isometric PNG of each town into this directory (needs Pillow)")
     args = ap.parse_args()
@@ -681,7 +699,7 @@ def main():
     if args.datapack:
         write_datapack(w, args.datapack)
     if args.config:
-        write_config(towns, args.config)
+        write_config(towns, args.config, routes=not args.no_routes)
     if args.routes:
         write_routes(towns, args.routes)
     if args.map:
