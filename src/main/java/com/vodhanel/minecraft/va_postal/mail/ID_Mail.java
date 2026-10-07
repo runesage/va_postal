@@ -211,13 +211,17 @@ public class ID_Mail {
         return true;
     }
 
-    private static final java.util.Set<String> explained_missing_chests = new java.util.HashSet<>();
+    /** When each missing mailbox was last explained: explained again every few minutes while it stays missing. */
+    private static final java.util.Map<String, Long> explained_missing_chests = new java.util.HashMap<>();
+    private static final long REEXPLAIN_MILLIS = 120_000L;
 
-    /** Logs, once per mailbox per server run, what the chest lookup saw, so a missing sign can be diagnosed. */
     private static void explain_missing_chest(String what, String slocation) {
-        if (!explained_missing_chests.add(what.toLowerCase())) {
+        long now = System.currentTimeMillis();
+        Long last = explained_missing_chests.get(what.toLowerCase());
+        if (last != null && now - last < REEXPLAIN_MILLIS) {
             return;
         }
+        explained_missing_chests.put(what.toLowerCase(), now);
         Location search = Util.str2location(slocation);
         if (search != null) {
             search = search.clone().subtract(0.0D, 1.0D, 0.0D);

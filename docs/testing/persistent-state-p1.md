@@ -151,7 +151,17 @@ If any check in section 3 fails, stop and send me the report (below) before goin
    sure the chest is really gone.
 - [ ] The console says `Letter <id> ... is MISSING (its chest is gone ...)`, and `/postal track <id>`
   shows `MISSING`.
-- [ ] Put the chest back (with its sign): postal works again for new mail.
+- [ ] Put the office back exactly as it was, from the console. The sign must be on the chest's **front**,
+  with `[Postal_Mail]` / `Testville` / `[Local]`:
+  ```
+  setblock 20 -60 0 minecraft:chest[facing=south]
+  setblock 20 -60 1 minecraft:oak_wall_sign[facing=south]{front_text:{messages:["[Postal_Mail]","Testville","[Local]",""]}}
+  ```
+  Then `/postal testletter Testville Testville Home` is delivered as normal.
+
+  If you rebuild it by hand instead, the chest faces you when you place it: put the sign on that face. If
+  Postal still can't find it, the console prints `Mailbox lookup for testville [Local] failed`, followed by
+  every chest it saw and what was in front of each one (repeated every 2 minutes).
 
 **4b. Removing a letter by hand**
 1. As 4a, but take the letter **out** of the office chest instead of breaking it (keep it in your
