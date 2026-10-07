@@ -326,6 +326,7 @@ public class RouteMngr {
         } else {
             lookclose_on_route(id, false);
             VA_postal.wtr_goal_active[id] = false;
+            com.vodhanel.minecraft.va_postal.mail.Letters.route_finished(id);
             C_Dispatcher.reset_pro_de_motion(VA_postal.wtr_qpair[id]);
             C_Queue.queue_pair_activity_flag(VA_postal.wtr_qpair[id], false, true, true);
             if (VA_postal.dynmap_configured) P_Dynmap.update_pos(id, false, false, true);

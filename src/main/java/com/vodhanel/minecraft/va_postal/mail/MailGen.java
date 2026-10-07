@@ -27,20 +27,8 @@ public class MailGen {
     }
 
     /** Rebuilds a parcel item from its serialized material name, amount and damage; null if unknown. */
-    @SuppressWarnings("deprecation")
     public static ItemStack serial2stack(String name, int qty, int damage) {
         Material material = Material.matchMaterial(name);
-        if (material == null) {
-            // Parcels written by v4 on 1.12 carry pre-1.13 names (e.g. WOOD, SMOOTH_BRICK).
-            Material legacy = Material.matchMaterial(name, true);
-            if (legacy != null) {
-                try {
-                    material = Bukkit.getUnsafe().fromLegacy(legacy);
-                } catch (RuntimeException ignored) {
-                    material = null;
-                }
-            }
-        }
         if (material == null || material.isAir() || !material.isItem()) {
             return null;
         }

@@ -145,33 +145,9 @@ public class C_Owner {
         return parse_owner(owner_uuid("address." + stown + "." + saddress + ".owner"));
     }
 
-    /**
-     * The owner UUID stored under {@code owner_path}.uuid. v4 configs stored the owner's name under
-     * {@code owner_path}.name instead; that is converted to a UUID the first time it's read (from the
-     * server's known players only, so it never blocks on a web lookup) and saved.
-     */
+    /** The owner UUID stored at {@code owner_path}.uuid, or null. */
     private static String owner_uuid(String owner_path) {
-        String uuid_path = GetConfig.path_format(owner_path + ".uuid");
-        String sid = VA_postal.plugin.getConfig().getString(uuid_path);
-        if (sid != null) {
-            return sid;
-        }
-        String name = VA_postal.plugin.getConfig().getString(GetConfig.path_format(owner_path + ".name"));
-        if (name == null || name.trim().isEmpty()) {
-            return null;
-        }
-        if ("server".equalsIgnoreCase(name.trim())) {
-            return VA_postal.SERVER_ID.toString();
-        }
-        org.bukkit.OfflinePlayer known = org.bukkit.Bukkit.getOfflinePlayerIfCached(name.trim());
-        if (known == null) {
-            Util.cinform(AnsiColor.RED + "[Postal] Unknown v4 owner '" + name + "' at " + owner_path + "; leaving it unowned");
-            return null;
-        }
-        VA_postal.plugin.getConfig().set(uuid_path, known.getUniqueId().toString());
-        VA_postal.plugin.saveConfig();
-        Util.cinform("[Postal] Migrated v4 owner '" + name + "' at " + owner_path + " to " + known.getUniqueId());
-        return known.getUniqueId().toString();
+        return VA_postal.plugin.getConfig().getString(GetConfig.path_format(owner_path + ".uuid"));
     }
 
     private static UUID parse_owner(String sid) {

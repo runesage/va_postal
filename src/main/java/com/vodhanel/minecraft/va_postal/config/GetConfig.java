@@ -237,6 +237,17 @@ public class GetConfig {
         return 5;
     }
 
+    /** Mail can only be addressed within this many blocks of a post office in the same world (0: anywhere). */
+    public static synchronized int mail_office_distance() {
+        String spath = path_format("settings.mail_office_distance");
+        try {
+            String str = VA_postal.plugin.getConfig().getString(spath);
+            return Math.max(0, Integer.parseInt(str.trim()));
+        } catch (Exception e) {
+        }
+        return 200;
+    }
+
     public static synchronized int allowed_geo_proximity() {
         String spath = path_format("settings.allowed_geo_proximity");
         try {

@@ -1367,20 +1367,6 @@ public class Util {
         return result;
     }
 
-    public static BlockFace int2BF(int face) {
-        switch (face) {
-            default:
-            case 2:
-                return BlockFace.NORTH;
-            case 3:
-                return BlockFace.SOUTH;
-            case 4:
-                return BlockFace.WEST;
-            case 5:
-                return BlockFace.EAST;
-        }
-    }
-
     public static Player UUID2Player(String id) {
         if (id == null || id.trim().isEmpty()) {
             return null;
