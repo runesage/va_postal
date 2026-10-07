@@ -284,10 +284,12 @@ public final class Reconciler {
         }
     }
 
+    /** A letter written to look like Postal mail. Shipping labels are untracked until P2, so they don't count. */
     private static boolean looks_like_mail(ItemStack item) {
         Book book = new Book(item);
         String[] pages = book.getPages();
-        return book.is_valid() && pages != null && pages.length > 0 && pages[0].contains("Mailed from:");
+        return book.is_valid() && pages != null && pages.length > 0 && pages[0].contains("Mailed from:")
+                && !pages[0].toLowerCase().contains("[shipping label]");
     }
 
     private static void warn_missing(MailRecord r, String why) {
