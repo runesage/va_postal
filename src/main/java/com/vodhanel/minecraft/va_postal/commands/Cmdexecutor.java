@@ -150,12 +150,16 @@ public class Cmdexecutor implements CommandExecutor {
             P_Bank.office_command(player, args, hasPermission(player, "postal.admin"));
             return true;
         }
-        if ("bank".equals(args[0].toLowerCase().trim())) {
+        String sub = args[0].toLowerCase().trim();
+        if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
                 return true;
             }
-            P_Bank.command(player, args);
+            if ("bank".equals(sub)) P_Bank.command(player, args);
+            else if ("track".equals(sub)) P_MailAdmin.track(player, args);
+            else if ("reconcile".equals(sub)) P_MailAdmin.reconcile(player);
+            else P_MailAdmin.testletter(player, args);
             return true;
         }
         if ("speed".equals(args[0].toLowerCase().trim())) {
@@ -294,7 +298,7 @@ public class Cmdexecutor implements CommandExecutor {
         if (args.length == 0) {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
-            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office>");
+            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/track/testletter/reconcile>");
             return true;
         }
 
@@ -304,6 +308,18 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("office".equals(args[0].toLowerCase().trim())) {
             P_Bank.office_command(sender, args, true);
+            return true;
+        }
+        if ("track".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.track(sender, args);
+            return true;
+        }
+        if ("reconcile".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.reconcile(sender);
+            return true;
+        }
+        if ("testletter".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.testletter(sender, args);
             return true;
         }
         if ("conc".equals(args[0].toLowerCase().trim())) {

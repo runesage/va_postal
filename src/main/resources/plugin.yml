@@ -6,6 +6,10 @@ author: Vodhanel
 main: com.vodhanel.minecraft.va_postal.VA_postal
 depend: [Citizens]
 softdepend: [Vault, dynmap, WorldGuard, Towny]
+# Downloaded from Maven Central by Paper on first start (keep in step with pom.xml).
+libraries:
+  - org.xerial:sqlite-jdbc:3.53.4.0
+  - com.zaxxer:HikariCP:7.1.0
 commands:
   postal:
     description: Administration and general help.

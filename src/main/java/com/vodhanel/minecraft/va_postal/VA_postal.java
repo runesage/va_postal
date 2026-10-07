@@ -327,6 +327,12 @@ public class VA_postal extends JavaPlugin {
         wtr_stuck_npc = new Stuck_NPC();
         setupScoreboard();
         setupPermissions();
+        com.vodhanel.minecraft.va_postal.store.MailStores.open(getDataFolder(),
+                getConfig().getString(GetConfig.path_format("storage.type"), "sqlite"),
+                getConfig().getString(GetConfig.path_format("network.server_id"), "main"), getLogger());
+        // Reconcile once the server is up (it may load chunks), then every 5 minutes for loaded chunks only.
+        getServer().getScheduler().runTaskLater(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(true), 40L);
+        getServer().getScheduler().runTaskTimer(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(false), 6000L, 6000L);
         setupEconomy();
         setupDynmap();
         setupTowny();
@@ -382,6 +388,7 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         SHUTDOWN();
         PostalEconomy.shutdown();
+        com.vodhanel.minecraft.va_postal.store.MailStores.close();
     }
 
     private synchronized void setupPermissions() {

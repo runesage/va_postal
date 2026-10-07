@@ -13,6 +13,8 @@ import com.vodhanel.minecraft.va_postal.mail.Book;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
 import com.vodhanel.minecraft.va_postal.mail.HoldTag;
+import com.vodhanel.minecraft.va_postal.mail.Letters;
+import com.vodhanel.minecraft.va_postal.mail.MailIds;
 import com.vodhanel.minecraft.va_postal.mail.SignManip;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -300,7 +302,7 @@ public class Cmd_static {
         pages[0] = "";
         for (String part : parts) pages[0] = (pages[0] + part + "\n");
         Book stamped_book = new Book(title, author, pages);
-        return HoldTag.carry(ind_item, stamped_book.generateItemStack());
+        return HoldTag.carry(ind_item, MailIds.carry(ind_item, stamped_book.generateItemStack()));
     }
 
     public static double cod_amount(ItemStack ind_item) {
@@ -338,8 +340,9 @@ public class Cmd_static {
         String chest_dir = "";
         Chest chest = (Chest) block.getState();
         if (chest == null) return false;
-        // Shipping labels keep v4's chest direction byte (2-5) so old labels still parse.
-        int c_data = BlockFacing.to_legacy(BlockFacing.facing(block));
+        // The label records which way the chest faces, to rebuild it facing the same way.
+        org.bukkit.block.BlockFace facing = BlockFacing.facing(block);
+        String c_data = facing == null ? "NORTH" : facing.name();
         Inventory inventory = chest.getInventory();
 
         if (inventory.getSize() > 27) {
@@ -443,6 +446,11 @@ public class Cmd_static {
         new_stack = P_Economy.hold_postage(player, stack, new_stack, parcel);
         if (new_stack == null) {
             return false;
+        }
+        if (!parcel) {
+            // A letter (parcels are tracked from phase P2): record it and tag the book with its mail id.
+            new_stack = Letters.posted(MailIds.carry(stack, new_stack), player.getUniqueId(), Letters.nearest_office(player),
+                    stown, saddress, OriginalPlayerAttention == null ? null : OriginalPlayerAttention.getUniqueId());
         }
         if ((inventory != null) &&
                 (title.equals(Util.df("[shipping label]")))) {
@@ -661,23 +669,10 @@ public class Cmd_static {
             Format formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
             Date date = new Date();
             String fdate = formatter.format(date);
-            String spage = "";
-            spage = spage + "§7§oTo:\n";
-            spage = spage + "§c " + town + "\n";
-            spage = spage + "§9 " + address + "\n";
-            spage = spage + "§7§oAttention:\n";
-            spage = spage + "§2 " + attention + "\n";
-            spage = spage + "§7§oMailed from:\n";
-            spage = spage + "§7 [not-processed]\n";
-            spage = spage + "§7 [not-processed]\n";
-            spage = spage + "§7§oWritten by:\n";
-            spage = spage + "§8 " + author + "\n";
-            spage = spage + "§8 " + title + "\n";
-            spage = spage + "§7 \n";
-            spage = spage + "§7" + fdate + "\n";
-            existing_pages[0] = spage;
+            // Same layout as /addr: the stamping code reads fixed columns and the sender/recipient UUID lines.
+            existing_pages[0] = Book.makeFirstMailPage(town, address, attention, null, null, author, title, fdate, pauthor, original);
             Book new_book = new Book(town, address, existing_pages);
-            ItemStack new_stack = HoldTag.carry(stack, new_book.generateItemStack());
+            ItemStack new_stack = HoldTag.carry(stack, MailIds.carry(stack, new_book.generateItemStack()));
             player.getInventory().setItemInMainHand(new_stack);
             Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
             Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(address) + " &7&otown of &9&o" + Util.df(town));

@@ -1,6 +1,6 @@
 # Design: persistent mail state (single-server and Velocity)
 
-**Status:** draft for review. **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (persistent in-transit state)
+**Status:** P1 implemented (letters on SQLite; see §14 for where it differs from this design). **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (persistent in-transit state)
 and §5 (multi-server exchange).
 
 ## 1. Goals
@@ -209,7 +209,7 @@ Network:
 
 There is no import or upgrade path from v4.01 or fork worlds (decided). Postal is treated as a new mod: the
 schema starts at version 1 with no import tooling. Old postal books in a world are ordinary books. As a
-follow-up, the v4-compatibility shims added during the port can be removed:
+follow-up, the v4-compatibility shims added during the port can be removed (done in P1):
 - the `owner.name` → UUID conversion;
 - pre-1.13 material names on parcels;
 - legacy armor and highlight IDs in config;
@@ -255,3 +255,23 @@ All are decided as of October 2026.
 5. **Database drivers load through Paper's `libraries:`** in `plugin.yml` (downloaded from Maven Central on
    first start), not shaded into the jar.
 6. **A new mod, with no migration** from v4.01 or fork worlds (§10).
+
+## 14. P1 as built
+
+P1 follows this design, with these differences:
+
+- **Synchronous store calls.** SQLite is called on the main thread (one pooled connection, WAL,
+  `synchronous=NORMAL`); each call is a single small transaction. The async pipeline arrives with MySQL in P3,
+  where network latency makes it necessary.
+- **Payload captured at posting.** A letter's `LETTER_V1` payload (title, author, pages) is stored when it's
+  addressed, so reconciliation can rebuild a lost book from the record.
+- **Custody on events.** `mail_event` rows carry the custody they moved to, so the previous chest is known
+  from history.
+- **Roll-forward.** The store commits at once but the world saves every few minutes, so after a crash the world
+  can be behind the store. When a letter isn't in the chest its record names, reconciliation looks in the chest
+  it was in before and moves that copy forward. It only ever moves an existing book, so it can't duplicate
+  one. Recently delivered letters (the last hour) are checked the same way.
+- **Admin commands.** `/postal track <id | recent>` shows a letter's record and history;
+  `/postal testletter <from> <to> <address>` hands in a tracked letter without a player (used by the smoke
+  test).
+- **Parcels stay untracked** until P2: only letters get a `mail_id`.
