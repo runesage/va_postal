@@ -84,6 +84,12 @@ pathfinding can't handle yet; after a change, an address that used to be walked 
 
 It isn't part of CI: it takes too long. Run it before and after a change to pathfinding.
 
+### Now (October 2026)
+
+With surveyed routes (`SURVEY=1`), all 15 addresses are walked with no rescues. With the hand-made routes,
+14 of 15: Tunnel's still needs rescuing (its surveyed route doesn't). The table below is the baseline from
+before the route work.
+
 ### Baseline (October 2026, manual routes, Citizens 2.0.44)
 
 A 10-minute soak on today's code. 11 of the 14 walkable addresses are walked cleanly. These need rescuing:

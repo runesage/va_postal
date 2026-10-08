@@ -151,6 +151,17 @@ for today's manual routes and the test bed for any of the options above. See `de
   is walking right now isn't replaced.
 - **`Climb`**: when the next waypoint is straight up or down a ladder column, Postal cancels Citizens'
   navigation and moves the postman 0.15 blocks a tick, facing the ladder.
-- **Doors:** Citizens' `DoorExaminer` is added to postmen, so its pathfinder plans through doors.
+- **Doors:** `Doorway` takes the postman through a door or gate just ahead of him: line up, open it, walk
+  through, close it behind him. v4's door sequencer is off; Citizens' pathfinder wouldn't plan through a door
+  even when it was open.
+- **Stairs:** the survey knows which way stairs go up (a step from the front, a jump from the side or back),
+  keeps a waypoint at the foot and top of every flight or drop, never on the stair itself, and keeps routes to
+  the middle of bridges and away from ledges.
+- **Arriving:** a waypoint counts as reached only at its height, and the top or foot of a climb only within
+  1.25 blocks. The old 2 blocks, ignoring height, let a postman count himself on a bridge while still beside it.
+- **Stall watchdog:** a postman who gets no closer to his waypoint for 30 seconds is teleported to it, so one
+  stuck postman can't stop his office's queue.
+- **Results (October 2026):** towns soak with surveyed routes: all 15 addresses walked, no rescues; SMP
+  load test (12 towns, 240 addresses): every route surveyed (median 8 ms), TPS at least 18.9, no rescues.
 - **Fixed on the way:** the stuck handler's door recovery looped forever, so a postman stuck at a door
   jumped in place for good.
