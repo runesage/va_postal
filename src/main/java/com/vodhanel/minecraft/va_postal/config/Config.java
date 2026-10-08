@@ -143,6 +143,13 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.signature"), "");
 
         VA_postal.plugin.getConfig().addDefault(path_format("storage.type"), "sqlite");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.host"), "localhost");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.port"), 3306);
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.database"), "postal");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.user"), "postal");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.password"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.pool_size"), 6);
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.properties"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("network.server_id"), "main");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");

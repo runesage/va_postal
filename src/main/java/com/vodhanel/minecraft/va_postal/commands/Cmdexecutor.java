@@ -153,7 +153,7 @@ public class Cmdexecutor implements CommandExecutor {
         String sub = args[0].toLowerCase().trim();
         if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
                 || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
-                || "setstate".equals(sub)) {
+                || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
                 return true;
@@ -166,6 +166,8 @@ public class Cmdexecutor implements CommandExecutor {
             else if ("accept".equals(sub)) P_MailAdmin.accept(player, args);
             else if ("refuse".equals(sub)) P_MailAdmin.refuse(player, args);
             else if ("setstate".equals(sub)) P_MailAdmin.setstate(player, args);
+            else if ("store".equals(sub)) P_MailAdmin.store(player);
+            else if ("directory".equals(sub)) P_MailAdmin.directory(player, args);
             else P_MailAdmin.testletter(player, args);
             return true;
         }
@@ -306,7 +308,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
             Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office>");
-            Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate>");
+            Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate/store/directory>");
             return true;
         }
 
@@ -320,6 +322,14 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("track".equals(args[0].toLowerCase().trim())) {
             P_MailAdmin.track(sender, args);
+            return true;
+        }
+        if ("store".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.store(sender);
+            return true;
+        }
+        if ("directory".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.directory(sender, args);
             return true;
         }
         if ("reconcile".equals(args[0].toLowerCase().trim())) {

@@ -1,0 +1,2 @@
+-- Schema 3 (persistent-state phase P3): parcel payloads larger than 64 KB. SQLite's BLOB has no such limit,
+-- so there's nothing to do here; V3__wide_payload.mysql.sql widens the column on MySQL/MariaDB.

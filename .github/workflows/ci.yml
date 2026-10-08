@@ -16,6 +16,22 @@ jobs:
   build:
     name: Build and unit tests
     runs-on: ubuntu-latest
+    # The store tests run on MariaDB as well as SQLite (MariaDbMailStoreTest), so both dialects stay identical.
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: postal_test
+          MARIADB_USER: postal
+          MARIADB_PASSWORD: postal
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      POSTAL_TEST_MYSQL_URL: jdbc:mariadb://127.0.0.1:3306/postal_test?user=postal&password=postal
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
