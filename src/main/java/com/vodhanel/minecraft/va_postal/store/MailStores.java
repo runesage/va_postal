@@ -89,7 +89,7 @@ public final class MailStores {
             }
             MailStore store = new SqlMailStore(ds, server_id, ds, dialect);
             stats = new StoreStats();
-            active = StoreStats.timed(store, stats, main_thread);
+            active = StoreStats.timed(store, stats, main_thread, log::warning);
             log.info("Mail store: " + description + ", schema " + active.schema_version() + ", server id '"
                     + active.server_id() + "'.");
         } catch (RuntimeException | LinkageError | java.sql.SQLException e) {

@@ -384,6 +384,10 @@ public final class P_MailAdmin {
             send(sender, String.format("&7On the main thread: &f%d&7 calls, &f%.1f ms&7 in all",
                     st.main_thread_calls.get(), st.main_thread_nanos.get() / 1e6D));
             send(sender, "&7Failures: &f" + st.failures.get() + (st.failures.get() > 0 ? "&7 (last: " + st.last_failure + ")" : ""));
+            if (st.unavailable != null) {
+                send(sender, "&cUnavailable for " + (System.currentTimeMillis() - st.unavailable_since) / 1000L
+                        + " s: calls fail at once and mail stays where it is until the database answers again.");
+            }
         }
         long now = System.currentTimeMillis();
         for (com.vodhanel.minecraft.va_postal.store.ServerInfo s : store.servers()) {

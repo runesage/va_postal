@@ -5,6 +5,9 @@
 #
 # Usage: ci/smoke-test.sh <path-to-postal.jar>
 # Env:   JAVA (default: java), WORK_DIR (default: ./smoke), PAPER_VERSION (default below)
+#        STORAGE=mysql runs it on MySQL/MariaDB instead of SQLite: MYSQL_HOST (default 127.0.0.1), MYSQL_PORT
+#        (3306), MYSQL_DATABASE (postal), MYSQL_USER (postal), MYSQL_PASSWORD (postal). The database must be
+#        empty: the store's tables are created on the first start.
 #
 # Running this accepts the Minecraft EULA for a throwaway test server.
 set -euo pipefail
@@ -12,6 +15,7 @@ set -euo pipefail
 POSTAL_JAR="$(realpath "${1:?usage: smoke-test.sh <postal.jar>}")"
 JAVA="${JAVA:-java}"
 WORK_DIR="${WORK_DIR:-smoke}"
+STORAGE="${STORAGE:-sqlite}"
 # shellcheck source=ci/lib.sh
 SEED_SIZE=small  # one address, so three deliveries fit in the run
 OWNER_UUID="4b1d3a6e-1c2f-4d5e-9a7b-0c1d2e3f4a5b"  # a made-up player who owns Testville and Home in phase 3
@@ -75,12 +79,35 @@ assert n == 1, "uniform toggle not found in config"
 open(p, 'w').write(s)
 PY
 
+if [ "$STORAGE" = mysql ]; then
+    python3 - "$CONFIG" "${MYSQL_HOST:-127.0.0.1}" "${MYSQL_PORT:-3306}" "${MYSQL_DATABASE:-postal}" \
+        "${MYSQL_USER:-postal}" "${MYSQL_PASSWORD:-postal}" <<'PY'
+import sys
+p, host, port, db, user, password = sys.argv[1:]
+lines = open(p).read().split("\n")
+values = {"Type": "mysql", "Host": host, "Port": port, "Database": db, "User": user, "Password": password}
+out, in_storage = [], False
+for line in lines:
+    if line.startswith("Storage:"):
+        in_storage = True
+    elif line and not line.startswith(" "):
+        in_storage = False
+    key = line.strip().split(":")[0]
+    if in_storage and key in values:
+        line = line[:len(line) - len(line.lstrip())] + key + ": '" + values.pop(key) + "'"
+    out.append(line)
+assert not values, "Storage keys not found in config: %s" % values
+open(p, "w").write("\n".join(out))
+PY
+fi
+
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
     "postal debug" "postal start" "sleep:5" "postal testletter testville testville home" "postal testparcel testville testville home retired" "sleep:263" "tlist" "alist Testville" "npc list" "showroute testville home" "/" "sleep:2" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
     "data get block 40 -60 0 Items" "data get block 20 -60 0 Items" "data get block 0 -60 0 Items" "postal track recent" \
     "postal accept last 30 -60 5" "sleep:1" "data get block 30 -60 5 Items" "postal accept last 31 -60 5" \
-    "postal track last" "execute if block 20 -60 -4 minecraft:air run say parcel chest collected"
+    "postal track last" "execute if block 20 -60 -4 minecraft:air run say parcel chest collected" \
+    "postal store" "postal directory" "postal directory main"
 
 # Recorded now: on its next start EssentialsX may purge NPC accounts still at the starting balance
 # (Postal recreates them on demand).
@@ -221,7 +248,16 @@ check "phase7: no Postal stack traces" no_match "at .*com\\.vodhanel\\." "$WORK_
 check "phase2: console /showroute highlights the route" grep -q "Waypoints have been highlighted for everyone online" "$WORK_DIR/phase2.log"
 plain() { sed $'s/\x1b\\[[0-9;]*m//g' "$WORK_DIR/$1.log"; }
 # Tracked letters (see /postal testletter, /postal track).
-check "phase2: the store opened" grep -q "Mail store: SQLite" "$WORK_DIR/phase2.log"
+if [ "$STORAGE" = mysql ]; then
+    check "phase2: the store opened on MySQL" grep -q "Mail store: MySQL" "$WORK_DIR/phase2.log"
+else
+    check "phase2: the store opened" grep -q "Mail store: SQLite" "$WORK_DIR/phase2.log"
+fi
+# P3: the store's health and the network directory.
+check "phase2: /postal store reports no failures" grep -qE "Failures: 0" <(plain phase2)
+check "phase2: /postal store lists this server" grep -qE "Server main \(this one\): last seen [0-9]+ s ago" <(plain phase2)
+check "phase2: the directory has Testville and its address" grep -qE "main / testville: 1 addresses" <(plain phase2)
+check "phase2: the directory lists Home" grep -qE "^\[[^]]*\]: +home$" <(plain phase2)
 check "phase2: a tracked letter is delivered to Home" grep -qE "testville, home: DELIVERED at CHEST@world,40,-60,0" <(plain phase2)
 # Parcels (P2): items held in the record, the label routed like a letter, items handed over exactly once.
 check "phase2: a parcel's label is delivered to Home" grep -qE "\[parcel\] testville, home: DELIVERED at CHEST@world,40,-60,0" <(plain phase2)

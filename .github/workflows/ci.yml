@@ -48,10 +48,24 @@ jobs:
           if-no-files-found: error
 
   smoke:
-    name: Smoke test on Paper ${{ matrix.paper }}
+    name: Smoke test on Paper ${{ matrix.paper }} (${{ matrix.storage }})
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # For the MySQL run (persistent-state phase P3); the SQLite run ignores it.
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: postal
+          MARIADB_USER: postal
+          MARIADB_PASSWORD: postal
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +73,10 @@ jobs:
           # Paper 26.x needs Java 25. EssentialsX 2.22.0 supports up to 26.1.2.
           - paper: "26.1.2"
             java: "25"
+            storage: sqlite
+          - paper: "26.1.2"
+            java: "25"
+            storage: mysql
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -78,12 +96,13 @@ jobs:
         env:
           PAPER_VERSION: ${{ matrix.paper }}
           WORK_DIR: smoke
+          STORAGE: ${{ matrix.storage }}
         run: ci/smoke-test.sh dist/va_postal-*.jar
       - name: Upload server logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-logs-${{ matrix.paper }}
+          name: smoke-logs-${{ matrix.paper }}-${{ matrix.storage }}
           path: |
             smoke/*.log
             smoke/server/logs/
