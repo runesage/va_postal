@@ -1366,6 +1366,11 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oYou must have a signed book in your hand.");
             return true;
         }
+        if (BookManip.is_shipping_label(stack)) {
+            // Refused straight away, not after a confirmation: a parcel's destination is part of its record.
+            Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
+            return true;
+        }
         String stown = C_Postoffice.town_complete(args[0]);
         if ("null".equals(stown)) {
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
