@@ -72,12 +72,13 @@ up, and `/postal start` when a step says so.
 **2a. With you watching**
 1. Package a chest (as in 1a) for Testville Bakery. Stand within about 20 blocks of the chest.
 2. Post the label in Home's mailbox (x=40), and `/postal start`.
-- [ ] When the postman collects the label at Home, a **Postal Courier** walks up to your packed chest, pauses,
-  picks it up (the chest disappears and he's holding one), walks off and vanishes in a puff of smoke.
+- [ ] As soon as you close Home's mailbox with the label in it, a **Postal Courier** walks up to your packed chest,
+  pauses, picks it up (the chest disappears and he's holding one), walks off and vanishes in a puff of smoke.
+  The postman takes the label later, on his round.
 - [ ] The chest and its sign are gone, and nothing dropped on the ground.
 
 **2b. With nobody near**
-1. Package a chest, then go more than 40 blocks away from it before the label is picked up.
+1. Package a chest, go more than 40 blocks away from it, and post the label there.
 - [ ] When you go back, the chest is simply gone. No courier was needed.
 
 **2c. Something left in the chest**

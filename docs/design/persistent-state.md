@@ -283,7 +283,8 @@ P1 follows this design, with these differences:
   enchantments, names, lore and everything else survive. The chest is emptied at once, so nothing can be
   duplicated while the label travels, but it stays where it was, locked by its `[Postal_Ship]` sign, for
   immersion.
-- **A courier collects the chest.** At the label's first pickup, if a player is within 40 blocks, a postal
+- **A courier collects the chest.** When the label is posted (left in a mailbox or a post office chest), or at
+  its first pickup if that comes first, if a player is within 40 blocks, a postal
   courier NPC walks up to the chest, picks it up and walks off (at most three at once); otherwise the chest is
   simply removed. Anything a hopper pushed in meanwhile is dropped, not lost. The courier is never saved by
   Citizens, and every failure path still removes the chest.

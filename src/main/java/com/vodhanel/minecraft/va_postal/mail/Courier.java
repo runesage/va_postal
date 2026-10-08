@@ -43,6 +43,11 @@ public final class Courier {
         if (!(chest.getState() instanceof Chest)) {
             return;
         }
+        for (Scene s : active) {
+            if (s.chest.equals(chest)) {
+                return; // a courier is already on his way to this chest
+            }
+        }
         if (active.size() >= MAX_ACTIVE || !audience(chest.getLocation()) || !citizens()) {
             remove(chest);
             return;

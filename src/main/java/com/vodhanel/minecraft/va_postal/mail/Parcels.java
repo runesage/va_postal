@@ -313,6 +313,24 @@ public final class Parcels {
     }
 
     /**
+     * A shipping label was just posted (left in a mailbox or a post office chest): the courier sets off for its
+     * chest now, so the chest is collected before the postman takes the label, not after. Only for a parcel not
+     * yet in the post, and not if the world was rolled back past its packing ({@link #rolled_back(ItemStack)}
+     * cancels it instead). The label's first pickup still sends him if this didn't.
+     */
+    public static void label_posted(ItemStack label) {
+        Optional<MailRecord> r = record(label);
+        if (r.isEmpty() || r.get().kind != MailKind.PARCEL || r.get().state != MailState.POSTED || r.get().moving()
+                || r.get().custody.kind != Custody.Kind.NONE) {
+            return;
+        }
+        if (rolled_back(label)) {
+            return;
+        }
+        collect(label);
+    }
+
+    /**
      * Before a shipping label's first pickup: true if its parcel was packed in a world a crash has since rolled
      * back (see {@link #rolled_back(MailRecord, ParcelPayload)}), in which case it's cancelled and the label
      * must be left where it is.
