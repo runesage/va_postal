@@ -152,7 +152,9 @@ public class Goal_WTR implements Behavior {
         // external watchdog (which counts any movement as progress) catches this, and one frozen postman
         // stops his whole office's queue.
         if (stalled()) {
-            ID_WTR.report_recovery(id, "Route Navigation, Watchdog Teleport Reset");
+            org.bukkit.Location at = VA_postal.wtr_npc[id].getEntity().getLocation();
+            ID_WTR.report_recovery(id, String.format("Route Navigation, Watchdog Teleport Reset (stalled at %.1f,%.1f,%.1f, %.1f blocks from the waypoint)",
+                    at.getX(), at.getY(), at.getZ(), at.distance(VA_postal.wtr_waypoint[id])));
             ID_WTR.tp_npc(VA_postal.wtr_npc[id], VA_postal.wtr_waypoint[id].clone().add(0.5, 0, 0.5));
             ID_WTR.invoke_next_waypoint(id);
             return;

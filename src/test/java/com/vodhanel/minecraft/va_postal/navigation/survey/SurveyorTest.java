@@ -202,6 +202,17 @@ class SurveyorTest {
     }
 
     @Test
+    void keepsToTheMiddleOfAWideBridge() {
+        // A three-wide bridge (x = 0..2) one block up over a river, stairs at both ends: the route takes the middle.
+        TestGrid g = new TestGrid().fill(-20, -1, 6, 20, -1, 8, Cell.WATER)
+                .fill(0, 0, 5, 2, 0, 9, Cell.ROAD).fill(0, 0, 4, 2, 0, 4, Cell.STAIRS_SOUTH)
+                .fill(0, 0, 10, 2, 0, 10, Cell.STAIRS_NORTH);
+        Result r = new Surveyor(g).survey(-6, 0, 0, 1, 0, 14);
+        assertTrue(r.ok(), r.failure());
+        assertTrue(r.path().stream().filter(p -> p.y() == 1 && p.z() >= 5 && p.z() <= 9).allMatch(p -> p.x() == 1), r.path().toString());
+    }
+
+    @Test
     void classifiesBlocksByName() {
         assertEquals(Cell.LADDER, Cell.of("LADDER", false));
         assertEquals(Cell.LADDER, Cell.of("VINE", false));

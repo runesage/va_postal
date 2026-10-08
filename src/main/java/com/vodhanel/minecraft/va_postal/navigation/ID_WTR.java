@@ -328,6 +328,12 @@ public class ID_WTR {
             Location target = VA_postal.wtr_waypoint[id];
 
 
+            // At the wrong height he isn't there, however close: beside a bridge isn't on it (and from there,
+            // heading for the far end of the deck, he walked into the river under it).
+            if (Math.abs(npc_loc.getY() - target.getBlockY()) > 0.9D) {
+                return false;
+            }
+
             int nx = npc_loc.getBlockX();
             int nz = npc_loc.getBlockZ();
             int tx = (int) Math.floor(target.getX());
@@ -340,6 +346,14 @@ public class ID_WTR {
             //Util.dinform(AnsiColor.L_GREEN + "at_waypoint for " + id + ": npc: " + nx + "," + nz + " target: " + tx + "," + tz + AnsiColor.YELLOW + " navigation location: " + navx + "," + navz + " " + ((navx == tx && navz == tz) ? AnsiColor.L_GREEN + "MATCH" : AnsiColor.RED + "NO MATCH"));
             if ((nx == tx) && (nz == tz)) {
                 return true;
+            }
+
+            // The top or foot of a climb (a stair, a step, a drop): close, and at its height. The usual 2 blocks let
+            // him clip the corner of a bridge's stair from the side and carry on from beside the bridge, not on it.
+            Location last = VA_postal.wtr_waypoint_last[id];
+            if (last != null && Math.abs(last.getBlockY() - target.getBlockY()) >= 1) {
+                double dx = npc_loc.getX() - target.getX(), dz = npc_loc.getZ() - target.getZ();
+                return Math.sqrt(dx * dx + dz * dz) <= 1.25D && Math.abs(npc_loc.getY() - target.getBlockY()) <= 0.6D;
             }
 
             //Util.dinform(AnsiColor.CYAN + "DISTANCE: "+npc_loc.distance(target));

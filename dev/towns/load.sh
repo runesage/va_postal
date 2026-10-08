@@ -74,6 +74,7 @@ echo "== Building $TOWNS towns"
 BUILD=("function postal_smp:central" "sleep:3")
 for i in $(seq 0 $((TOWNS - 1))); do BUILD+=("function postal_smp:town_$i" "sleep:4"); done
 run_server "$WORK_DIR/build.log" 1800 "${BUILD[@]}" "save-all flush" "sleep:10"
+keep_libraries "$CACHE" "$SERVER"
 built=$(grep -c "Postal SMP built town_" "$WORK_DIR/build.log" || true)
 [ "$built" = "$TOWNS" ] || { echo "only $built of $TOWNS towns were built; see $WORK_DIR/build.log" >&2; exit 1; }
 

@@ -264,7 +264,7 @@ public final class Surveyor {
                 int fall = from.y - y;
                 cost += fall + (fall >= 2 ? 3.0D : 0.0D);
             }
-            cost += 0.25D * walls_beside(x, y, z);
+            cost += 0.25D * walls_beside(x, y, z) + 0.6D * edges_beside(x, y, z);
         }
         double g = from.g + cost;
         out.add(new Node(x, y, z, move, g, g + h(x, y, z, t), from));
@@ -288,6 +288,23 @@ public final class Surveyor {
         int n = 0;
         for (int[] d : SIDES) {
             if (!grid.cell(x + d[0], y, z + d[1]).passable || !grid.cell(x + d[0], y + 1, z + d[1]).passable) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * How many of the four sides of a position are an edge: open, but nothing to stand on at the same height
+     * (the side of a bridge, a ledge, a riverbank). A postman one step from falling off is where Citizens goes
+     * wrong, so routes keep to the middle.
+     */
+    private int edges_beside(int x, int y, int z) {
+        int n = 0;
+        for (int[] d : SIDES) {
+            int nx = x + d[0], nz = z + d[1];
+            Cell feet = grid.cell(nx, y, nz);
+            if (feet.passable && grid.cell(nx, y + 1, nz).passable && !stand(nx, y, nz) && !stand(nx, y + 1, nz)) {
                 n++;
             }
         }

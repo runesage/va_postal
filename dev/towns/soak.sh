@@ -66,6 +66,7 @@ run_server() {
 
 echo "== Building the towns"
 run_server "$WORK_DIR/build.log" 600 "function postal_towns:build" "sleep:10" "save-all flush" "sleep:5"
+keep_libraries "$CACHE" "$SERVER"
 grep -q "Postal test towns built" "$WORK_DIR/build.log" || { echo "the towns weren't built; see $WORK_DIR/build.log" >&2; exit 1; }
 
 # The towns' offices, addresses and routes, plus quick postman pacing so every route runs several times.
