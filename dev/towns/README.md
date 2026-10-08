@@ -46,7 +46,7 @@ Central's postman teleports between offices, so only routes inside each town are
 | | | Tunnel | a one-wide, two-high tunnel through a mound |
 | | | Hedge | a zigzag corridor between hedges |
 | | | Farm | around a wheat field |
-| | | Loft | upstairs, only by ladder: **expected to fail** (postmen can't climb) |
+| | | Loft | upstairs, only by ladder (Postal climbs it for the postman) |
 
 ## Playing in it
 
@@ -63,6 +63,7 @@ towns are built on the first start and the dispatcher starts on its own. `/go Hi
 ```
 dev/towns/soak.sh                 # uses the newest target/va_postal-*.jar
 SOAK_SECONDS=1800 dev/towns/soak.sh
+SURVEY=1 dev/towns/soak.sh        # throw the hand-made routes away; Postal surveys every route first
 ```
 
 The soak builds a throwaway server, builds the towns and lets the postmen run every route. The default run
@@ -99,6 +100,30 @@ door forever, jumping on the mailbox: 72 door resets in the last 5.5 minutes of 
 
 Stairs, slab ramps, the L-shaped stair, both bridges, the fence gate, the hedge maze and the forest paths
 are all walked without help.
+
+## SMP load test
+
+`build_smp.py` generates a much bigger world, in the shape of a busy survival server: 12 towns (`--towns`)
+spread over about 1,300 x 1,300 blocks, each with a post office and 20 houses (`--addresses`) on a street
+grid. Towns take turns at a river crossed by bridges, a raised district reached by stairs, and a street
+closed by a fence gate, with trees in the gaps. None of it has routes, so every route is surveyed. Each town
+is built by its own data pack function and then unforced, so most towns are unloaded most of the time, as
+on a real server.
+
+```
+dev/towns/load.sh                              # 12 towns x 20 addresses, 15 minutes of postmen
+TOWNS=24 ADDRESSES=30 LOAD_SECONDS=1800 dev/towns/load.sh
+```
+
+It surveys every route, then runs every post office at once (`Concurrent_Postmen`) while sampling `tps` and
+`mspt` every 30 seconds. It reports:
+- surveys: how many found a route, the failures and why, the median and slowest times, positions searched;
+- the server: the lowest and median TPS, and tick times;
+- the postmen: round trips recorded, and the addresses that needed the most rescues.
+
+It fails if any survey failed or TPS dropped below `MIN_TPS` (default 18). Like the soak, it isn't part of
+CI. `SurveyorLoadTest` is the fast version that does run in CI: 60 surveys across a 600 x 600 block random
+town, plus an unreachable address, each held to the search's work bound.
 
 ## Changing the towns
 

@@ -1,6 +1,7 @@
 # Design: routes without manual waypoints
 
-**Status:** ideas for discussion. **No decisions have been made**; everything below is an option.
+**Status:** option A (automatic survey) is built, with ladder climbing; see §8. The other options are still
+ideas.
 
 ## 1. The problem
 
@@ -122,4 +123,34 @@ for today's manual routes and the test bed for any of the options above. See `de
 
 ## 7. Decisions
 
-None yet.
+- **Surveyed routes are accepted automatically** and saved as ordinary waypoints. `/showroute` previews them
+  and `/setroute` still edits them, so an admin can correct one by hand.
+- **A new address is surveyed when it's registered** (`/setaddr`); it opens once it has a route. A failed
+  survey says how close it got, and the address stays closed until a route is set by hand.
+- **Ladders are supported**: the survey climbs them and Postal climbs the postman (Citizens can't).
+  Scaffolding and vines count as ladders. Water columns and elevators aren't supported.
+- **No swimming, no crops, drops of three blocks at most**, and never over a chest (so never across a
+  mailbox).
+
+## 8. As built (R1)
+
+- **`Surveyor`** (pure Java, unit-tested on hand-built grids): A* over cells (`Cell`: open, ground, road,
+  step, rough, wall, door, gate, ladder, crop, water, danger, unknown). Moves: walk, diagonal (only when both
+  sides are clear), step up, drop (up to 3), through doors and gates, up and down ladders. Costs prefer roads
+  and stairs, and treat a jump onto a full block as expensive, so the bridge's stairs win over jumping on
+  from the side. Steps next to walls cost a little more, which keeps routes to the middle of passages.
+  Bounded by a box (32 blocks around the two ends, 16 up or down) and 400,000 positions.
+- **Waypoints:** the path is cut to straight hops at most 8 blocks long. Each hop is checked across the
+  postman's width (no cut corners), and the path between must stay within 0.75 blocks of the line. A
+  waypoint is kept on either side of every door (never on the door: Postal's door handling expects it
+  between two waypoints), every jump and every drop of two or more, and on every ladder rung.
+- **`SurveyGrid`**: chunk snapshots, so the search runs off the main thread. Chunks are loaded
+  asynchronously and never generated, and unloaded or missing chunks read as walls. Blocks are classified by
+  name.
+- **`RouteSurvey`**: `/postal survey` and the `/setaddr` hook. Surveys run one at a time. A route a postman
+  is walking right now isn't replaced.
+- **`Climb`**: when the next waypoint is straight up or down a ladder column, Postal cancels Citizens'
+  navigation and moves the postman 0.15 blocks a tick, facing the ladder.
+- **Doors:** Citizens' `DoorExaminer` is added to postmen, so its pathfinder plans through doors.
+- **Fixed on the way:** the stuck handler's door recovery looped forever, so a postman stuck at a door
+  jumped in place for good.

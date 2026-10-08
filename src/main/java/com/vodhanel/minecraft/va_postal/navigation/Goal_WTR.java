@@ -18,8 +18,15 @@ import org.bukkit.event.EventHandler;
  * {@code GoalSelector.finishAndRemove()}.
  */
 public class Goal_WTR implements Behavior {
+    /** A postman who gets no closer to his waypoint for this long is stuck, whatever Citizens thinks. */
+    static final long STALL_MS = 30_000L;
+
     private int id;
     private boolean finished = false;
+    // Progress towards the current waypoint, for the stall watchdog.
+    private org.bukkit.Location progress_target;
+    private double progress_best;
+    private long progress_stamp;
 
     public Goal_WTR(int p_id) {
         id = p_id;
@@ -140,6 +147,17 @@ public class Goal_WTR implements Behavior {
         }
 
 
+        // Stalled: no closer to his waypoint for STALL_MS (pushing at a wall, jittering on a corner, a path
+        // Citizens keeps replanning): teleport him there and carry on. Neither Citizens' stuck action nor the
+        // external watchdog (which counts any movement as progress) catches this, and one frozen postman
+        // stops his whole office's queue.
+        if (stalled()) {
+            ID_WTR.report_recovery(id, "Route Navigation, Watchdog Teleport Reset");
+            ID_WTR.tp_npc(VA_postal.wtr_npc[id], VA_postal.wtr_waypoint[id].clone().add(0.5, 0, 0.5));
+            ID_WTR.invoke_next_waypoint(id);
+            return;
+        }
+
         // A ladder: Postal climbs him (Citizens can't), and finishes the waypoint when he's there.
         if (!VA_postal.wtr_waypoint_completed[id] && Climb.tick(id)) {
             return;
@@ -154,6 +172,35 @@ public class Goal_WTR implements Behavior {
         //Util.dinform(AnsiColor.L_YELLOW + id + " IS NOT AT WAYPOINT");
 
         ID_WTR.safe_re_target(id);
+    }
+
+    /** True if the postman has got no closer to his current waypoint for {@link #STALL_MS}. */
+    private boolean stalled() {
+        org.bukkit.Location target = VA_postal.wtr_waypoint[id];
+        long now = System.currentTimeMillis();
+        if (target == null || VA_postal.wtr_waypoint_completed[id] || VA_postal.wtr_cooling[id]
+                || VA_postal.wtr_npc[id].getEntity() == null
+                || !target.getWorld().equals(VA_postal.wtr_npc[id].getEntity().getWorld())) {
+            progress_target = null;
+            return false;
+        }
+        double d = VA_postal.wtr_npc[id].getEntity().getLocation().distance(target);
+        if (!target.equals(progress_target)) {
+            progress_target = target.clone();
+            progress_best = d;
+            progress_stamp = now;
+            return false;
+        }
+        if (d < progress_best - 0.5D) {
+            progress_best = d;
+            progress_stamp = now;
+            return false;
+        }
+        if (now - progress_stamp > STALL_MS) {
+            progress_target = null;
+            return true;
+        }
+        return false;
     }
 
     public boolean shouldExecute() {
