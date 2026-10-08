@@ -65,7 +65,7 @@ up, and `/postal start` when a step says so.
 
 **1d. Re-addressing**
 1. Holding an unposted label, run `/addr Testville Bakery`.
-- [ ] It's refused, and tells you to cancel and package again.
+- [ ] It's refused at once (no confirmation prompt), and tells you to cancel and package again.
 
 ## 2. The courier
 
@@ -96,7 +96,8 @@ up, and `/postal start` when a step says so.
 - [ ] The label became a statement. `/postal track last` shows `ACCEPTED`.
 
 **3b. Accepting twice**
-- [ ] `/accept` again (holding the statement) is refused.
+- [ ] `/accept` again (holding the statement) is refused at once, before any confirmation: "That's a statement:
+  this parcel has already been accepted or refused."
 
 **3c. A copied label**
 1. Ship another test parcel to Home. When it's delivered, **craft a copy** of the label (the label plus a

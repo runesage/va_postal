@@ -220,6 +220,11 @@ public final class Parcels {
         return true;
     }
 
+    /** True if this label's parcel can be accepted or refused now; if not, says why. Changes nothing. */
+    public static boolean can_open(Player player, ItemStack label) {
+        return delivered(player, label) != null;
+    }
+
     /** The parcel this delivered label belongs to, ready to accept or refuse; null (with a message) if not. */
     private static MailRecord delivered(Player player, ItemStack label) {
         Optional<MailRecord> found = record(label);

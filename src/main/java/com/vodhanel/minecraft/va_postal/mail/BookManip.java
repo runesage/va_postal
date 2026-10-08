@@ -133,7 +133,9 @@ public class BookManip {
             boolean fixed_accept = false;
             boolean fixed_refuse = false;
 
-            spage[0] = spage[0].replace("[shipping label]", "[statement]");
+            // The label reads "[Shipping Label]": a case-sensitive replace missed it, so a statement still
+            // looked like a label to /accept and /refuse.
+            spage[0] = spage[0].replaceAll("(?i)\\[shipping label\\]", "[statement]");
 
             for (int i = 1; i < spage.length; i++) {
                 if (spage[i].contains("§2/accept")) {
@@ -210,6 +212,30 @@ public class BookManip {
     }
 
     /** True if {@code item} is a shipping label (addressed or not). */
+    /**
+     * True if this is a parcel's statement (what a label becomes once the parcel is accepted or refused),
+     * including statements stamped before "[statement]" was written reliably.
+     */
+    public static boolean is_parcel_statement(ItemStack item) {
+        if (item == null || item.getType() != Material.WRITTEN_BOOK) {
+            return false;
+        }
+        Book book = new Book(item);
+        String[] pages = book.is_valid() ? book.getPages() : null;
+        if (pages == null || pages.length == 0 || pages[0] == null) {
+            return false;
+        }
+        if (pages[0].toLowerCase().contains("[statement]")) {
+            return true;
+        }
+        for (String p : pages) {
+            if (p != null && (p.contains("Shipment Accepted") || p.contains("Shipment Refused"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean is_shipping_label(ItemStack item) {
         if (item == null || item.getType() != Material.WRITTEN_BOOK) {
             return false;

@@ -1503,8 +1503,16 @@ public class Cmdexecutor implements CommandExecutor {
 
         // The parcel's record decides whether it can be accepted (delivered, not yet filled), not the label's text.
         ItemStack stack = player.getInventory().getItemInMainHand();
+        if (BookManip.is_parcel_statement(stack)) {
+            Util.pinform(player, "&c&oThat's a statement: this parcel has already been accepted or refused.");
+            return true;
+        }
         if (!BookManip.is_shipping_label(stack)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
+            return true;
+        }
+        // Checked before asking for confirmation, so a parcel that can't be accepted is refused at once.
+        if (!com.vodhanel.minecraft.va_postal.mail.Parcels.can_open(player, stack)) {
             return true;
         }
 
@@ -1550,6 +1558,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         ItemStack stack = player.getInventory().getItemInMainHand();
+        if (BookManip.is_parcel_statement(stack)) {
+            Util.pinform(player, "&c&oThat's a statement: this parcel has already been accepted or refused.");
+            return true;
+        }
         if (!BookManip.is_shipping_label(stack)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
