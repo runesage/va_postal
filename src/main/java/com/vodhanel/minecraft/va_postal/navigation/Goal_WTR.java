@@ -158,6 +158,11 @@ public class Goal_WTR implements Behavior {
             return;
         }
 
+        // A door or gate just ahead: Postal takes him through it (Citizens won't plan through doors).
+        if (!VA_postal.wtr_waypoint_completed[id] && Doorway.tick(id)) {
+            return;
+        }
+
         // A ladder: Postal climbs him (Citizens can't), and finishes the waypoint when he's there.
         if (!VA_postal.wtr_waypoint_completed[id] && Climb.tick(id)) {
             return;

@@ -334,6 +334,7 @@ public class RouteMngr {
     }
 
     public static synchronized void cancel_route(int id) {
+        Doorway.reset(id);
         if ((!VA_Dispatcher.dispatcher_running) || (!VA_postal.wtr_goal_active[id])) return;
         VA_postal.wtr_done[id] = true;
 

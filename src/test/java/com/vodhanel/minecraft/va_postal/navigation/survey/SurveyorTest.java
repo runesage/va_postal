@@ -179,6 +179,29 @@ class SurveyorTest {
     }
 
     @Test
+    void goesUpStairsFromTheirFrontOnly() {
+        // The bridge again, but with real stairs: up towards the south at z = 4, up towards the north at z = 10.
+        // From beside the first stair (x = -1, z = 4) it would be a jump onto its side.
+        TestGrid g = new TestGrid().fill(-20, -1, 6, 20, -1, 8, Cell.WATER)
+                .fill(0, 0, 5, 1, 0, 9, Cell.ROAD).fill(0, 0, 4, 1, 0, 4, Cell.STAIRS_SOUTH)
+                .fill(0, 0, 10, 1, 0, 10, Cell.STAIRS_NORTH);
+        Result r = new Surveyor(g).survey(-4, 0, 4, 0, 0, 13);
+        assertTrue(r.ok(), r.failure());
+        int up = 0;
+        while (r.path().get(up).y() == 0) {
+            up++;
+        }
+        Point before = r.path().get(up - 1), on = r.path().get(up);
+        assertEquals(4, on.z(), r.path().toString());
+        assertEquals(3, before.z(), "climbed the stair from its side: " + r.path());
+        // The foot of each stair and the full block past its top are waypoints, so no hop takes a stair at an angle,
+        // and no waypoint is on a stair (where a postman stands half a block lower).
+        assertTrue(r.waypoints().contains(before), r.waypoints().toString());
+        assertTrue(r.waypoints().stream().anyMatch(p -> p.y() == 1 && p.z() == 5), r.waypoints().toString());
+        assertTrue(r.waypoints().stream().noneMatch(p -> p.y() == 1 && (p.z() == 4 || p.z() == 10)), r.waypoints().toString());
+    }
+
+    @Test
     void classifiesBlocksByName() {
         assertEquals(Cell.LADDER, Cell.of("LADDER", false));
         assertEquals(Cell.LADDER, Cell.of("VINE", false));

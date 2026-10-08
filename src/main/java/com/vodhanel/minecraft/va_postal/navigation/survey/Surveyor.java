@@ -258,8 +258,8 @@ public final class Surveyor {
             }
             cost = length * surface + (feet.passable ? feet.cost : 0.0D);
             if (move == Move.STEP_UP) {
-                // Up a stair or onto a slab is a step; onto a full block is a jump.
-                cost += jump(x, y, z) ? 3.0D : 0.3D;
+                // Up a stair (from its front) or onto a slab is a step; anything else is a jump.
+                cost += jump(from.x, from.z, x, y, z) ? 3.0D : 0.3D;
             } else if (move == Move.DROP) {
                 int fall = from.y - y;
                 cost += fall + (fall >= 2 ? 3.0D : 0.0D);
@@ -270,9 +270,17 @@ public final class Surveyor {
         out.add(new Node(x, y, z, move, g, g + h(x, y, z, t), from));
     }
 
-    /** True if standing at (x, y, z) after stepping up means he jumped (onto a full block, not a stair or slab). */
-    private boolean jump(int x, int y, int z) {
-        return grid.cell(x, y - 1, z) != Cell.STEP;
+    /**
+     * True if stepping up from (fx, fz) to stand at (x, y, z) means a jump: onto a full block, or onto a stair
+     * from its side or back. Up a stair from the front, or onto a slab, is just a step.
+     */
+    private boolean jump(int fx, int fz, int x, int y, int z) {
+        Cell under = grid.cell(x, y - 1, z);
+        if (under == Cell.STEP) {
+            return false;
+        }
+        int[] up = under.ascends();
+        return up == null || up[0] != x - fx || up[1] != z - fz;
     }
 
     /** How many of the four sides of a position are blocked at feet or head height (to keep off walls). */
@@ -311,9 +319,29 @@ public final class Surveyor {
         keep[path.size() - 1] = true;
         for (int i = 1; i < path.size(); i++) {
             Point p = path.get(i);
+            Point prev = path.get(i - 1);
             boolean special = p.move() == Move.DOOR || p.move() == Move.LADDER
-                    || p.move() == Move.DROP && path.get(i - 1).y() - p.y() >= 2
-                    || p.move() == Move.STEP_UP && jump(p.x(), p.y(), p.z());
+                    || p.move() == Move.DROP && prev.y() - p.y() >= 2
+                    || p.move() == Move.STEP_UP && jump(prev.x(), prev.z(), p.x(), p.y(), p.z());
+            // The foot and the top of every climb or descent (a flight of stairs counts as one): hops stay level,
+            // so Citizens never has to take a stair at an angle.
+            // Never on the stair or slab itself: a postman stands half a block lower there, and Citizens won't take
+            // a target on it, so the waypoint goes on the full block beside it.
+            boolean vertical = p.y() != prev.y() && p.move() != Move.LADDER;
+            if (vertical && (i < 2 || path.get(i - 2).y() == prev.y())) {
+                int k = i - 1;
+                if (on_step(path.get(k)) && k >= 1 && path.get(k - 1).y() == path.get(k).y() && !on_step(path.get(k - 1))) {
+                    k--;
+                }
+                keep[k] = true;
+            }
+            if (vertical && (i + 1 >= path.size() || path.get(i + 1).y() == p.y())) {
+                int k = i;
+                if (on_step(p) && k + 1 < path.size() && path.get(k + 1).y() == p.y() && !on_step(path.get(k + 1))) {
+                    k++;
+                }
+                keep[k] = true;
+            }
             if (special) {
                 keep[i - 1] = true;
                 if (p.move() == Move.LADDER) {
@@ -356,6 +384,12 @@ public final class Surveyor {
         return out;
     }
 
+    /** True if this point stands on a stair or slab (half a block lower than it looks). */
+    private boolean on_step(Point p) {
+        Cell under = grid.cell(p.x(), p.y() - 1, p.z());
+        return under == Cell.STEP || under.ascends() != null;
+    }
+
     /** True if a postman can walk straight from path[a] to path[b], with the path between staying close by. */
     private boolean hop_ok(List<Point> path, int a, int b) {
         Point p = path.get(a), q = path.get(b);
@@ -371,7 +405,7 @@ public final class Surveyor {
         for (int i = a; i <= b; i++) {
             Point m = path.get(i);
             if (i > a && (m.move() == Move.DOOR || m.move() == Move.LADDER
-                    || i < b && m.move() == Move.STEP_UP && jump(m.x(), m.y(), m.z()))) {
+                    || i < b && m.move() == Move.STEP_UP && jump(path.get(i - 1).x(), path.get(i - 1).z(), m.x(), m.y(), m.z()))) {
                 return false; // doors, ladders and jumps are their own hops
             }
             ylo = Math.min(ylo, m.y());

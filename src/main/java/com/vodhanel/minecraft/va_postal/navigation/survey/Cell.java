@@ -17,8 +17,13 @@ public enum Cell {
     GROUND(false, true, 1.0D),
     /** Roads and floors: paths, gravel, stone bricks, planks. Preferred. */
     ROAD(false, true, 0.7D),
-    /** Slabs and stairs: a road a postman steps up onto without jumping. */
+    /** A bottom slab (or a stair whose facing isn't known): a road a postman steps up onto without jumping. */
     STEP(false, true, 0.7D),
+    /** Stairs going up towards the north (their high side): stepped up from the south; from anywhere else it's a jump. */
+    STAIRS_NORTH(false, true, 0.7D),
+    STAIRS_SOUTH(false, true, 0.7D),
+    STAIRS_EAST(false, true, 0.7D),
+    STAIRS_WEST(false, true, 0.7D),
     /** Ground that's slow or unpleasant: sand, soul sand, snow, farmland. */
     ROUGH(false, true, 2.0D),
     /** Can't be walked through or stood on: fences, walls, leaves, panes, iron bars. */
@@ -37,6 +42,28 @@ public enum Cell {
     DANGER(false, false, 0.0D),
     /** Not loaded or outside the survey area: treated as a wall. */
     UNKNOWN(false, false, 0.0D);
+
+    /** For stairs: the way up, as {dx, dz}; null for anything else. */
+    public int[] ascends() {
+        return switch (this) {
+            case STAIRS_NORTH -> new int[]{0, -1};
+            case STAIRS_SOUTH -> new int[]{0, 1};
+            case STAIRS_EAST -> new int[]{1, 0};
+            case STAIRS_WEST -> new int[]{-1, 0};
+            default -> null;
+        };
+    }
+
+    /** Stairs going up towards {@code facing} (NORTH, SOUTH, EAST or WEST). */
+    public static Cell stairs(String facing) {
+        return switch (facing) {
+            case "NORTH" -> STAIRS_NORTH;
+            case "SOUTH" -> STAIRS_SOUTH;
+            case "EAST" -> STAIRS_EAST;
+            case "WEST" -> STAIRS_WEST;
+            default -> STEP;
+        };
+    }
 
     public final boolean passable;
     public final boolean floor;

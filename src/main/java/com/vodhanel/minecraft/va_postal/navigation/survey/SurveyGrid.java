@@ -54,6 +54,16 @@ public final class SurveyGrid implements Grid {
             return Cell.UNKNOWN;
         }
         Cell c = cells.get(snap.getBlockType(x & 15, y, z & 15));
+        if (c == Cell.STEP) {
+            // Stairs and slabs: which way, and which half, from the block data.
+            org.bukkit.block.data.BlockData data = snap.getBlockData(x & 15, y, z & 15);
+            if (data instanceof org.bukkit.block.data.type.Stairs st) {
+                return st.getHalf() == org.bukkit.block.data.Bisected.Half.TOP ? Cell.ROAD : Cell.stairs(st.getFacing().name());
+            }
+            if (data instanceof org.bukkit.block.data.type.Slab sl && sl.getType() != org.bukkit.block.data.type.Slab.Type.BOTTOM) {
+                return Cell.ROAD;
+            }
+        }
         return c != null ? c : Cell.GROUND;
     }
 

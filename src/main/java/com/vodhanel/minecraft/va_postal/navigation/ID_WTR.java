@@ -274,6 +274,7 @@ public class ID_WTR {
     }
 
     public static synchronized void cancel_route(int id) {
+        Doorway.reset(id);
         if ((!VA_Dispatcher.dispatcher_running) || (!VA_postal.wtr_goal_active[id])) {
             return;
         }
@@ -494,7 +495,7 @@ public class ID_WTR {
         set_door_open(block, false, quiet);
     }
 
-    private static void set_door_open(Block block, boolean open, boolean quiet) {
+    static void set_door_open(Block block, boolean open, boolean quiet) {
         if (block == null || !is_route_door(block.getType())) {
             return;
         }
@@ -719,7 +720,9 @@ public class ID_WTR {
         }
 
 
-        if (!VA_postal.wtr_door[id]) {
+        // v4's door sequencer is off: Doorway takes postmen through doors as they reach them. It juggled the
+        // waypoints around a door on timers and kept getting stuck there (and once looped forever).
+        if (!VA_postal.wtr_door[id] && !Doorway.ENABLED) {
             if (VA_postal.wtr_swaypoint[id] == null) {
                 Util.dinform(AnsiColor.RED + "WAYPOINT " + id + " IS NULL");
             }
