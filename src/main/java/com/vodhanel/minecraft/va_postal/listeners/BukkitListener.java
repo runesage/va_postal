@@ -283,6 +283,14 @@ public class BukkitListener implements Listener {
 
         if (InventoryType.CHEST == event.getInventory().getType()) {
             MailSecurity.event_check_chest_for_new_mail(event.getInventory());
+            // A shipping label just posted: the courier goes for its chest now, before the postman comes.
+            if (BookManip.is_there_a_postal_log(event.getInventory())) {
+                for (ItemStack item : event.getInventory().getContents()) {
+                    if (BookManip.is_shipping_label(item)) {
+                        com.vodhanel.minecraft.va_postal.mail.Parcels.label_posted(item);
+                    }
+                }
+            }
         }
     }
 

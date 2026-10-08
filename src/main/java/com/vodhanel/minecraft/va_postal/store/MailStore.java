@@ -24,6 +24,12 @@ public interface MailStore extends AutoCloseable {
     /** A state change with no world move (e.g. to MISSING, or a change of custody already made). */
     MailRecord transition(MailRecord current, MailState to, Custody custody, Actor actor, String detail);
 
+    /**
+     * Changes a record's terms (COD amount, postage hold) without moving it; version-checked and recorded in
+     * its history like a transition.
+     */
+    MailRecord set_terms(MailRecord current, double cod_amount, String hold_id, Actor actor, String detail);
+
     /** Phase 1 of a move: records the destination. The record keeps its current custody until committed. */
     MailRecord begin_move(MailRecord current, MailState to, Custody to_custody, Actor actor, String detail);
 

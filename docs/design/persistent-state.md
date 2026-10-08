@@ -1,6 +1,6 @@
 # Design: persistent mail state (single-server and Velocity)
 
-**Status:** P1 implemented (letters on SQLite; see §14 for where it differs from this design). **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (persistent in-transit state)
+**Status:** P1 and P2 implemented (letters and parcels on SQLite; see §14 and §15 for where they differ from this design). **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (persistent in-transit state)
 and §5 (multi-server exchange).
 
 ## 1. Goals
@@ -274,4 +274,49 @@ P1 follows this design, with these differences:
 - **Admin commands.** `/postal track <id | recent>` shows a letter's record and history;
   `/postal testletter <from> <to> <address>` hands in a tracked letter without a player (used by the smoke
   test).
-- **Parcels stay untracked** until P2: only letters get a `mail_id`.
+- **Parcels stayed untracked** in P1: only letters got a `mail_id` (parcels followed in P2, below).
+
+## 15. P2 as built
+
+- **Parcels are records.** At `/package` the chest's items go into the parcel's record (`PARCEL_V1`: the label
+  as text, the chest's position and facing, and each item's `ItemStack.serializeAsBytes()` with its slot), so
+  enchantments, names, lore and everything else survive. The chest is emptied at once, so nothing can be
+  duplicated while the label travels, but it stays where it was, locked by its `[Postal_Ship]` sign, for
+  immersion.
+- **A courier collects the chest.** When the label is posted (left in a mailbox or a post office chest), or at
+  its first pickup if that comes first, if a player is within 40 blocks, a postal
+  courier NPC walks up to the chest, picks it up and walks off (at most three at once); otherwise the chest is
+  simply removed. Anything a hopper pushed in meanwhile is dropped, not lost. The courier is never saved by
+  Citizens, and every failure path still removes the chest.
+- **The label travels like a letter**, through the same tracked moves, reconciliation and stale-copy removal.
+- **Exactly once.** `/accept`, `/refuse` and `/package cancel` are each one version-checked transition
+  (`DELIVERED` → `ACCEPTED`/`REFUSED`, `POSTED` → `RETURNED`), made before any items are handed over, so a
+  parcel's items come out once. A copied label (crafting copies the book's data, mail id included) is the
+  same parcel: whichever label goes first gets the items, and the other is refused. The record, not the label's text, decides what a label can do, so a label rebuilt from its record
+  works.
+- **COD and postage on the record.** The COD amount is recorded on the parcel (`/accept` charges what the
+  record says), and every letter and parcel records its postage hold (`hold_id`, schema V2). A book rebuilt
+  from its record gets its hold back, and delivery settles from the record if a book's hold tag was lost: the
+  gap left in P1.
+- **A crash right after packing.** If the world is rolled back past a `/package` (the chest full again) while
+  the label survived (say the player logged out first), the parcel would be duplicated. The chest carries a
+  `postal:packed` mark from packing; at the label's first pickup, a chest that has items and no mark means a
+  rollback, so the parcel is cancelled (`RETURNED`, postage refunded), the label is never routed, and the chest
+  is unlocked with the real items in it.
+- **Items removed from the game.** Paper upgrades an item's stored data when it's read back, so renamed ids
+  and changed components carry over between Minecraft versions. If an item no longer exists at all, the parcel
+  is still opened (accepted, refused, cancelled or recovered) with everything else in it. Whoever opens it is
+  told which item was left out (its old id is read from the stored bytes), and the log and the parcel's history
+  note it too. The record keeps the item's data, so nothing is erased. `/postal track` lists such an item as
+  "no longer in the game".
+- **`/package cancel`** (an unposted label in hand) puts the items back in the chest they were packed in
+  (unlocking it), or a new chest in front of the sender, and refunds the postage.
+- **Claim hook.** `MailMissingEvent` (Bukkit event, `com.vodhanel.minecraft.va_postal.api`) fires whenever a
+  letter or parcel is marked `MISSING`, with its id, kind, sender, destination, last place and COD amount: the
+  hook for lost-mail claims and an insurance fund. `/postal recover <id>` rebuilds lost mail from its record and
+  closes it as `RECOVERED`, so the original (if it turns up) is never routed or accepted.
+- **Re-addressing a shipping label** is refused (the destination is part of the record); cancel and package
+  again.
+- **Test helpers** (admin): `/postal testparcel` (with `retired` for an item gone from the game), `/postal accept|refuse <id>`, `/postal recover <id>`,
+  `/postal setstate <id> <state>`; `last` stands for the newest mail id.
+- **Fixed from P1:** a letter already `MISSING` was marked `MISSING` again on every reconciliation pass.

@@ -55,7 +55,7 @@ public final class Letters {
             }
             UUID id = UUID.randomUUID();
             store.create(MailRecord.new_letter(id, store.server_id(), origin_office, dest_office, dest_address,
-                    sender, attention, payload(book), data_version(), System.currentTimeMillis()),
+                    sender, attention, payload(book), data_version(), System.currentTimeMillis(), HoldTag.read(book)),
                     sender == null ? Actor.system("console") : Actor.player(sender),
                     "addressed to " + dest_office + ", " + dest_address);
             return MailIds.write(book, id);
@@ -252,8 +252,7 @@ public final class Letters {
                     if (chest != null && !Reconciler.holds(chest, r.id)) {
                         store.transition(r, MailState.MISSING, r.custody, Actor.postman(run[1]),
                                 "not in the office chest when its route ended");
-                        Util.cinform("[Postal] Letter " + r.id + " for " + r.dest_office + ", " + r.dest_address
-                                + " is MISSING (not in the office chest when its route ended).");
+                        Reconciler.missing(r, "not in the office chest when its route ended");
                     } else {
                         store.transition(r, MailState.AT_DEST_BRANCH, r.custody, Actor.postman(run[1]), "run ended without delivering it");
                     }
@@ -309,20 +308,42 @@ public final class Letters {
         return GSON.toJson(o).getBytes(StandardCharsets.UTF_8);
     }
 
-    /** Rebuilds a letter's book from its record (recovery, or a letter arriving from another server). */
+    /**
+     * Rebuilds a piece of mail's book from its record (recovery, or a letter arriving from another server): a
+     * letter, or a parcel's shipping label. It carries its mail id and its postage hold.
+     */
     public static ItemStack materialise(MailRecord record) {
+        ItemStack item = record.kind == com.vodhanel.minecraft.va_postal.store.MailKind.PARCEL
+                ? Parcels.label(record) : letter_book(record);
+        return HoldTag.write(MailIds.write(item, record.id), record.hold_id);
+    }
+
+    /** The postage hold recorded for this book's mail, or null (for books whose hold tag was lost). */
+    public static String hold_of(ItemStack book) {
+        MailStore store = store();
+        UUID id = MailIds.read(book);
+        if (store == null || id == null) {
+            return null;
+        }
+        try {
+            return store.get(id).map(r -> r.hold_id).orElse(null);
+        } catch (StoreException e) {
+            return null;
+        }
+    }
+
+    private static ItemStack letter_book(MailRecord record) {
         JsonObject o = GSON.fromJson(new String(record.payload, StandardCharsets.UTF_8), JsonObject.class);
         JsonArray arr = o.getAsJsonArray("pages");
         String[] pages = new String[arr.size()];
         for (int i = 0; i < pages.length; i++) {
             pages[i] = arr.get(i).getAsString();
         }
-        ItemStack item = new Book(o.get("title").getAsString(), o.get("author").getAsString(), pages).generateItemStack();
-        return MailIds.write(item, record.id);
+        return new Book(o.get("title").getAsString(), o.get("author").getAsString(), pages).generateItemStack();
     }
 
     @SuppressWarnings("deprecation")
-    private static int data_version() {
+    static int data_version() {
         try {
             return Bukkit.getUnsafe().getDataVersion();
         } catch (RuntimeException | LinkageError e) {

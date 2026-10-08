@@ -22,12 +22,12 @@ import java.util.UUID;
  */
 public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
-    static final String[] MIGRATIONS = {"V1__init.sql"};
+    static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
             + "pending_ref, sender_uuid, attention_uuid, cod_amount, postage_paid, payload_format, payload, "
-            + "mc_data_version, created_at, updated_at";
+            + "mc_data_version, created_at, updated_at, hold_id";
 
     private final DataSource source;
     private final String server_id;
@@ -110,7 +110,7 @@ public final class SqlMailStore implements MailStore {
 
     @Override
     public MailRecord create(MailRecord r, Actor actor, String detail) {
-        String sql = "INSERT INTO mail (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO mail (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         try (Connection c = source.getConnection()) {
             c.setAutoCommit(false);
             try {
@@ -140,6 +140,7 @@ public final class SqlMailStore implements MailStore {
                     ps.setInt(i++, r.mc_data_version);
                     ps.setLong(i++, r.created_at);
                     ps.setLong(i++, r.updated_at);
+                    ps.setString(i++, r.hold_id);
                     ps.executeUpdate();
                 }
                 event(c, r.id, r.version, null, r.state, r.custody, actor, detail);
@@ -173,6 +174,39 @@ public final class SqlMailStore implements MailStore {
             throw new ConflictException(current.id + " has a move in flight; commit or cancel it first");
         }
         return update(current, to, custody, null, null, actor, detail);
+    }
+
+    @Override
+    public MailRecord set_terms(MailRecord current, double cod_amount, String hold_id, Actor actor, String detail) {
+        long now = System.currentTimeMillis();
+        String sql = "UPDATE mail SET cod_amount = ?, hold_id = ?, version = ?, updated_at = ? WHERE mail_id = ? AND version = ?";
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                int rows;
+                try (PreparedStatement ps = c.prepareStatement(sql)) {
+                    ps.setBigDecimal(1, BigDecimal.valueOf(cod_amount));
+                    ps.setString(2, hold_id);
+                    ps.setInt(3, current.version + 1);
+                    ps.setLong(4, now);
+                    ps.setString(5, current.id.toString());
+                    ps.setInt(6, current.version);
+                    rows = ps.executeUpdate();
+                }
+                if (rows != 1) {
+                    c.rollback();
+                    throw new ConflictException(current.id + " changed since version " + current.version);
+                }
+                event(c, current.id, current.version + 1, current.state, current.state, current.custody, actor, detail);
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not update mail " + current.id, e);
+        }
+        return get(current.id).orElseThrow();
     }
 
     @Override
@@ -276,7 +310,7 @@ public final class SqlMailStore implements MailStore {
     @Override
     public List<MailRecord> held_here() {
         return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND (custody_kind <> 'NONE' OR "
-                + "pending_state IS NOT NULL) AND state NOT IN ('DELIVERED','RETURNED','REFUSED','EXPIRED','CLAIMED')", server_id);
+                + "pending_state IS NOT NULL) AND state NOT IN ('DELIVERED','RETURNED','REFUSED','ACCEPTED','EXPIRED','CLAIMED','RECOVERED')", server_id);
     }
 
     @Override
@@ -422,7 +456,7 @@ public final class SqlMailStore implements MailStore {
                 uuid(rs.getString("sender_uuid")), uuid(rs.getString("attention_uuid")),
                 rs.getBigDecimal("cod_amount").doubleValue(), rs.getBigDecimal("postage_paid").doubleValue(),
                 rs.getString("payload_format"), rs.getBytes("payload"), rs.getInt("mc_data_version"),
-                rs.getLong("created_at"), rs.getLong("updated_at"));
+                rs.getLong("created_at"), rs.getLong("updated_at"), rs.getString("hold_id"));
     }
 
     private static MailState state(String s) {

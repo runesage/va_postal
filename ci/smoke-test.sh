@@ -77,8 +77,10 @@ PY
 
 echo "== Phase 2: dispatcher starts on the seeded network and runs routes"
 run_server "$WORK_DIR/phase2.log" \
-    "postal debug" "postal start" "sleep:5" "postal testletter testville testville home" "sleep:265" "tlist" "alist Testville" "npc list" "showroute testville home" "/" "sleep:2" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
-    "data get block 40 -60 0 Items" "data get block 20 -60 0 Items" "data get block 0 -60 0 Items" "postal track recent"
+    "postal debug" "postal start" "sleep:5" "postal testletter testville testville home" "postal testparcel testville testville home retired" "sleep:263" "tlist" "alist Testville" "npc list" "showroute testville home" "/" "sleep:2" "postal bank" "postal bank newday" "sleep:1" "postal stop" "sleep:5" \
+    "data get block 40 -60 0 Items" "data get block 20 -60 0 Items" "data get block 0 -60 0 Items" "postal track recent" \
+    "postal accept last 30 -60 5" "sleep:1" "data get block 30 -60 5 Items" "postal accept last 31 -60 5" \
+    "postal track last" "execute if block 20 -60 -4 minecraft:air run say parcel chest collected"
 
 # Recorded now: on its next start EssentialsX may purge NPC accounts still at the starting balance
 # (Postal recreates them on demand).
@@ -112,6 +114,7 @@ run_server_then_kill() {
 # delivered exactly once after the restart.
 echo "== Phase 3: post a letter, then kill -9 the server"
 run_server_then_kill "$WORK_DIR/phase3.log" "postal start" "sleep:10" "postal testletter testville testville home" \
+    "postal testparcel testville testville home" \
     "save-all flush" "sleep:40"
 echo "== Phase 4: restart; reconciliation and the postman finish the job"
 run_server "$WORK_DIR/phase4.log" "postal start" "sleep:150" "postal stop" "sleep:3" \
@@ -220,6 +223,19 @@ plain() { sed $'s/\x1b\\[[0-9;]*m//g' "$WORK_DIR/$1.log"; }
 # Tracked letters (see /postal testletter, /postal track).
 check "phase2: the store opened" grep -q "Mail store: SQLite" "$WORK_DIR/phase2.log"
 check "phase2: a tracked letter is delivered to Home" grep -qE "testville, home: DELIVERED at CHEST@world,40,-60,0" <(plain phase2)
+# Parcels (P2): items held in the record, the label routed like a letter, items handed over exactly once.
+check "phase2: a parcel's label is delivered to Home" grep -qE "\[parcel\] testville, home: DELIVERED at CHEST@world,40,-60,0" <(plain phase2)
+parcel_items() { plain phase2 | grep -E "\]: 30, -60, 5 has the following block data" | tail -1; }
+check "phase2: the parcel's renamed sword arrives intact" grep -q "Test Blade" <(parcel_items)
+check "phase2: the parcel's enchantments arrive intact" grep -qE 'sharpness"?: ?5' <(parcel_items)
+check "phase2: the parcel's other stacks arrive" grep -qE 'oak_log.*count: ?32|count: ?32.*oak_log' <(parcel_items)
+# The parcel also carries an item recorded under an id this Minecraft doesn't have (as if an upgrade removed it).
+check "phase2: an item gone from the game is left out" no_match "minecraft:paper" <(parcel_items)
+check "phase2: the recipient is told what was left out" grep -q "(minecraft:postal_retired_item) no longer exists in this version of Minecraft" <(plain phase2)
+check "phase2: the log names the left-out item" grep -q "left out: minecraft:postal_retired_item" <(plain phase2)
+check "phase2: the parcel's history notes the left-out item" grep -q "left out (no longer in the game): minecraft:postal_retired_item" <(plain phase2)
+check "phase2: a parcel is accepted only once" grep -q "Can't accept it" <(plain phase2)
+check "phase2: the packed chest was collected" grep -q "parcel chest collected" <(plain phase2)
 letter_ids() { plain phase4 | grep -oE "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} testville, home: DELIVERED" | cut -d' ' -f1; }
 check "phase4: both letters (before and across the kill) are delivered" test "$(letter_ids | sort -u | wc -l)" -ge 2
 exactly_once() {
@@ -232,6 +248,15 @@ exactly_once() {
 }
 check "phase4: each letter is in Home exactly once, none left at the office" exactly_once
 check "phase4: reconciliation ran at startup" grep -q "Reconciliation:" "$WORK_DIR/phase4.log"
+parcel_id() { plain phase4 | grep -oE "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} \[parcel\] testville, home: DELIVERED" | head -1 | cut -d' ' -f1; }
+check "phase4: the parcel posted across the kill is delivered" test -n "$(parcel_id)"
+parcel_once() {
+    local id home
+    id=$(parcel_id)
+    home=$(plain phase4 | grep -E "\]: 40, -60, 0 has the following block data" | tail -1 | grep -o "$id" | wc -l)
+    [ "$home" -eq 1 ] || { echo "    parcel $id: $home labels in Home"; return 1; }
+}
+check "phase4: its label is in Home exactly once" parcel_once
 check "phase6: a letter whose chest was destroyed is MISSING" grep -qE "testville, home: MISSING at CHEST@world,20,-60,0" <(plain phase6)
 for phase in phase3 phase4 phase5 phase6; do
     check "$phase: no Postal stack traces" no_match "at .*com\.vodhanel\." "$WORK_DIR/$phase.log"

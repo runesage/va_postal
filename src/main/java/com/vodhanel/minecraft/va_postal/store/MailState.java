@@ -12,7 +12,10 @@ public enum MailState {
     OUT_FOR_DELIVERY,
     DELIVERED,
     RETURNED,
+    /** A parcel its recipient refused: its items went back to the sender. */
     REFUSED,
+    /** A parcel its recipient accepted: its items were handed over. */
+    ACCEPTED,
     EXPIRED,
     /** The record says a chest holds it, and the chest doesn't: griefed. */
     MISSING,
@@ -21,6 +24,7 @@ public enum MailState {
 
     /** True once Postal no longer moves it. */
     public boolean terminal() {
-        return this == DELIVERED || this == RETURNED || this == REFUSED || this == EXPIRED || this == CLAIMED;
+        return this == DELIVERED || this == RETURNED || this == REFUSED || this == ACCEPTED || this == EXPIRED
+                || this == CLAIMED || this == RECOVERED;
     }
 }
