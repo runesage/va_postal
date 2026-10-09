@@ -788,7 +788,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for address. See list:");
             return true;
         }
-        if (!hasPermission_ext(player, "postal.closeaddr", stown, "null")) {
+        if (!hasPermission_ext(player, "postal.closeaddr", stown, saddress)) {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
@@ -866,7 +866,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for address. See list:");
             return true;
         }
-        if (!hasPermission_ext(player, "postal.openaddr", stown, "null")) {
+        if (!hasPermission_ext(player, "postal.openaddr", stown, saddress)) {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
