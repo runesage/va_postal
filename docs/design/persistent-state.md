@@ -396,7 +396,17 @@ and there are **no duplicate or divergent records**.
   history, two claimers with one winner, only the addressed server claiming, a local letter never entering the
   network, a parcel never outbound or claimable, local queries ignoring outbound letters, and one player row
   across servers (switching, renaming, stopping). `ci/network-test.sh` runs two Paper servers on one MariaDB, each
-  with a Testville/Home, and sends a letter each way at the same time (results below).
+  with a Testville/Home, and sends a letter each way at the same time, with 1-minute departures, a 30-second trip
+  and the purser forced on. Each letter was delivered once, to the other server's Home and not the sender's
+  namesake; each record carries both servers' history (posted, Central and `IN_NETWORK` on the origin; claimed,
+  Central, postman and `DELIVERED` on the destination); both ships and both pursers announced themselves; and
+  the trip took about 2.5 minutes from posting to the mailbox, most of it the schedule and the postman's round.
+- **Found by the network test.** Two servers starting together on an empty MySQL database raced to create the schema,
+  and one failed to open its store (MySQL commits DDL at once, so the migration transaction couldn't separate
+  them). Migrations now hold a named lock (`GET_LOCK('postal_migrate')`), and the contract suite opens three
+  stores at once on a fresh database. Also: a server that had just started couldn't address another server's
+  office for up to 30 seconds (its directory copy predated the other's publish); a name that isn't in the copy
+  now re-reads the directory on the spot, at most every 3 seconds.
 
 ## 15. P2 as built
 
