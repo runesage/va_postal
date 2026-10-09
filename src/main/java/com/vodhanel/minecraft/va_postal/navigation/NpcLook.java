@@ -65,10 +65,15 @@ public final class NpcLook {
 
     /** Applies the configured skin. Call before spawning so the NPC never shows the name-lookup skin. */
     public static void skin(NPC npc, boolean local) {
+        skin(npc, local ? "local" : "central");
+    }
+
+    /** {@code role}: {@code local} (postman), {@code central} (postmaster) or {@code purser} (the network's courier). */
+    public static void skin(NPC npc, String role) {
         if (npc == null) {
             return;
         }
-        String role = local ? "local" : "central";
+        boolean local = "local".equals(role);
         String setting = config_string("settings.skin." + role, "bundled").trim();
         SkinTrait trait = npc.getOrAddTrait(SkinTrait.class);
         trait.setFetchDefaultSkin(false);
@@ -100,15 +105,20 @@ public final class NpcLook {
 
     /** Puts on (or, with the uniform disabled, takes off) the configured uniform. */
     public static void uniform(NPC npc, boolean local) {
+        uniform(npc, local ? "local" : "central",
+                "true".equalsIgnoreCase(config_string("settings.uniform.enabled", "false").trim()));
+    }
+
+    /** The uniform for {@code role} ({@code settings.uniform.<role>.*}), or none when not {@code enabled}. */
+    public static void uniform(NPC npc, String role, boolean enabled) {
         if (npc == null) {
             return;
         }
-        boolean enabled = "true".equalsIgnoreCase(config_string("settings.uniform.enabled", "false").trim());
         Equipment equipment = npc.getOrAddTrait(Equipment.class);
         for (int i = 0; i < UNIFORM_PIECES.length; i++) {
             ItemStack piece = null;
             if (enabled) {
-                String path = "settings.uniform." + (local ? "local" : "central") + "." + UNIFORM_PIECES[i];
+                String path = "settings.uniform." + role + "." + UNIFORM_PIECES[i];
                 piece = uniform_piece(config_string(path, "none"));
             }
             equipment.set(UNIFORM_SLOTS[i], piece);

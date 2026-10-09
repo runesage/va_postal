@@ -345,6 +345,22 @@ and there are **no duplicate or divergent records**.
   `/postal network`, for everyone, shows the schedule, the next departure, the letters waiting at Central for it,
   what's on its way here, and the other servers. A letter that reaches Central just after a departure waits
   for the next one. That's deliberate: it's a schedule.
+- **The purser.** A character carries the mail between Central and the ship, so the transfer is something players
+  see. At a departure the purser appears a few dozen blocks from Central (`Network.Purser.Distance`, 24), walks to
+  the Central chest, opens it, takes the outbound letters in a mailbag and says so to anyone nearby ("All aboard
+  for creative! 3 letters for the voyage."), closes the chest and walks off. The bell rings as the ship sails.
+  At an arrival they walk in carrying the bag, ring the bell, leave the letters in the chest ("Mail from survival!
+  2 letters off the ship.") and walk off empty-handed. There is no dock to build: they come from, and go to, a
+  free spot near Central. The name (`Network.Purser.Name`, "&3Purser"), the lines (`Network.Purser.Lines.*`),
+  the skin (`Settings.Skin.Purser`, the postmaster's bundled skin by default, or `custom`/a player name like the
+  others) and the uniform (`Settings.Uniform.Purser.*`, navy and white, on unless `Network.Purser.Uniform` is
+  false) are all configurable. The **transfer itself happens when the purser reaches the chest**: the letters'
+  records and books move then. The purser can only make it late, never stop it. With nobody within 48 blocks of
+  Central to see it, without Citizens, with `Network.Purser.Enabled: false`, or if anything goes wrong (a walk
+  past 30 seconds ends in a teleport, an unloaded chunk, a shutdown), the transfer runs at once. One voyage runs at
+  a time; a departure that comes up while the purser is out keeps its slot and goes when they're back. Like the
+  parcel courier, the NPC is never saved by Citizens. `Network.Purser.Always` brings them even with nobody
+  watching (the network test uses it).
 - **Letters only, at every layer** (§6): `/package` refuses another server's office, and `addr_worker` refuses
   a parcel for one; the store refuses to move a non-letter into `IN_NETWORK` or to claim one; the claim query
   matches only `LETTER`; the `CHECK` constraint rejects it in the database; and `LETTER_V1` has no item fields.

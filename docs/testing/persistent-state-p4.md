@@ -61,10 +61,15 @@ Each server needs a Central and at least one office with an address. Give both s
 2. Confirm with `/`, and post it in a mailbox or at the post office. Once it reaches A's Central, run
    `/postal network` on A.
 - [ ] It shows the next departure and `1 letter waiting at Central (B: 1)`.
-- [ ] At the departure, A broadcasts `The mail ship departs for B with 1 letter; it arrives in 1 min.`, and a
-  bell rings at A's Central.
-- [ ] A minute later, B broadcasts `The mail ship from A has arrived with 1 letter.`, and a bell rings at B's
-  Central.
+- [ ] At the departure, standing near A's Central: the **Purser** walks in from a few dozen blocks away, opens the
+  chest, takes the letter (now holding a mailbag), says `All aboard for B! 1 letter for the voyage.`, closes
+  the chest and walks off. A bell rings as they leave. A broadcasts `The mail ship departs for B with 1 letter;
+  it arrives in 1 min.`
+- [ ] A minute later, standing near B's Central: the Purser walks in with the bag, a bell rings, they leave the
+  letter in the chest (`Mail from A! 1 letter off the ship.`) and walk off empty-handed. B broadcasts `The mail
+  ship from A has arrived with 1 letter.`
+- [ ] Away from Central (more than 48 blocks), the same departure happens with no Purser: the letter just leaves
+  on time.
 - [ ] Soon after, it's delivered to Home **on B**, not to A's own Testville/Home.
 - [ ] The letter on B has the right title, text and author, and names your friend.
 3. `/postal track last` on A, and `/postal track <id>` on B.

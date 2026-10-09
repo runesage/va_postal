@@ -362,10 +362,14 @@ public final class Network {
     }
 
     /**
-     * On the main thread: at a departure, hands {@code out} to the network; and claims the letters in {@code in}
-     * whose trip is over into the Central chest at {@code key}.
+     * On the main thread: at a departure, the purser takes {@code out} to the ship; when letters in {@code in} have
+     * arrived, the purser brings them to the Central chest at {@code key}. One voyage at a time: while the purser is
+     * out, the next waits for them (a departure keeps its time, since its slot isn't marked done).
      */
     static void exchange(MailStore store, String key, List<MailRecord> out, List<MailRecord> in, long now) {
+        if (Purser.busy()) {
+            return;
+        }
         long period = Math.max(1_000L, departure_millis());
         long slot = now / period;
         boolean departure = departed_slot >= 0 && slot > departed_slot;
@@ -378,23 +382,45 @@ public final class Network {
                 arriving.add(r);
             }
         }
-        if ((!departure || out.isEmpty()) && arriving.isEmpty()) {
+        org.bukkit.Location at = Util.str2location(VA_postal.central_schest_location);
+        if (at == null || at.getWorld() == null) {
             return;
         }
-        Inventory chest = Reconciler.chest(Custody.chest(key), true);
-        if (chest == null) {
-            return;
-        }
+        org.bukkit.block.Block block = at.getBlock();
         if (departure && !out.isEmpty()) {
             long arrives = slot * period + transit_millis();
-            java.util.Map<String, Integer> sent = new java.util.TreeMap<>();
-            for (MailRecord r : out) {
-                if (hand_off(store, chest, r, arrives)) {
-                    sent.merge(r.dest_server, 1, Integer::sum);
-                }
+            Purser.voyage(Purser.Voyage.DEPARTURE, block, () -> depart(store, key, out, arrives));
+        } else if (!arriving.isEmpty()) {
+            Purser.voyage(Purser.Voyage.ARRIVAL, block, () -> arrive(store, key, arriving));
+        }
+    }
+
+    /** The purser takes the outbound letters: returns their line, or null if none left. */
+    private static String depart(MailStore store, String key, List<MailRecord> out, long arrives) {
+        Inventory chest = Reconciler.chest(Custody.chest(key), true);
+        if (chest == null) {
+            return null;
+        }
+        java.util.Map<String, Integer> sent = new java.util.TreeMap<>();
+        for (MailRecord r : out) {
+            if (hand_off(store, chest, r, arrives)) {
+                sent.merge(r.dest_server, 1, Integer::sum);
             }
-            sent.forEach((server, n) -> announce(key, proper(vehicle()) + " departs for &f" + server + "&7 with " + letters(n)
-                    + "; it arrives in " + duration(arrives - now) + "."));
+        }
+        if (sent.isEmpty()) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        sent.forEach((server, n) -> announce(proper(vehicle()) + " departs for &f" + server + "&7 with " + letters(n)
+                + "; it arrives in " + duration(arrives - now) + "."));
+        return Purser.line(Purser.Voyage.DEPARTURE, and(sent.keySet()), total(sent));
+    }
+
+    /** The purser brings the arrived letters: returns their line, or null if none could be claimed. */
+    private static String arrive(MailStore store, String key, List<MailRecord> arriving) {
+        Inventory chest = Reconciler.chest(Custody.chest(key), true);
+        if (chest == null) {
+            return null;
         }
         java.util.Map<String, Integer> received = new java.util.TreeMap<>();
         for (MailRecord r : arriving) {
@@ -405,20 +431,35 @@ public final class Network {
                 received.merge(r.origin_server, 1, Integer::sum);
             }
         }
-        received.forEach((server, n) -> announce(key, proper(vehicle()) + " from &f" + server + "&7 has arrived with " + letters(n) + "."));
+        if (received.isEmpty()) {
+            return null;
+        }
+        received.forEach((server, n) -> announce(proper(vehicle()) + " from &f" + server + "&7 has arrived with " + letters(n) + "."));
+        return Purser.line(Purser.Voyage.ARRIVAL, and(received.keySet()), total(received));
     }
 
-    /** A broadcast ({@code Network.Broadcast}) and a sound at Central ({@code Network.Sound}). */
-    private static void announce(String central_key, String message) {
+    private static int total(java.util.Map<String, Integer> counts) {
+        int n = 0;
+        for (int c : counts.values()) {
+            n += c;
+        }
+        return n;
+    }
+
+    private static String and(java.util.Collection<String> names) {
+        List<String> list = new ArrayList<>(names);
+        if (list.size() <= 1) {
+            return list.isEmpty() ? "" : list.get(0);
+        }
+        return String.join(", ", list.subList(0, list.size() - 1)) + " and " + list.get(list.size() - 1);
+    }
+
+    /** A broadcast ({@code Network.Broadcast}), or just the log. The bell is the purser's (or {@link Purser#voyage}'s). */
+    private static void announce(String message) {
         if (VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.broadcast"), true)) {
             Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&9[Postal] &7" + message));
         } else {
-            Util.cinform("[Postal] " + org.bukkit.ChatColor.stripColor(message.replace("&f", "").replace("&7", "")));
-        }
-        String sound = VA_postal.plugin.getConfig().getString(GetConfig.path_format("network.sound"), "block.bell.use");
-        org.bukkit.Location at = Util.str2location(VA_postal.central_schest_location);
-        if (sound != null && !sound.isBlank() && at != null && at.getWorld() != null) {
-            at.getWorld().playSound(at, sound.trim(), 4.0F, 1.0F);
+            Util.cinform("[Postal] " + message.replace("&f", "").replace("&7", ""));
         }
     }
 

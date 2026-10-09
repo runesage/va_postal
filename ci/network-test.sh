@@ -92,14 +92,17 @@ import sys
 p, server, host, port, db, user, password = sys.argv[1:]
 want = {"Storage": {"Type": "mysql", "Host": host, "Port": port, "Database": db, "User": user, "Password": password},
         "Network": {"Server_id": server, "Poll_seconds": "3", "Departure_minutes": "1", "Transit_minutes": "0.5",
-                    "Vehicle": "the test ship"}}
+                    "Vehicle": "the test ship", "Always": "true"}}
 out, block = [], None
 for line in open(p).read().split("\n"):
     if line and not line.startswith(" "):
         block = line.split(":")[0]
     key = line.strip().split(":")[0]
     if block in want and key in want[block]:
-        line = line[:len(line) - len(line.lstrip())] + key + ": '" + want[block].pop(key) + "'"
+        value = want[block].pop(key)
+        # Numbers and booleans unquoted: Bukkit's getInt/getDouble/getBoolean ignore a quoted '3'.
+        plain = value in ("true", "false") or value.replace(".", "", 1).isdigit()
+        line = line[:len(line) - len(line.lstrip())] + key + ": " + (value if plain else "'" + value + "'")
     out.append(line)
 missing = {b: k for b, k in want.items() if k}
 assert not missing, "keys not found in config: %s" % missing
@@ -198,6 +201,8 @@ check "alpha's letter: claimed and delivered on beta" grep -qE "DELIVERED by pos
 check "beta's letter: delivered on alpha" grep -qE "To .*alpha:testville, home.*DELIVERED" "$WORK_DIR/beta.log"
 check "alpha: the ship departed for beta" grep -q "The test ship departs for beta with 1 letter" "$WORK_DIR/alpha.log"
 check "beta: the ship from alpha arrived" grep -q "The test ship from alpha has arrived with 1 letter" "$WORK_DIR/beta.log"
+check "alpha: the purser carried the mail out" grep -q "Purser at Central: All aboard for beta! 1 letter for the voyage." "$WORK_DIR/alpha.log"
+check "beta: the purser brought the mail in" grep -q "Purser at Central: Mail from alpha! 1 letter off the ship." "$WORK_DIR/beta.log"
 check "alpha: /postal network shows the schedule" grep -q "The test ship leaves every 1 min and takes 30s" "$WORK_DIR/alpha.log"
 check "beta: unknown player reported" grep -q "No player called nobody_here" "$WORK_DIR/beta.log"
 
