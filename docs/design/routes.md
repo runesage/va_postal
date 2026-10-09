@@ -209,6 +209,9 @@ for today's manual routes and the test bed for any of the options above. See `de
 - **Results (October 2026), towns soak with surveyed routes (21 addresses, 20 minutes):**
   - Before these fixes: Canalside and Cellar rescued on every trip.
   - After them: 21 of 21 walked, 85 round trips, no rescues, no stuck reports of any kind, no exceptions.
+  - SMP load test (12 towns, 240 addresses, 15 minutes): all 240 routes surveyed (median 8 ms, slowest 132 ms),
+    TPS at least 18.8 (median 20.0), median tick 7.2 ms, 167 addresses served in the time, no rescues, no
+    exceptions.
 - **Doors from inside:** the "near enough" radii never reach through a door, checked over every block between
   him and the waypoint (a line to the waypoint's corner slipped past the door beside it, so coming out of a
   house he "arrived" outside while still indoors and pushed against the closed door).
