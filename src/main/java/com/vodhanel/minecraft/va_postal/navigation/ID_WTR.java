@@ -95,10 +95,22 @@ public class ID_WTR {
 
         String slocation = Util.put_point_on_ground(VA_postal.wtr_slocation_address_spawn[id], false);
         Location target = Util.str2location(slocation);
+        if (target != null) {
+            target.add(0.5, 0, 0.5);
+        }
         if (VA_postal.wtr_npc[id].getEntity().getLocation() != target) {
             VA_postal.wtr_nav[id].getDefaultParameters().speedModifier(0.5F);
             Util.dinform(AnsiColor.GREEN + "AAA: New target for " + id + " " + target);
-            VA_postal.wtr_nav[id].setTarget(target);
+            // The last step, to stand at the mailbox: straight to the middle of the spot when it's close and level.
+            // Citizens' pathfinder always finishes at the corner of the block it's given, and from beside a corner he
+            // set off again for the route home off to one side: up a one-wide alley, he caught on its mouth.
+            Location at = VA_postal.wtr_npc[id].getEntity().getLocation();
+            if (target != null && at.getWorld() == target.getWorld() && at.getBlockY() == target.getBlockY()
+                    && at.distanceSquared(target) <= 16.0D) {
+                VA_postal.wtr_nav[id].setStraightLineTarget(target);
+            } else {
+                VA_postal.wtr_nav[id].setTarget(target);
+            }
             if ((VA_postal.wtr_controller[id] != null) &&
                     (VA_postal.wtr_controller[id].isPaused())) {
                 VA_postal.wtr_controller[id].setPaused(false);
@@ -350,6 +362,14 @@ public class ID_WTR {
             //Util.dinform(AnsiColor.L_GREEN + "at_waypoint for " + id + ": npc: " + nx + "," + nz + " target: " + tx + "," + tz + AnsiColor.YELLOW + " navigation location: " + navx + "," + navz + " " + ((navx == tx && navz == tz) ? AnsiColor.L_GREEN + "MATCH" : AnsiColor.RED + "NO MATCH"));
             if ((nx == tx) && (nz == tz)) {
                 return true;
+            }
+
+            // Ladders are exact both ways. Still on one, he hasn't reached anywhere off it, however close: at the foot
+            // of the cellar's ladder the next two waypoints counted from there, and he set off for the mailbox still
+            // holding on, and froze. And a waypoint on a ladder counts only at its column, where Postal climbs him:
+            // from two blocks away he was left to Citizens, which can't climb.
+            if (Climb.climbable(npc_loc.getBlock()) || Climb.on_ladder(target)) {
+                return Climb.in_column(npc_loc, target);
             }
 
             // The top or foot of a climb (a stair, a step, a drop): close, and at its height. The usual 2 blocks let

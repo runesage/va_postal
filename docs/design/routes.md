@@ -116,9 +116,11 @@ speed, or the recorded round-trip time).
 
 ## 6. Test world
 
-`dev/towns/` builds three small towns (hills with stairs and a slab ramp, a river with two kinds of bridge, a
-fence gate, a door, an alley, a tunnel, a hedge maze, trees and a ladder-only loft) with a route to each of
-15 addresses, and `dev/towns/soak.sh` reports which addresses the postmen actually reach. It's the baseline
+`dev/towns/` builds four small towns with a route to each of 21 addresses, and `dev/towns/soak.sh` reports
+which addresses the postmen actually reach. The first three have hills with stairs and a slab ramp, a river
+with two kinds of bridge, a fence gate, a door, an alley, a tunnel, a hedge maze, trees and a ladder-only
+loft. Stonegate, the fourth, has a winding alley with stairs, a curving tunnel with rails, a townhouse behind
+a gate and a door, a canal crossed by one bridge far to the side, a snowy street and a cellar under a hatch. It's the baseline
 for today's manual routes and the test bed for any of the options above. See `dev/towns/README.md`.
 
 ## 7. Decisions
@@ -165,3 +167,49 @@ for today's manual routes and the test bed for any of the options above. See `de
   load test (12 towns, 240 addresses): every route surveyed (median 8 ms), TPS at least 18.9, no rescues.
 - **Fixed on the way:** the stuck handler's door recovery looped forever, so a postman stuck at a door
   jumped in place for good.
+
+## 9. As built (R2)
+
+- **Hatches:** trapdoors over a ladder are climbed through. The survey treats one as a ladder rung it can
+  pass, and `Climb` opens it ahead of the postman and closes it behind him. Iron trapdoors are walls.
+- **Doors, gates and hatches are shared.** Postmen hold them open through one count (`Openings`): a postman
+  never shuts one another is going through, Postal never closes a door a player left open, and everything
+  Postal opened is closed on shutdown, NPC deletion, route start and route end.
+- **Door crossings** go along the door's own facing, start only with clear ground either side, and are
+  dropped if he's teleported away or his waypoint changes. A waypoint never counts as reached through a door.
+- **Survey reach:** an address is reached from any spot a postman can stand on within 2 blocks of its
+  mailbox, so a mailbox set in a wall works. A survey that runs into the edge of its box tries once more with
+  a box three times as wide (96 blocks), which also searches further up and down.
+- **Classification:** thin blocks a postman walks over or through (carpets, signs, banners, torches,
+  candles, pressure plates, buttons, rails, redstone, levers, tripwire, thin snow, lily pads) are open.
+  Copper chests, chains, bars and rods are walls. Portals and hot cauldrons are danger, and sugar cane is a
+  crop.
+- **Recovery:** the first stuck report on a waypoint is a soft reset that lifts him one step at most, never
+  to another floor. A second report on the same waypoint teleports him there and counts as a rescue.
+- **No hostile mobs on routes:** mob spawn suppression covers every `Enemy` (slimes too), not just
+  `Monster`. Slimes were shoving a postman along the canal path.
+- **Dry feet (`DryGround`):** Citizens' pathfinder counts the surface of water as ground; its block examiner
+  does by design, and it always adds a swimming examiner. `avoidWater` only makes water dearer. Because a
+  diagonal costs it no more than a straight step, a hop along a canal bank could plan out over the water, and
+  the postman sank to the bottom and couldn't climb out. With `avoidWater` on, Postal wraps the block examiner
+  so that standing on or in liquid is never allowed, and drops the swimming examiner.
+- **Distance margin 0.5:** Citizens counts a step of its path as reached within the distance margin. At
+  Postal's old default of a whole block, he turned for the next step still pressed against one side of a
+  one-wide tunnel or alley and caught on its mouth. At 0.3 he couldn't settle on stairs.
+- **Standing at the mailbox:** the [Postal_Mail] sign in front of every mailbox counted as ground (Bukkit calls
+  signs solid), so his standing spot was a block up and Citizens couldn't take him there. Ground now has to be
+  something you'd bump into. He also walks the last short, level step to it straight to the middle of the spot:
+  Citizens' pathfinder always ends a path on the corner of the block it's given, and from beside a corner he
+  set off home off to one side and caught on the mouth of a one-wide alley.
+- **Ladders, both ways:** standing on a ladder he hasn't reached anywhere off it, and Postal walks him off it
+  (left to Citizens, its ladder handling climbed him a rung instead). A waypoint on a ladder counts only at its
+  column (within 0.75 of its middle, or 0.6 of the corner Citizens aims for), where Postal climbs him; from two
+  blocks away he was left to Citizens, which can't climb. The stuck handler leaves him alone while he's climbing.
+- **Tests:** 58 new surveyor tests for shapes and edge cases, 75 in all.
+- **Results (October 2026), towns soak with surveyed routes (21 addresses, 20 minutes):**
+  - Before these fixes: Canalside and Cellar rescued on every trip.
+  - After them: 20 of 21 walked with no rescues. Loft needed 3 rescues at the top of its ladder, where Citizens
+    left him just outside the column; the corner allowance fixed that (Loft alone: 3 round trips, no rescues).
+  - Still open: a single soft reset (no rescue) now and then at Riverside Doorstep's waypoint 4, Woodvale
+    Tunnel's waypoint 12 and the foot of Loft's ladder.
+

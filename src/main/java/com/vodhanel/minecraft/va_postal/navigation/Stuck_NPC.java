@@ -46,6 +46,12 @@ public class Stuck_NPC implements StuckAction {
                 return false;
             }
 
+            // On a ladder Postal climbs him itself (Climb); Citizens only sees him standing still.
+            if (at != null && wp != null && Climb.on_ladder(wp) && Climb.in_column(at, wp)) {
+                VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
+                return false;
+            }
+
 
             String stuck_action = VA_postal.wtr_poffice[id] + "," + VA_postal.wtr_address[id] + "," + Util.int2str(VA_postal.wtr_pos[id]);
             String door_given_up = "DOOR_TP," + stuck_action;

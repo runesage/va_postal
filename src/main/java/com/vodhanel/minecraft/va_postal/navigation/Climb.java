@@ -27,6 +27,17 @@ public final class Climb {
     /** Hatches each postman has opened on his way through, closed once he's past them. */
     private static final java.util.Map<Integer, java.util.List<Block>> hatches = new java.util.HashMap<>();
 
+    /**
+     * True if he's at the waypoint's column: within 0.75 blocks of its middle, or 0.6 of its corner. Citizens walks him
+     * to the corner of the block it's given (and stops up to its distance margin short), so his feet are often just
+     * over the line in the next block.
+     */
+    static boolean in_column(Location at, Location target) {
+        double dx = at.getX() - (target.getBlockX() + 0.5D), dz = at.getZ() - (target.getBlockZ() + 0.5D);
+        double cx = at.getX() - target.getBlockX(), cz = at.getZ() - target.getBlockZ();
+        return dx * dx + dz * dz <= 0.75D * 0.75D || cx * cx + cz * cz <= 0.6D * 0.6D;
+    }
+
     /** True if this block is something to climb. */
     public static boolean climbable(Block b) {
         return b != null && Tag.CLIMBABLE.isTagged(b.getType());
@@ -102,6 +113,40 @@ public final class Climb {
      * Climbs postman {@code id} towards his waypoint, if that's a climb: straight up or down a ladder column from
      * where he is. Returns true if it handled this tick (and the waypoint, once he's there).
      */
+    /**
+     * At the foot (or top) of a ladder with his next waypoint off it on the same level, Postal walks him off it too.
+     * Left to Citizens, its path started in the ladder block and its ladder handling climbed him a rung instead: at
+     * the foot of the cellar's ladder he hung under the hatch until he was rescued.
+     */
+    private static boolean step_off(int id, Entity e, Location at, Location target) {
+        if (!climbable(at.getBlock()) || target.getBlockY() != at.getBlockY()) {
+            return false;
+        }
+        double dx = target.getBlockX() + 0.5D - at.getX(), dz = target.getBlockZ() + 0.5D - at.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1.0E-3D) {
+            return false;
+        }
+        Location next = at.clone().add(dx / len * SPEED, 0, dz / len * SPEED);
+        next.setY(at.getBlockY());
+        Block feet = next.getBlock();
+        Block head = feet.getRelative(BlockFace.UP);
+        if (!((feet.isPassable() || climbable(feet)) && (head.isPassable() || climbable(head)))) {
+            return false; // nothing to step onto that way: leave him to Citizens and the stuck handling
+        }
+        if (VA_postal.wtr_nav[id] != null && VA_postal.wtr_nav[id].isNavigating()) {
+            VA_postal.wtr_nav[id].cancelNavigation();
+        }
+        VA_postal.wtr_watchdog_stuck_stamp[id] = System.currentTimeMillis();
+        VA_postal.wtr_watchdog_ext_npc_stamp[id] = Util.time_stamp();
+        next.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
+        next.setPitch(0.0F);
+        e.teleport(next);
+        e.setVelocity(new Vector(0, 0, 0));
+        e.setFallDistance(0.0F);
+        return true;
+    }
+
     public static boolean tick(int id) {
         Location target = VA_postal.wtr_waypoint[id];
         Entity e = VA_postal.wtr_npc[id] == null ? null : VA_postal.wtr_npc[id].getEntity();
@@ -109,8 +154,8 @@ public final class Climb {
             return false;
         }
         Location at = e.getLocation();
-        if (at.getBlockX() != target.getBlockX() || at.getBlockZ() != target.getBlockZ()) {
-            return false;
+        if (!in_column(at, target)) {
+            return step_off(id, e, at, target);
         }
         double dy = target.getBlockY() - at.getY();
         if (Math.abs(dy) < 0.2D || !column_climbable(at, target)) {
