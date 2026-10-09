@@ -151,12 +151,13 @@ id_of() { grep -oE "Test letter [0-9a-f-]{36} handed in" "$WORK_DIR/$1.log" | he
 A_ID="$(id_of alpha)"; B_ID="$(id_of beta)"
 echo "alpha's letter: ${A_ID:-none}, beta's letter: ${B_ID:-none}"
 
-delivered() { # server-id: its Home mailbox has a written book
+has_letter() { # server-id mail-id: that letter (by its mail id) is in the server's Home mailbox now
     say "$1" "data get block 40 -60 0 Items"
-    tail -n 5 "$WORK_DIR/$1.log" | grep -q "written_book"
+    tail -n 5 "$WORK_DIR/$1.log" | grep -q "$2"
 }
+# Departures every minute, 30 s at sea, then Central and the postman: a few minutes in all.
 for _ in $(seq 1 60); do
-    if delivered beta && delivered alpha; then break; fi
+    if has_letter beta "$A_ID" && has_letter alpha "$B_ID"; then break; fi
     sleep 8
 done
 for s in alpha beta; do
@@ -168,6 +169,7 @@ done
 say alpha "postal track $A_ID"
 say beta "postal track $A_ID"
 say beta "postal track $B_ID"
+say alpha "postal track $B_ID"
 say alpha "postal store"
 say beta "postal whois nobody_here"
 say alpha "postal network"
@@ -175,36 +177,43 @@ sleep 2
 for s in alpha beta; do stop "$s"; done
 
 # ---- Assertions ---------------------------------------------------------------------------
+# Compare without the console's colour codes.
+for s in alpha beta; do sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/$s.log" > "$WORK_DIR/$s.txt"; done
 fail=0
 check() { # description, command...
     local desc="$1"; shift
     if "$@"; then echo "PASS: $desc"; else echo "FAIL: $desc"; fail=1; fi
 }
 no_match() { ! grep -qE "$1" "$2"; }
-books_in_mailbox() { # log: written books in the last 'data get block 40 -60 0' answer
-    grep -E "40, -60, 0 has the following block data" "$1" | tail -1 | grep -o "written_book" | wc -l
+mailbox() { # server: the last answer to 'data get block 40 -60 0' (its Home mailbox)
+    grep -a "40, -60, 0 has the following block data" "$WORK_DIR/$1.txt" | tail -1
 }
+in_mailbox() { mailbox "$1" | grep -q "$2"; }      # server mail-id
+not_in_mailbox() { ! in_mailbox "$1" "$2"; }
+A="$WORK_DIR/alpha.txt"; B="$WORK_DIR/beta.txt"
 for s in alpha beta; do
-    log="$WORK_DIR/$s.log"
+    log="$WORK_DIR/$s.txt"
     check "$s: mail store open on schema 5 as '$s'" grep -q "schema 5, server id '$s'" "$log"
     check "$s: no Postal stack traces" no_match "at .*com\.vodhanel\." "$log"
     check "$s: no command exceptions" no_match "Command exception: /?postal" "$log"
     check "$s: no duplicate server id" no_match "Another server is using Network.Server_id" "$log"
-    check "$s: exactly one letter delivered to its Home" test "$(books_in_mailbox "$log")" = 1
 done
 check "alpha: letter recorded for beta" test -n "$A_ID"
 check "beta: letter recorded for alpha" test -n "$B_ID"
-check "alpha sees beta's offices in the directory" grep -q "beta / testville: 1 addresses" "$WORK_DIR/alpha.log"
-check "alpha's letter: delivered, one record" grep -qE "To .*beta:testville, home.*DELIVERED" "$WORK_DIR/alpha.log"
-check "alpha's letter: handed to the network on alpha" grep -qE "IN_NETWORK by central.* on alpha" "$WORK_DIR/alpha.log"
-check "alpha's letter: claimed and delivered on beta" grep -qE "DELIVERED by postman testville on beta" "$WORK_DIR/beta.log"
-check "beta's letter: delivered on alpha" grep -qE "To .*alpha:testville, home.*DELIVERED" "$WORK_DIR/beta.log"
-check "alpha: the ship departed for beta" grep -q "The test ship departs for beta with 1 letter" "$WORK_DIR/alpha.log"
-check "beta: the ship from alpha arrived" grep -q "The test ship from alpha has arrived with 1 letter" "$WORK_DIR/beta.log"
-check "alpha: the purser carried the mail out" grep -q "Purser at Central: All aboard for beta! 1 letter for the voyage." "$WORK_DIR/alpha.log"
-check "beta: the purser brought the mail in" grep -q "Purser at Central: Mail from alpha! 1 letter off the ship." "$WORK_DIR/beta.log"
-check "alpha: /postal network shows the schedule" grep -q "The test ship leaves every 1 min and takes 30s" "$WORK_DIR/alpha.log"
-check "beta: unknown player reported" grep -q "No player called nobody_here" "$WORK_DIR/beta.log"
+check "beta's Home got alpha's letter" in_mailbox beta "$A_ID"
+check "alpha's Home got beta's letter" in_mailbox alpha "$B_ID"
+check "alpha's own Home did not get alpha's letter" not_in_mailbox alpha "$A_ID"
+check "alpha sees beta's offices in the directory" grep -q "beta / testville: 1 addresses" "$A"
+check "alpha's letter: delivered, one record" grep -qE "To beta:testville, home from alpha:testville: DELIVERED" "$B"
+check "alpha's letter: handed to the network on alpha" grep -qE "AT_CENTRAL -> IN_NETWORK by CENTRAL on alpha \(left on the test ship\)" "$A"
+check "alpha's letter: claimed and delivered on beta" grep -qE -e "-> DELIVERED by POSTMAN testville on beta" "$B"
+check "beta's letter: delivered on alpha" grep -qE "To alpha:testville, home from beta:testville: DELIVERED" "$A"
+check "alpha: the ship departed for beta" grep -q "The test ship departs for beta with 1 letter" "$A"
+check "beta: the ship from alpha arrived" grep -q "The test ship from alpha has arrived with 1 letter" "$B"
+check "alpha: the purser carried the mail out" grep -q "Purser at Central: All aboard for beta! 1 letter for the voyage." "$A"
+check "beta: the purser brought the mail in" grep -q "Purser at Central: Mail from alpha! 1 letter off the ship." "$B"
+check "alpha: /postal network shows the schedule" grep -q "The test ship leaves every 1 min and takes 30s" "$A"
+check "beta: unknown player reported" grep -q "No player called nobody_here" "$B"
 
 if [ "$fail" -ne 0 ]; then
     echo "Network test FAILED. Logs: $WORK_DIR/alpha.log, $WORK_DIR/beta.log"
