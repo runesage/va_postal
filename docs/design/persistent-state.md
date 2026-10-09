@@ -353,8 +353,9 @@ and there are **no duplicate or divergent records**.
   2 letters off the ship.") and walk off empty-handed. There is no dock to build: they come from, and go to, a
   free spot near Central. The name (`Network.Purser.Name`, "&3Purser"), the lines (`Network.Purser.Lines.*`),
   the skin (`Settings.Skin.Purser`, the postmaster's bundled skin by default, or `custom`/a player name like the
-  others) and the uniform (`Settings.Uniform.Purser.*`, navy and white, on unless `Network.Purser.Uniform` is
-  false) are all configurable. The **transfer itself happens when the purser reaches the chest**: the letters'
+  others) and the uniform (`Settings.Uniform.Purser.*`: a postal-green cap and coat with the navy trousers and black boots the
+  postman and postmaster wear, so they're plainly Post Office staff but neither of the other two; on unless
+  `Network.Purser.Uniform` is false) are all configurable. The **transfer itself happens when the purser reaches the chest**: the letters'
   records and books move then. The purser can only make it late, never stop it. With nobody within 48 blocks of
   Central to see it, without Citizens, with `Network.Purser.Enabled: false`, or if anything goes wrong (a walk
   past 30 seconds ends in a teleport, an unloaded chunk, a shutdown), the transfer runs at once. One voyage runs at

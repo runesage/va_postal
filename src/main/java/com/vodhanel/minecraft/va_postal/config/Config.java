@@ -167,9 +167,9 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.purser"), "bundled");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.purser.texture"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.purser.signature"), "");
-        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.helmet"), "LEATHER_HELMET #1B2A41");
-        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.chestplate"), "LEATHER_CHESTPLATE #1B2A41");
-        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.leggings"), "LEATHER_LEGGINGS #E8E4D8");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.helmet"), "LEATHER_HELMET #2E5E4E");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.chestplate"), "LEATHER_CHESTPLATE #2E5E4E");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.leggings"), "LEATHER_LEGGINGS #24345C");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.purser.boots"), "LEATHER_BOOTS #2B2B2B");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.letter.network"), "10");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");

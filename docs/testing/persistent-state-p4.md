@@ -68,6 +68,8 @@ Each server needs a Central and at least one office with an address. Give both s
 - [ ] A minute later, standing near B's Central: the Purser walks in with the bag, a bell rings, they leave the
   letter in the chest (`Mail from A! 1 letter off the ship.`) and walk off empty-handed. B broadcasts `The mail
   ship from A has arrived with 1 letter.`
+- [ ] The Purser wears a postal-green cap and coat with navy trousers and black boots: clearly Post Office staff,
+  and distinguishable from both the postman (light-blue shirt) and the postmaster (maroon).
 - [ ] Away from Central (more than 48 blocks), the same departure happens with no Purser: the letter just leaves
   on time.
 - [ ] Soon after, it's delivered to Home **on B**, not to A's own Testville/Home.
