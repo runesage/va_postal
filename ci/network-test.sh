@@ -28,6 +28,9 @@ download_server_jars "$CACHE"
 
 declare -A PORT=([alpha]=25565 [beta]=25566)
 declare -A PID=()
+# However the script ends, its servers end with it (a leftover server holds its port for the next run).
+cleanup() { for pid in "${PID[@]}"; do kill -9 "$pid" 2>/dev/null || true; done; }
+trap cleanup EXIT
 
 dir() { echo "$WORK_DIR/$1"; }
 
