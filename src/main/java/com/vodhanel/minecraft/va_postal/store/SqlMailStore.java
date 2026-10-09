@@ -77,6 +77,31 @@ public final class SqlMailStore implements MailStore {
 
     private void migrate() {
         try (Connection c = source.getConnection()) {
+            // Servers sharing a database may start together: one migrates while the others wait, then find the
+            // schema current. (MySQL commits DDL at once, so a transaction can't keep them apart.)
+            if (dialect == Dialect.MYSQL) {
+                try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery("SELECT GET_LOCK('postal_migrate', 120)")) {
+                    if (!rs.next() || rs.getInt(1) != 1) {
+                        throw new SQLException("Timed out waiting for another server to finish migrating the mail store");
+                    }
+                }
+            }
+            try {
+                migrate(c);
+            } finally {
+                if (dialect == Dialect.MYSQL) {
+                    try (Statement st = c.createStatement()) {
+                        st.execute("DO RELEASE_LOCK('postal_migrate')");
+                    }
+                }
+            }
+        } catch (SQLException | IOException e) {
+            throw new StoreException("Could not migrate the mail store", e);
+        }
+    }
+
+    private void migrate(Connection c) throws SQLException, IOException {
+        {
             try (Statement st = c.createStatement()) {
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS schema_version (version INT NOT NULL)");
             }
@@ -101,8 +126,6 @@ public final class SqlMailStore implements MailStore {
                     c.setAutoCommit(true);
                 }
             }
-        } catch (SQLException | IOException e) {
-            throw new StoreException("Could not migrate the mail store", e);
         }
     }
 

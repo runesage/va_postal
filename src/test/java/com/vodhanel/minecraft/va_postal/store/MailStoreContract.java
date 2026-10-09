@@ -414,4 +414,23 @@ abstract class MailStoreContract {
         assertEquals(123_456_789L, skyblock.in_network().get(0).due_at);
         assertThrows(ConflictException.class, () -> store.depart(sent, 1L, Actor.central(), null));
     }
+
+    @Test
+    void serversStartingTogetherOnAFreshDatabaseBothOpen() throws Exception {
+        store.close();
+        DataSource fresh = fresh_database();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(3);
+        try {
+            List<java.util.concurrent.Future<SqlMailStore>> opening = new java.util.ArrayList<>();
+            for (String id : new String[]{"alpha", "beta", "gamma"}) {
+                opening.add(pool.submit(() -> new SqlMailStore(fresh, id, null, dialect())));
+            }
+            for (java.util.concurrent.Future<SqlMailStore> f : opening) {
+                assertEquals(SqlMailStore.MIGRATIONS.length, f.get().schema_version());
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        store = new SqlMailStore(fresh, "main", null, dialect());
+    }
 }
