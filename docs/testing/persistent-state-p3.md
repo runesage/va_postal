@@ -6,8 +6,17 @@ What P3 promises, and what this plan checks:
 - **The directory and server registry** fill in by themselves, and two servers can't share a server id unnoticed.
 - **`/postal store`** shows whether the database is healthy and fast enough.
 
-Allow about 45 minutes. You need a MySQL or MariaDB server you can create a database on (a local MariaDB is
-fine: on Ubuntu, `sudo apt install mariadb-server`).
+**Most of this is covered automatically:** CI runs the store tests and the whole smoke test (letters, parcels,
+a `kill -9` crash) on both SQLite and MariaDB, and the 240-address load test and a database outage were run on
+MariaDB. What it can't cover is *your* database: its version, how users log in (MySQL 8 defaults to a different
+password plugin than MariaDB), SSL, or a database on another machine.
+
+- **Staying on SQLite?** Nothing here needs testing.
+- **Switching to MySQL/MariaDB?** Do **section 2, steps 1 to 4** on your own database (about 5 minutes). The rest
+  (crash, outage, two servers) is optional.
+
+You need a MySQL or MariaDB server you can create a database on (a local MariaDB is fine: on Ubuntu,
+`sudo apt install mariadb-server`).
 
 ## 0. Setup
 
