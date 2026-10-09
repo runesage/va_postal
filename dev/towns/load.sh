@@ -142,7 +142,7 @@ if mspt:
 visited = {}
 for block in re.split(r"Addresses for ", log)[1:]:
     town = block.split(":", 1)[0].strip()
-    secs = [int(x) for x in re.findall(r"(?m)^\[[^\]]*\]: (?:\[Postal\] \[STDOUT\] )?\s+\S+\s+\S+\s+Seconds: (\d+)", block)]
+    secs = [int(x) for x in re.findall(r"(?m)^\[[^\]]*\]: (?:\[Postal\] (?:\[STDOUT\] )?)?\s+\S+\s+\S+\s+Seconds: (\d+)", block)]
     visited[town] = (sum(1 for x in secs if x > 0), len(secs))
 done = sum(v for v, _ in visited.values())
 rescues = re.findall(r"(Teleport Reset|Soft Reset).*?Nav recovery for\s*:\s*(\S+).*?While servicing\s*:\s*(\S+)", log, re.S)

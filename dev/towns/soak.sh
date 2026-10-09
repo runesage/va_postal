@@ -113,7 +113,7 @@ from collections import Counter, defaultdict
 routes = json.load(open(sys.argv[1]))
 log = re.sub(r"\x1b\[[0-9;]*m", "", open(sys.argv[2], errors="replace").read())
 seconds = {}
-for m in re.finditer(r"(?m)^\[[^\]]*\]: (?:\[Postal\] \[STDOUT\] )?\s+(\S+)\s+\S+\s+Seconds: (\d+)", log):
+for m in re.finditer(r"(?m)^\[[^\]]*\]: (?:\[Postal\] (?:\[STDOUT\] )?)?\s+(\S+)\s+\S+\s+Seconds: (\d+)", log):
     seconds[m.group(1).lower()] = int(m.group(2))
 # A rescue: the postman got stuck and Postal teleported it on (or reset it at a door).
 rescues = Counter()

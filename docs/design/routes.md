@@ -208,8 +208,7 @@ for today's manual routes and the test bed for any of the options above. See `de
 - **Tests:** 58 new surveyor tests for shapes and edge cases, 75 in all.
 - **Results (October 2026), towns soak with surveyed routes (21 addresses, 20 minutes):**
   - Before these fixes: Canalside and Cellar rescued on every trip.
-  - After them: 20 of 21 walked with no rescues. Loft needed 3 rescues at the top of its ladder, where Citizens
-    left him just outside the column; the corner allowance fixed that (Loft alone: 3 round trips, no rescues).
-  - Still open: a single soft reset (no rescue) now and then at Riverside Doorstep's waypoint 4, Woodvale
-    Tunnel's waypoint 12 and the foot of Loft's ladder.
+  - After them: 21 of 21 walked, no rescues, no exceptions.
+  - Still open: a single soft reset (no rescue) on some trips at Riverside Doorstep, coming back out of the
+    house, and at the foot of Loft's ladder.
 
