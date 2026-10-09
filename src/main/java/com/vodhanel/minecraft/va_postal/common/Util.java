@@ -439,8 +439,9 @@ public class Util {
                 if ((p_poffice == null) || (poffice.contains(p_poffice))) {
                     if (!poffice.equals(l_poffice)) {
                         owner = "Server";
-                        if (C_Owner.is_local_po_owner_defined(poffice)) {
-                            owner = C_Owner.get_owner_local_po(poffice).getDisplayName();
+                        String po_owner_name = C_Owner.get_owner_local_po_name(poffice);
+                        if (po_owner_name != null) {
+                            owner = po_owner_name;
                         }
                         sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(poffice));
                         disp = fmt_po + fixed_len(poffice.toUpperCase(), 16, fmt_fill);
@@ -458,8 +459,9 @@ public class Util {
 
                     if (detail) {
                         owner = " server";
-                        if (C_Owner.is_address_owner_defined(poffice, address)) {
-                            owner = " " + C_Owner.get_owner_address(poffice, address).getDisplayName();
+                        String addr_owner_name = C_Owner.get_owner_address_name(poffice, address);
+                        if (addr_owner_name != null) {
+                            owner = " " + addr_owner_name;
                         }
                         disp = fmt_addr + fixed_len(Util.df(address), 16, fmt_fill);
                         disp = disp + fmt_ownr + owner;
