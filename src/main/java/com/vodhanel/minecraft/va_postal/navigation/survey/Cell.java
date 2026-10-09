@@ -88,6 +88,17 @@ public enum Cell {
         switch (n) {
             case "AIR", "CAVE_AIR", "VOID_AIR":
                 return OPEN;
+            case "NETHER_PORTAL", "END_PORTAL", "END_GATEWAY", "LAVA_CAULDRON", "POWDER_SNOW_CAULDRON":
+                return DANGER; // a portal would carry him off; the cauldrons hurt
+            case "SUGAR_CANE":
+                return CROP; // no collision, but someone's crop
+            case "IRON_TRAPDOOR", "TURTLE_EGG", "FROGSPAWN", "END_ROD", "CHORUS_PLANT", "CHORUS_FLOWER",
+                 "AMETHYST_CLUSTER", "SMALL_AMETHYST_BUD", "MEDIUM_AMETHYST_BUD", "LARGE_AMETHYST_BUD":
+                return WALL; // no hand opens an iron trapdoor; eggs aren't for trampling; posts and crystals are obstacles
+            case "LEVER", "TRIPWIRE", "TRIPWIRE_HOOK", "REDSTONE_WIRE", "REPEATER", "COMPARATOR", "COCOA":
+                return OPEN;
+            case "CLAY":
+                return GROUND;
             case "SNOW", "LILY_PAD":
                 // A thin snow layer is stepped over (SurveyGrid makes deep ones ground); a lily pad is never a floor
                 // (the water under it isn't one either, so a route never crosses water on them).
@@ -97,7 +108,7 @@ public enum Cell {
             case "LAVA", "FIRE", "SOUL_FIRE", "MAGMA_BLOCK", "CACTUS", "SWEET_BERRY_BUSH", "POWDER_SNOW", "CAMPFIRE",
                  "SOUL_CAMPFIRE", "WITHER_ROSE", "POINTED_DRIPSTONE":
                 return DANGER;
-            case "IRON_DOOR", "IRON_BARS", "COBWEB", "BAMBOO", "CHEST", "TRAPPED_CHEST", "ENDER_CHEST", "SUGAR_CANE",
+            case "IRON_DOOR", "IRON_BARS", "COBWEB", "BAMBOO", "CHEST", "TRAPPED_CHEST", "ENDER_CHEST",
                  "CHAIN":
                 return WALL; // chests: never route over a mailbox
             case "LADDER", "VINE", "SCAFFOLDING", "WEEPING_VINES", "WEEPING_VINES_PLANT", "TWISTING_VINES",
@@ -108,11 +119,20 @@ public enum Cell {
                 return CROP;
             case "DIRT_PATH", "GRAVEL":
                 return ROAD;
-            case "SAND", "RED_SAND", "SOUL_SAND", "SOUL_SOIL", "FARMLAND", "SNOW_BLOCK", "MUD", "CLAY", "HONEY_BLOCK",
+            case "SAND", "RED_SAND", "SOUL_SAND", "SOUL_SOIL", "FARMLAND", "SNOW_BLOCK", "MUD", "HONEY_BLOCK",
                  "SLIME_BLOCK":
                 return ROUGH;
             default:
                 break;
+        }
+        // Thin things a postman walks over or through, whatever the server says about their collision box (a carpet
+        // is "solid", but he stands on top of it, not a block higher).
+        if (n.endsWith("_CARPET") || n.endsWith("_SIGN") || n.endsWith("_BANNER") || n.endsWith("TORCH")
+                || n.endsWith("CANDLE") || n.endsWith("_PRESSURE_PLATE") || n.endsWith("_BUTTON") || n.endsWith("RAIL")) {
+            return OPEN;
+        }
+        if (n.endsWith("_CHEST") || n.endsWith("LIGHTNING_ROD")) {
+            return WALL; // copper chests are mailboxes like any chest; rods are posts
         }
         if (n.endsWith("_DOOR")) {
             return DOOR;

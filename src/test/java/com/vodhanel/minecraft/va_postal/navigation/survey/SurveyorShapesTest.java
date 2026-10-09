@@ -290,4 +290,32 @@ class SurveyorShapesTest {
         Result r = new Surveyor(hall, 50_000).survey(0, 0, 0, 10, 0, 0);
         assertFalse(r.ok(), "walked through a trapdoor: " + r.path());
     }
+
+    @Test
+    void classifiesWhatTheBlockAuditFlagged() {
+        // Walked over or through, even where the server reports a collision box.
+        for (String n : new String[]{"WHITE_CARPET", "MOSS_CARPET", "PALE_MOSS_CARPET", "OAK_SIGN", "OAK_WALL_SIGN",
+                "OAK_HANGING_SIGN", "RED_BANNER", "RED_WALL_BANNER", "TORCH", "SOUL_WALL_TORCH", "CANDLE", "RED_CANDLE",
+                "STONE_PRESSURE_PLATE", "POLISHED_BLACKSTONE_PRESSURE_PLATE", "OAK_BUTTON", "POLISHED_BLACKSTONE_BUTTON",
+                "RAIL", "POWERED_RAIL", "LEVER", "TRIPWIRE", "REDSTONE_WIRE", "REPEATER", "COMPARATOR"}) {
+            assertEquals(Cell.OPEN, Cell.of(n, true), n);
+        }
+        assertEquals(Cell.WALL, Cell.of("COPPER_CHEST", true));
+        assertEquals(Cell.WALL, Cell.of("WAXED_OXIDIZED_COPPER_CHEST", true));
+        assertEquals(Cell.WALL, Cell.of("IRON_TRAPDOOR", true));
+        assertEquals(Cell.HATCH, Cell.of("SPRUCE_TRAPDOOR", true));
+        assertEquals(Cell.WALL, Cell.of("LIGHTNING_ROD", true));
+        assertEquals(Cell.WALL, Cell.of("WAXED_EXPOSED_LIGHTNING_ROD", true));
+        assertEquals(Cell.WALL, Cell.of("END_ROD", true));
+        assertEquals(Cell.WALL, Cell.of("AMETHYST_CLUSTER", true));
+        assertEquals(Cell.WALL, Cell.of("TURTLE_EGG", true));
+        assertEquals(Cell.DANGER, Cell.of("NETHER_PORTAL", false));
+        assertEquals(Cell.DANGER, Cell.of("END_GATEWAY", false));
+        assertEquals(Cell.DANGER, Cell.of("LAVA_CAULDRON", true));
+        assertEquals(Cell.CROP, Cell.of("SUGAR_CANE", false));
+        assertEquals(Cell.GROUND, Cell.of("CLAY", true));
+        assertEquals(Cell.ROAD, Cell.of("POLISHED_ANDESITE", true));   // still a road: only buttons/plates are open
+        assertEquals(Cell.DOOR, Cell.of("OAK_DOOR", true));
+        assertEquals(Cell.WALL, Cell.of("CHEST", true));
+    }
 }
