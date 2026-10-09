@@ -32,6 +32,11 @@ public enum Cell {
     DOOR(true, false, 3.0D),
     /** A fence gate: passable once opened. */
     GATE(true, false, 3.0D),
+    /**
+     * A closed trapdoor: stood on like a floor and walked into like a wall, but a climb up or down a ladder passes
+     * through it (Postal opens it for the postman: a hatch over a ladder shaft).
+     */
+    HATCH(false, true, 0.7D),
     /** A ladder or vine: passable, climbable, and its top can be stood on. */
     LADDER(true, true, 2.0D),
     /** Crops: passable, but a postman shouldn't walk through someone's field. */
@@ -118,7 +123,10 @@ public enum Cell {
         if (n.endsWith("_CHAIN") || n.endsWith("_BARS")) {
             return WALL; // IRON_CHAIN and the copper chains and bars (Minecraft 1.21.9)
         }
-        if (n.endsWith("_FENCE") || n.endsWith("_LEAVES") || n.endsWith("_TRAPDOOR") || n.endsWith("SHULKER_BOX")
+        if (n.endsWith("_TRAPDOOR")) {
+            return HATCH; // SurveyGrid makes an open one open
+        }
+        if (n.endsWith("_FENCE") || n.endsWith("_LEAVES") || n.endsWith("SHULKER_BOX")
                 || n.endsWith("_PANE") || n.endsWith("_WALL") && !n.endsWith("_SIGN") || n.equals("COBBLESTONE_WALL")) {
             return WALL;
         }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Route soak on the "towns" test world: builds the three test towns (dev/towns/build_towns.py) on a
+# Route soak on the "towns" test world: builds the test towns (dev/towns/build_towns.py) on a
 # throwaway Paper server, lets the postmen run every route for a while, then reports, per address,
 # whether a postman completed the round trip and how long it took.
 #
@@ -70,9 +70,14 @@ keep_libraries "$CACHE" "$SERVER"
 grep -q "Postal test towns built" "$WORK_DIR/build.log" || { echo "the towns weren't built; see $WORK_DIR/build.log" >&2; exit 1; }
 
 # The towns' offices, addresses and routes, plus quick postman pacing so every route runs several times.
+mapfile -t TOWNS < <(python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))))' "$ROUTES")
+ALIST_CMDS=()
+for town in "${TOWNS[@]}"; do ALIST_CMDS+=("alist $town"); done
 if [ "$SURVEY" = 1 ]; then
     python3 "$REPO/dev/towns/build_towns.py" --config "$CONFIG" --no-routes
-    SURVEY_CMDS=("postal survey Hillcrest" "postal survey Riverside" "postal survey Woodvale" "sleep:30")
+    SURVEY_CMDS=()
+    for town in "${TOWNS[@]}"; do SURVEY_CMDS+=("postal survey $town"); done
+    SURVEY_CMDS+=("sleep:45")
 else
     python3 "$REPO/dev/towns/build_towns.py" --config "$CONFIG"
     SURVEY_CMDS=()
@@ -94,7 +99,7 @@ PY
 
 echo "== Running the postmen for ${SOAK_SECONDS}s"
 run_server "$WORK_DIR/soak.log" "$((SOAK_SECONDS + 600))" \
-    "${SURVEY_CMDS[@]}" "postal start" "sleep:$SOAK_SECONDS" "alist Hillcrest" "alist Riverside" "alist Woodvale" \
+    "${SURVEY_CMDS[@]}" "postal start" "sleep:$SOAK_SECONDS" "${ALIST_CMDS[@]}" \
     "postal stop" "sleep:5"
 
 if [ "$SURVEY" = 1 ]; then

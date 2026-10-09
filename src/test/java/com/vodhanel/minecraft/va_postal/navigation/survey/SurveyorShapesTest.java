@@ -248,7 +248,46 @@ class SurveyorShapesTest {
         assertEquals(Cell.WALL, Cell.of("COPPER_BARS", false));
         assertEquals(Cell.WALL, Cell.of("IRON_BARS", false));
         assertEquals(Cell.ROUGH, Cell.of("SNOW_BLOCK", true));
-        assertEquals(Cell.WALL, Cell.of("OAK_TRAPDOOR", false));
+        assertEquals(Cell.HATCH, Cell.of("OAK_TRAPDOOR", false)); // SurveyGrid makes an open one open
         assertEquals(Cell.DOOR, Cell.of("COPPER_DOOR", true));
+    }
+
+    // ---- Hatches ----------------------------------------------------------------------------
+
+    /**
+     * A cellar: the ground floor at y = 0 has a ladder shaft at (5, *, 5) going down to a cellar whose floor stands at
+     * y = -4, with a closed trapdoor (a hatch) in the ground at (5, -1, 5). Solid rock around the cellar.
+     */
+    private static TestGrid cellar() {
+        TestGrid g = new TestGrid().fill(0, -6, 0, 10, -1, 10, Cell.GROUND);
+        g.fill(3, -4, 3, 9, -2, 9, Cell.OPEN);              // the cellar room, three high, floor at y = -5
+        g.fill(5, -4, 5, 5, -2, 5, Cell.LADDER);            // the ladder up the shaft
+        g.set(5, -1, 5, Cell.HATCH);                        // the hatch in the ground floor
+        return g;
+    }
+
+    @Test
+    void climbsDownThroughAHatchIntoACellarAndBackUp() {
+        TestGrid g = cellar();
+        Result down = new Surveyor(g).survey(0, 0, 0, 8, -4, 8);
+        assertWalkable(g, down);
+        assertTrue(down.path().stream().anyMatch(p -> p.x() == 5 && p.z() == 5 && p.y() == -1 && p.move() == Move.LADDER),
+                "through the hatch: " + down.path());
+        Result up = new Surveyor(g).survey(8, -4, 8, 0, 0, 0);
+        assertWalkable(g, up);
+        assertTrue(up.path().stream().filter(p -> p.move() == Move.LADDER).count() >= 4, up.path().toString());
+    }
+
+    @Test
+    void walksOverAClosedHatchAndNeverIntoATrapdoorFromTheSide() {
+        // Over the hatch: it's a floor.
+        TestGrid g = cellar();
+        Result over = new Surveyor(g).survey(3, 0, 5, 7, 0, 5);
+        assertWalkable(g, over);
+        assertTrue(over.path().stream().allMatch(p -> p.y() == 0), over.path().toString());
+        // A trapdoor fixed across a doorway (decoration, no ladder under it, a lintel above) is a wall.
+        TestGrid hall = new TestGrid().fill(5, 0, -60, 5, 2, 60, Cell.WALL).set(5, 0, 0, Cell.HATCH).set(5, 1, 0, Cell.OPEN);
+        Result r = new Surveyor(hall, 50_000).survey(0, 0, 0, 10, 0, 0);
+        assertFalse(r.ok(), "walked through a trapdoor: " + r.path());
     }
 }

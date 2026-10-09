@@ -62,6 +62,13 @@ public final class SurveyGrid implements Grid {
             return data instanceof org.bukkit.block.data.type.Snow sn && sn.getLayers() > DEEP_SNOW ? Cell.GROUND : Cell.OPEN;
         }
         Cell c = cells.get(type);
+        if (c == Cell.HATCH) {
+            // An open trapdoor stands up against its side: a postman walks or climbs past it.
+            org.bukkit.block.data.BlockData data = snap.getBlockData(x & 15, y, z & 15);
+            if (data instanceof org.bukkit.block.data.Openable o && o.isOpen()) {
+                return Cell.OPEN;
+            }
+        }
         if (c == Cell.STEP) {
             // Stairs and slabs: which way, and which half, from the block data.
             org.bukkit.block.data.BlockData data = snap.getBlockData(x & 15, y, z & 15);

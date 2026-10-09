@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the "towns" test world for Postal: three small towns with hills, a river, bridges, doors,
+"""Generates the "towns" test world for Postal: four small towns with hills, a river, bridges, doors,
 gates, a tunnel, trees and hedges, each with a post office and five addresses joined by routes.
 
 It writes two things, both reproducible block for block:
@@ -32,7 +32,8 @@ MAX_GAP = 10.0   # longest allowed step between two waypoints
 
 AIR = "minecraft:air"
 # Blocks a postman can walk through (or open); everything else placed here is solid.
-PASSABLE = ("air", "water", "sign", "door", "fence_gate", "ladder", "wheat", "torch", "leaves_top")
+PASSABLE = ("air", "water", "sign", "door", "fence_gate", "ladder", "wheat", "torch", "leaves_top", "rail")
+DEEP_SNOW = 4    # snow deeper than this many layers is ground to climb onto; thinner is walked through
 
 
 # Each town's architecture. wall_x/wall_z are the wall blocks for walls running along x and along z
@@ -74,6 +75,9 @@ def passable(block):
     if block is None:
         return True
     name = block.split("[")[0].split("{")[0].replace("minecraft:", "")
+    if name == "snow":  # a snow layer: thin enough to walk through, or a drift to climb
+        layers = int(block.split("layers=")[1].split("]")[0].split(",")[0]) if "layers=" in block else 1
+        return layers <= DEEP_SNOW
     return any(p in name for p in PASSABLE) and "trapdoor" not in name
 
 
@@ -494,6 +498,105 @@ def woodvale(w):
     return info
 
 
+def stonegate(w):
+    """A walled stone town for the awkward shapes: a winding alley with stairs at a corner, a curving tunnel with
+    rails, a two-storey townhouse behind a door and a gate, a canal crossed only by a bridge far to the side, and
+    a snowy street with a drift."""
+    w.postal_building((0, G, -75), "south", "civic", "Stonegate", "Office", width=11, depth=8, office=True)
+
+    # Lanes: an S-shaped alley, one wide and three high, through a block of stone; stairs up at its third bend.
+    w.fill(14, G, -100, 32, G + 4, -80, "minecraft:stone_bricks")
+    w.fill(16, G, -86, 16, G + 2, -80, AIR)
+    w.fill(16, G, -86, 24, G + 2, -86, AIR)
+    w.fill(24, G, -89, 24, G + 2, -86, AIR)
+    w.set(24, G, -90, "minecraft:stone_brick_stairs[facing=north]")
+    w.fill(24, G + 1, -94, 24, G + 3, -90, AIR)
+    w.fill(24, G + 1, -94, 30, G + 3, -94, AIR)
+    w.fill(30, G + 1, -100, 30, G + 3, -94, AIR)
+    w.fill(26, G, -113, 34, G, -101, "minecraft:stone_bricks")      # a terrace at the alley's upper end
+    w.postal_building((30, G + 1, -106), "south", "civic", "Stonegate", "Lanes")
+
+    # Mineway: a mound with an L-shaped tunnel, one wide and two high, rails along its floor.
+    w.fill(-40, G, -110, -20, G + 5, -86, "minecraft:dirt")
+    w.fill(-40, G + 6, -110, -20, G + 6, -86, "minecraft:grass_block")
+    w.fill(-24, G, -98, -24, G + 1, -86, AIR)
+    w.fill(-36, G, -98, -24, G + 1, -98, AIR)
+    w.fill(-36, G, -110, -36, G + 1, -98, AIR)
+    for z in range(-98, -85):
+        w.set(-24, G, z, "minecraft:rail")
+    for x in range(-36, -24):
+        w.set(x, G, -98, "minecraft:rail")
+    for z in range(-110, -98):
+        w.set(-36, G, z, "minecraft:rail")
+    w.postal_building((-36, G, -114), "south", "civic", "Stonegate", "Mineway")
+
+    # Townhouse: two storeys; a fenced porch whose gate is right against the front door; stairs up the west wall
+    # inside to the upper floor, where the mailbox is.
+    w.building(40, -100, 50, -90, G, "south", "civic", 45, height=9, sign=("Townhouse", "Stonegate"),
+               what="Stonegate/Townhouse")
+    w.fill(42, G, -89, 48, G, -89, "minecraft:oak_fence")
+    w.set(45, G, -89, "minecraft:oak_fence_gate[facing=south,open=false]")
+    w.fill(41, G + 4, -99, 49, G + 4, -97, "minecraft:oak_planks")    # the upper floor (north end)
+    w.fill(42, G + 4, -96, 49, G + 4, -96, "minecraft:oak_planks")
+    for k in range(5):                                                  # five stairs up the west wall, northwards
+        if k:
+            w.fill(41, G, -92 - k, 41, G + k - 1, -92 - k, "minecraft:oak_planks")
+        w.set(41, G + k, -92 - k, "minecraft:oak_stairs[facing=north]")
+    w.mailbox(46, G + 5, -98, "south", "Stonegate", "Townhouse")
+
+    # Canalside: a canal right across the town (and beyond), crossed only by a flat bridge at x = -50.
+    w.fill(-110, G - 2, -128, 115, G - 1, -126, "minecraft:water")
+    w.fill(-52, G - 1, -128, -48, G - 1, -126, "minecraft:spruce_planks")
+    w.postal_building((10, G, -138), "south", "civic", "Stonegate", "Canalside")
+
+    # Snowdrift: a street under a thin layer of snow, with a deep drift across half of it.
+    w.postal_building((78, G, -86), "south", "civic", "Stonegate", "Snowdrift")
+    for x in range(54, 84):
+        for z in range(-84, -69):
+            if w.block_at(x, G, z) is None:
+                w.set(x, G, z, "minecraft:snow[layers=2]")
+    w.fill(64, G, -84, 66, G, -76, "minecraft:snow[layers=7]")
+
+    # Cellar: a cottage whose mailbox is in the cellar, down a ladder under a closed trapdoor in the floor. (Bedrock
+    # is four blocks down on the superflat world, so the cellar is two high.)
+    w.building(88, -100, 96, -92, G, "south", "civic", 92, sign=("Cellar", "Stonegate"), what="Stonegate/Cellar")
+    w.fill(90, G - 3, -98, 94, G - 2, -94, AIR)
+    w.fill(90, G - 3, -96, 90, G - 2, -96, "minecraft:ladder[facing=east]")
+    w.set(90, G - 1, -96, "minecraft:oak_trapdoor[facing=east,half=top,open=false]")
+    w.mailbox(94, G - 3, -96, "west", "Stonegate", "Cellar")
+
+    to_east = [(0, G, -73), (8, G, -74), (16, G, -77)]
+    return {
+        "location": (0, G, -73),
+        "addresses": {
+            "Lanes": to_east + [(16, G, -80), (16, G, -86), (24, G, -86), (24, G, -89), (24, G + 1, -91),
+                                (24, G + 1, -94), (30, G + 1, -94), (30, G + 1, -100), (30, G + 1, -104)],
+            "Mineway": [(0, G, -73), (-8, G, -76), (-16, G, -80), (-24, G, -84), (-24, G, -92), (-24, G, -98),
+                        (-30, G, -98), (-36, G, -98), (-36, G, -106), (-36, G, -112)],
+            "Townhouse": to_east + [(24, G, -77), (32, G, -77), (40, G, -80), (45, G, -84), (45, G, -88),
+                                    (45, G, -91), (41, G, -91), (41, G + 5, -97), (46, G + 5, -96)],
+            "Canalside": [(0, G, -73), (-8, G, -76), (-16, G, -80), (-24, G, -82), (-32, G, -82), (-40, G, -82),
+                          (-44, G, -84), (-46, G, -92), (-48, G, -100), (-50, G, -108), (-50, G, -116),
+                          (-50, G, -122), (-50, G, -130), (-42, G, -133), (-34, G, -135), (-26, G, -136),
+                          (-18, G, -136), (-10, G, -136), (-2, G, -136), (6, G, -136), (10, G, -136)],
+            "Snowdrift": to_east + [(24, G, -77), (32, G, -77), (40, G, -77), (48, G, -76), (56, G, -75),
+                                    (62, G, -72), (68, G, -72), (74, G, -76), (78, G, -80), (78, G, -84)],
+            "Cellar": to_east + [(24, G, -77), (32, G, -77), (40, G, -77), (48, G, -76), (56, G, -75),
+                                 (62, G, -72), (70, G, -72), (78, G, -72), (86, G, -76), (92, G, -84),
+                                 (92, G, -90), (92, G, -93), (90, G, -96), (90, G - 3, -96), (92, G - 3, -96)],
+        },
+        "expect_unreachable": [],
+        "notes": {
+            "Lanes": "an S-shaped one-wide alley, with stairs at a bend",
+            "Mineway": "an L-shaped two-high tunnel with rails",
+            "Townhouse": "a gate straight onto a door, then stairs to an upper floor",
+            "Canalside": "a canal whose only bridge is 50 blocks to the side",
+            "Snowdrift": "a snowy street, round a deep drift",
+            "Cellar": "down a ladder through a closed trapdoor (Postal opens it)",
+        },
+    }
+
+
 def plant_trees(w, info):
     """Scatters trees through the forest, keeping trunks clear of every route and building."""
     rng = random.Random(4013)
@@ -525,13 +628,14 @@ def seg_dist(p, a, b):
 
 # ---- Output ----------------------------------------------------------------------------------
 
-FORCELOAD = [(-16, -20, 16, 16), (60, -35, 145, 35), (-45, 60, 45, 125), (-140, -40, -60, 50)]
+FORCELOAD = [(-16, -20, 16, 16), (60, -35, 145, 35), (-45, 60, 45, 125), (-140, -40, -60, 50),
+             (-112, -150, 116, -60)]
 
 
 def build():
     w = World()
     towns = {"Central": central(w), "Hillcrest": hillcrest(w), "Riverside": riverside(w),
-             "Woodvale": woodvale(w)}
+             "Woodvale": woodvale(w), "Stonegate": stonegate(w)}
     for town, info in towns.items():
         for addr, points in info.get("addresses", {}).items():
             if addr not in info["expect_unreachable"]:

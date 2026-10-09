@@ -76,8 +76,16 @@ public final class Surveyor {
     /** True if a postman can stand with his feet at (x, y, z). */
     public boolean stand(int x, int y, int z) {
         Cell feet = grid.cell(x, y, z);
-        if (!feet.passable || !grid.cell(x, y + 1, z).passable) {
+        if (feet == Cell.HATCH) {
+            // In a hatch he's climbing through: the ladder below holds him, and the hatch is opened for him.
+            return grid.cell(x, y - 1, z) == Cell.LADDER && climbable_through(grid.cell(x, y + 1, z));
+        }
+        if (!feet.passable || !climbable_through(grid.cell(x, y + 1, z))) {
             return false;
+        }
+        Cell head = grid.cell(x, y + 1, z);
+        if (head == Cell.HATCH && feet != Cell.LADDER) {
+            return false; // only a climber passes his head through a hatch
         }
         return feet == Cell.LADDER || grid.cell(x, y - 1, z).floor;
     }
@@ -250,13 +258,21 @@ public final class Surveyor {
                 }
             }
         }
-        // Ladders: up while there's ladder (or room) above, down while there's ladder below.
-        if (here == Cell.LADDER && grid.cell(x, y + 1, z).passable && grid.cell(x, y + 2, z).passable) {
+        // Ladders: up while there's ladder (or room, or a hatch to open) above, down while there's ladder (or a
+        // hatch over a ladder) below. A hatch is climbed through, never walked into.
+        boolean climbing = here == Cell.LADDER || here == Cell.HATCH && grid.cell(x, y - 1, z) == Cell.LADDER;
+        if (climbing && climbable_through(grid.cell(x, y + 1, z)) && climbable_through(grid.cell(x, y + 2, z))) {
             add(out, n, x, y + 1, z, Move.LADDER, 0.0D, t);
         }
-        if (grid.cell(x, y - 1, z) == Cell.LADDER) {
+        Cell below = grid.cell(x, y - 1, z);
+        if (below == Cell.LADDER || below == Cell.HATCH && grid.cell(x, y - 2, z) == Cell.LADDER) {
             add(out, n, x, y - 1, z, Move.LADDER, 0.0D, t);
         }
+    }
+
+    /** True if a climb can pass through this cell: open, a ladder, or a hatch the postman opens. */
+    private static boolean climbable_through(Cell c) {
+        return c.passable || c == Cell.HATCH;
     }
 
     private static boolean isDoor(Cell c) {

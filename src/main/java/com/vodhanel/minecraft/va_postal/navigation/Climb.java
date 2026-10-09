@@ -13,7 +13,8 @@ import org.bukkit.util.Vector;
 /**
  * Ladder climbing. Citizens' pathfinder doesn't climb, so when a postman's next waypoint is straight above or
  * below him in a ladder (or vine, or scaffolding) column, Postal moves him itself: onto the middle of the
- * column, then up or down a little every tick, facing the ladder. A surveyed route keeps a waypoint at the foot
+ * column, then up or down a little every tick, facing the ladder. A trapdoor over the shaft (a hatch) is opened as
+ * he reaches it and closed behind him. A surveyed route keeps a waypoint at the foot
  * and top of every ladder, so this is all a ladder needs.
  */
 public final class Climb {
@@ -23,14 +24,73 @@ public final class Climb {
     private Climb() {
     }
 
+    /** Hatches each postman has opened on his way through, closed once he's past them. */
+    private static final java.util.Map<Integer, java.util.List<Block>> hatches = new java.util.HashMap<>();
+
     /** True if this block is something to climb. */
     public static boolean climbable(Block b) {
         return b != null && Tag.CLIMBABLE.isTagged(b.getType());
     }
 
-    /** True if a waypoint is on a ladder (in one, or just above its top): it mustn't be moved to the ground. */
+    /** True if this block is a trapdoor over a ladder: a hatch Postal opens for a climber. */
+    static boolean hatch(Block b) {
+        return b != null && Tag.TRAPDOORS.isTagged(b.getType()) && climbable(b.getRelative(BlockFace.DOWN));
+    }
+
+    /**
+     * True if a waypoint is on a ladder (in one, just above its top, or on the hatch over it): it mustn't be moved to
+     * the ground.
+     */
     public static boolean on_ladder(Location at) {
-        return at != null && (climbable(at.getBlock()) || climbable(at.getBlock().getRelative(BlockFace.DOWN)));
+        if (at == null) {
+            return false;
+        }
+        Block b = at.getBlock(), under = b.getRelative(BlockFace.DOWN);
+        return climbable(b) || climbable(under) || hatch(b) || hatch(under);
+    }
+
+    /** Closes the hatches he opened that he's clear of now (not at his feet or head). */
+    private static void close_passed(int id, Location at) {
+        java.util.List<Block> open = hatches.get(id);
+        if (open == null) {
+            return;
+        }
+        int feet = at.getBlockY();
+        open.removeIf(b -> {
+            boolean clear = b.getX() != at.getBlockX() || b.getZ() != at.getBlockZ() || b.getY() < feet || b.getY() > feet + 1;
+            if (clear) {
+                ID_WTR.set_door_open(b, false, true);
+            }
+            return clear;
+        });
+        if (open.isEmpty()) {
+            hatches.remove(id);
+        }
+    }
+
+    /** Closes any hatch postman {@code id} opened (his route was cancelled or finished). */
+    public static void reset(int id) {
+        java.util.List<Block> open = hatches.remove(id);
+        if (open != null) {
+            for (Block b : open) {
+                ID_WTR.set_door_open(b, false, true);
+            }
+        }
+    }
+
+    /**
+     * Opens a closed hatch in his way: just under his feet (going down), at his feet or head, or just above his head
+     * (going up).
+     */
+    private static void open_hatches(int id, Location next) {
+        int feet = (int) Math.floor(next.getY());
+        for (int y = feet - 1; y <= feet + 2; y++) {
+            Block b = next.getWorld().getBlockAt(next.getBlockX(), y, next.getBlockZ());
+            if (hatch(b) && b.getBlockData() instanceof org.bukkit.block.data.Openable o && !o.isOpen()) {
+                ID_WTR.set_door_open(b, true, false);
+                hatches.computeIfAbsent(id, k -> new java.util.ArrayList<>()).add(b);
+            }
+        }
     }
 
     /**
@@ -62,6 +122,7 @@ public final class Climb {
         next.setZ(target.getBlockZ() + 0.5D);
         double step = Math.max(-SPEED, Math.min(SPEED, dy));
         next.setY(at.getY() + step);
+        open_hatches(id, next);
         face_ladder(next);
         e.teleport(next);
         e.setVelocity(new Vector(0, 0, 0));
@@ -70,6 +131,7 @@ public final class Climb {
             Location done = next.clone();
             done.setY(target.getBlockY());
             e.teleport(done);
+            close_passed(id, done); // the hatches behind him: above him going down, under his feet at the top
             ID_WTR.invoke_next_waypoint(id);
         }
         return true;
@@ -82,7 +144,7 @@ public final class Climb {
         // standing on the floor at the foot).
         for (int y = lo; y < hi; y++) {
             Block blk = base.getRelative(0, y - lo, 0);
-            if (!climbable(blk) && !(y == lo && climbable(blk.getRelative(BlockFace.UP)))) {
+            if (!climbable(blk) && !hatch(blk) && !(y == lo && climbable(blk.getRelative(BlockFace.UP)))) {
                 return false;
             }
         }
