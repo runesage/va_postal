@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
-    static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql"};
+    static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -32,15 +32,36 @@ public final class SqlMailStore implements MailStore {
     private final DataSource source;
     private final String server_id;
     private final AutoCloseable closer;
+    private final Dialect dialect;
 
     /**
      * @param closer closed with the store (the connection pool), or null
      */
     public SqlMailStore(DataSource source, String server_id, AutoCloseable closer) {
+        this(source, server_id, closer, Dialect.SQLITE);
+    }
+
+    public SqlMailStore(DataSource source, String server_id, AutoCloseable closer, Dialect dialect) {
         this.source = source;
         this.server_id = server_id;
         this.closer = closer;
+        this.dialect = dialect;
         migrate();
+    }
+
+    @Override
+    public Dialect dialect() {
+        return dialect;
+    }
+
+    @Override
+    public int schema_version() {
+        try (Connection c = source.getConnection(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT MAX(version) FROM schema_version")) {
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new StoreException("Could not read the schema version", e);
+        }
     }
 
     @Override
@@ -64,7 +85,7 @@ public final class SqlMailStore implements MailStore {
             for (int v = current + 1; v <= MIGRATIONS.length; v++) {
                 c.setAutoCommit(false);
                 try (Statement st = c.createStatement()) {
-                    for (String sql : statements(read_migration(MIGRATIONS[v - 1]))) {
+                    for (String sql : statements(read_migration(MIGRATIONS[v - 1], dialect))) {
                         st.executeUpdate(sql);
                     }
                     st.executeUpdate("INSERT INTO schema_version (version) VALUES (" + v + ")");
@@ -81,7 +102,14 @@ public final class SqlMailStore implements MailStore {
         }
     }
 
-    private static String read_migration(String name) throws IOException {
+    /** A migration's script: its dialect-specific variant ({@code V3__x.mysql.sql}) if there is one. */
+    static String read_migration(String name, Dialect dialect) throws IOException {
+        String variant = name.replace(".sql", "." + dialect.suffix + ".sql");
+        try (InputStream in = SqlMailStore.class.getResourceAsStream("/db/" + variant)) {
+            if (in != null) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
         try (InputStream in = SqlMailStore.class.getResourceAsStream("/db/" + name)) {
             if (in == null) {
                 throw new IOException("Missing migration " + name);
@@ -441,6 +469,150 @@ public final class SqlMailStore implements MailStore {
         } catch (SQLException e) {
             throw new StoreException("Mail store write failed", e);
         }
+    }
+
+    // ---- Network ---------------------------------------------------------------------------
+
+    @Override
+    public UUID heartbeat(UUID instance, long started_at, long now, boolean first) {
+        UUID other = null;
+        try (Connection c = source.getConnection()) {
+            try (PreparedStatement ps = c.prepareStatement("SELECT instance FROM postal_server WHERE server_id = ?")) {
+                ps.setString(1, server_id);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next() && !first && !instance.toString().equals(rs.getString(1))) {
+                        other = UUID.fromString(rs.getString(1));
+                    }
+                }
+            }
+            try (PreparedStatement ps = c.prepareStatement(
+                    "UPDATE postal_server SET instance = ?, started_at = ?, last_seen = ? WHERE server_id = ?")) {
+                ps.setString(1, instance.toString());
+                ps.setLong(2, started_at);
+                ps.setLong(3, now);
+                ps.setString(4, server_id);
+                if (ps.executeUpdate() == 0) {
+                    try (PreparedStatement ins = c.prepareStatement(
+                            "INSERT INTO postal_server (server_id, instance, started_at, last_seen) VALUES (?,?,?,?)")) {
+                        ins.setString(1, server_id);
+                        ins.setString(2, instance.toString());
+                        ins.setLong(3, started_at);
+                        ins.setLong(4, now);
+                        ins.executeUpdate();
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not record this server", e);
+        }
+        return other;
+    }
+
+    @Override
+    public void sign_off(UUID instance) {
+        exec("UPDATE postal_server SET last_seen = 0 WHERE server_id = ? AND instance = ?", server_id, instance.toString());
+    }
+
+    @Override
+    public List<ServerInfo> servers() {
+        List<ServerInfo> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT server_id, instance, started_at, last_seen FROM postal_server ORDER BY server_id")) {
+            while (rs.next()) {
+                out.add(new ServerInfo(rs.getString(1), UUID.fromString(rs.getString(2)), rs.getLong(3), rs.getLong(4)));
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read the servers", e);
+        }
+        return out;
+    }
+
+    @Override
+    public void publish_directory(List<DirectoryEntry> entries, long now) {
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM directory_address WHERE server_id = ?")) {
+                    ps.setString(1, server_id);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM directory_office WHERE server_id = ?")) {
+                    ps.setString(1, server_id);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement office = c.prepareStatement("INSERT INTO directory_office (server_id, office, "
+                        + "owner_uuid, is_open, is_central, location_key, updated_at) VALUES (?,?,?,?,?,?,?)");
+                     PreparedStatement address = c.prepareStatement("INSERT INTO directory_address (server_id, office, "
+                             + "address, owner_uuid, is_open, location_key, updated_at) VALUES (?,?,?,?,?,?,?)")) {
+                    for (DirectoryEntry e : entries) {
+                        if (e.is_office()) {
+                            office.setString(1, server_id);
+                            office.setString(2, e.office().toLowerCase());
+                            office.setString(3, str(e.owner()));
+                            office.setInt(4, e.open() ? 1 : 0);
+                            office.setInt(5, e.central() ? 1 : 0);
+                            office.setString(6, e.location());
+                            office.setLong(7, now);
+                            office.addBatch();
+                        } else {
+                            address.setString(1, server_id);
+                            address.setString(2, e.office().toLowerCase());
+                            address.setString(3, e.address().toLowerCase());
+                            address.setString(4, str(e.owner()));
+                            address.setInt(5, e.open() ? 1 : 0);
+                            address.setString(6, e.location());
+                            address.setLong(7, now);
+                            address.addBatch();
+                        }
+                    }
+                    office.executeBatch();
+                    address.executeBatch();
+                }
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not publish the directory", e);
+        }
+    }
+
+    @Override
+    public List<DirectoryEntry> directory(String server) {
+        List<DirectoryEntry> out = new ArrayList<>();
+        String where = server == null ? "" : " WHERE server_id = ?";
+        try (Connection c = source.getConnection()) {
+            try (PreparedStatement ps = c.prepareStatement("SELECT server_id, office, owner_uuid, is_open, is_central, "
+                    + "location_key FROM directory_office" + where + " ORDER BY server_id, office")) {
+                if (server != null) {
+                    ps.setString(1, server);
+                }
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(new DirectoryEntry(rs.getString(1), rs.getString(2), null, uuid(rs.getString(3)),
+                                rs.getInt(4) != 0, rs.getInt(5) != 0, rs.getString(6)));
+                    }
+                }
+            }
+            try (PreparedStatement ps = c.prepareStatement("SELECT server_id, office, address, owner_uuid, is_open, "
+                    + "location_key FROM directory_address" + where + " ORDER BY server_id, office, address")) {
+                if (server != null) {
+                    ps.setString(1, server);
+                }
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(new DirectoryEntry(rs.getString(1), rs.getString(2), rs.getString(3),
+                                uuid(rs.getString(4)), rs.getInt(5) != 0, false, rs.getString(6)));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read the directory", e);
+        }
+        return out;
     }
 
     // ---- Mapping ---------------------------------------------------------------------------

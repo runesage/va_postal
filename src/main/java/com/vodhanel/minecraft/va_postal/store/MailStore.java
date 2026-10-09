@@ -63,6 +63,34 @@ public interface MailStore extends AutoCloseable {
     /** Route runs this server has recorded as in progress: {run_id, office, address}. */
     List<String[]> runs();
 
+    // ---- Network (persistent-state phase P3) ------------------------------------------------
+
+    /** The database behind this store. */
+    Dialect dialect();
+
+    /** The applied schema version. */
+    int schema_version();
+
+    /**
+     * Records that this server ({@code instance}, started {@code started_at}) is running. Returns the instance
+     * that wrote this server id's row since this one last did, if any: another server is using the same id.
+     * Null when all is well (and on the first call, which takes the row over from a server that stopped or
+     * crashed).
+     */
+    UUID heartbeat(UUID instance, long started_at, long now, boolean first);
+
+    /** Marks this server as stopped. */
+    void sign_off(UUID instance);
+
+    /** Every server that has used this database. */
+    List<ServerInfo> servers();
+
+    /** Replaces this server's directory rows (its offices and addresses) with {@code entries}, in one transaction. */
+    void publish_directory(List<DirectoryEntry> entries, long now);
+
+    /** The directory: every server's offices and addresses ({@code server_id} null), or one server's. */
+    List<DirectoryEntry> directory(String server_id);
+
     @Override
     void close();
 }

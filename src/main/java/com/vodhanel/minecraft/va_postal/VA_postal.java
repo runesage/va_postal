@@ -327,9 +327,18 @@ public class VA_postal extends JavaPlugin {
         wtr_stuck_npc = new Stuck_NPC();
         setupScoreboard();
         setupPermissions();
-        com.vodhanel.minecraft.va_postal.store.MailStores.open(getDataFolder(),
+        com.vodhanel.minecraft.va_postal.store.MailStores.open(getDataFolder(), new com.vodhanel.minecraft.va_postal.store.MailStores.Settings(
                 getConfig().getString(GetConfig.path_format("storage.type"), "sqlite"),
-                getConfig().getString(GetConfig.path_format("network.server_id"), "main"), getLogger());
+                getConfig().getString(GetConfig.path_format("network.server_id"), "main"),
+                getConfig().getString(GetConfig.path_format("storage.mysql.host"), "localhost"),
+                getConfig().getInt(GetConfig.path_format("storage.mysql.port"), 3306),
+                getConfig().getString(GetConfig.path_format("storage.mysql.database"), "postal"),
+                getConfig().getString(GetConfig.path_format("storage.mysql.user"), "postal"),
+                getConfig().getString(GetConfig.path_format("storage.mysql.password"), ""),
+                getConfig().getInt(GetConfig.path_format("storage.mysql.pool_size"), 6),
+                getConfig().getString(GetConfig.path_format("storage.mysql.properties"), "")),
+                org.bukkit.Bukkit::isPrimaryThread, getLogger());
+        com.vodhanel.minecraft.va_postal.mail.Directory.start();
         // Reconcile once the server is up (it may load chunks), then every 5 minutes for loaded chunks only.
         getServer().getScheduler().runTaskLater(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(true), 40L);
         getServer().getScheduler().runTaskTimer(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(false), 6000L, 6000L);
@@ -387,6 +396,7 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.economy.EconomyState.save();
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         com.vodhanel.minecraft.va_postal.mail.Courier.shutdown();
+        com.vodhanel.minecraft.va_postal.mail.Directory.stop();
         SHUTDOWN();
         PostalEconomy.shutdown();
         com.vodhanel.minecraft.va_postal.store.MailStores.close();

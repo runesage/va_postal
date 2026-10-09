@@ -363,6 +363,98 @@ public final class P_MailAdmin {
         return SignManip.LookForSignChest(around, VA_postal.search_distance, "[Postal_Mail]", office, "[Local]", owner_name);
     }
 
+    /**
+     * {@code /postal store}: the mail store's health: backend, schema, server id, call timings (a remote MySQL
+     * adds its latency to every call; main-thread time is what the server feels), failures, and the servers
+     * sharing the database.
+     */
+    public static void store(CommandSender sender) {
+        com.vodhanel.minecraft.va_postal.store.MailStore store = MailStores.active();
+        send(sender, "&6[Postal] Mail store: &f" + MailStores.description());
+        if (store == null) {
+            send(sender, "&cNot open: mail isn't being tracked. See the server log for why.");
+            return;
+        }
+        String schema;
+        try {
+            schema = String.valueOf(store.schema_version());
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            schema = "unknown (unreachable)";
+        }
+        send(sender, "&7Server id &f" + store.server_id() + "&7, schema &f" + schema);
+        com.vodhanel.minecraft.va_postal.store.StoreStats st = MailStores.stats();
+        if (st != null) {
+            long minutes = Math.max(1L, (System.currentTimeMillis() - st.since) / 60000L);
+            send(sender, String.format("&7Calls: &f%d&7 (%.1f a minute), average &f%.2f ms&7, slowest &f%.1f ms&7 (%s)",
+                    st.calls.get(), st.calls.get() / (double) minutes, st.average_ms(), st.max_ms(), st.slowest_call));
+            send(sender, String.format("&7On the main thread: &f%d&7 calls, &f%.1f ms&7 in all",
+                    st.main_thread_calls.get(), st.main_thread_nanos.get() / 1e6D));
+            send(sender, "&7Failures: &f" + st.failures.get() + (st.failures.get() > 0 ? "&7 (last: " + st.last_failure + ")" : ""));
+            if (st.unavailable != null) {
+                send(sender, "&cUnavailable for " + (System.currentTimeMillis() - st.unavailable_since) / 1000L
+                        + " s: calls fail at once and mail stays where it is until the database answers again.");
+            }
+        }
+        long now = System.currentTimeMillis();
+        java.util.List<com.vodhanel.minecraft.va_postal.store.ServerInfo> servers;
+        try {
+            servers = store.servers();
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            send(sender, "&cCan't list the servers: " + e.getMessage());
+            return;
+        }
+        for (com.vodhanel.minecraft.va_postal.store.ServerInfo s : servers) {
+            String seen = s.last_seen() == 0 ? "stopped" : ((now - s.last_seen()) / 1000L) + " s ago";
+            boolean me = s.server_id().equals(store.server_id());
+            send(sender, "&7Server &f" + s.server_id() + (me ? " &7(this one)" : "") + "&7: last seen " + seen
+                    + (me && !s.instance().equals(com.vodhanel.minecraft.va_postal.mail.Directory.instance())
+                    ? " &c(another instance wrote it: two servers share this id?)" : ""));
+        }
+        if (com.vodhanel.minecraft.va_postal.mail.Directory.last_conflict() != null) {
+            send(sender, "&cAnother server used this id: " + com.vodhanel.minecraft.va_postal.mail.Directory.last_conflict());
+        }
+    }
+
+    /**
+     * {@code /postal directory [server]}: the network directory: each server's offices with their address counts,
+     * or one server's offices and addresses.
+     */
+    public static void directory(CommandSender sender, String[] args) {
+        com.vodhanel.minecraft.va_postal.store.MailStore store = MailStores.active();
+        if (store == null) {
+            send(sender, "&7The mail store isn't open.");
+            return;
+        }
+        String server = args.length > 1 ? args[1] : null;
+        java.util.List<com.vodhanel.minecraft.va_postal.store.DirectoryEntry> all;
+        try {
+            all = store.directory(server);
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            send(sender, "&cCan't read the directory: " + e.getMessage());
+            return;
+        }
+        if (all.isEmpty()) {
+            send(sender, "&7Nothing published" + (server == null ? "" : " by " + server) + " yet (it's published a few"
+                    + " seconds after start, then every minute when something changes).");
+            return;
+        }
+        send(sender, "&6[Postal] Directory" + (server == null ? "" : " of " + server));
+        java.util.Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+        for (com.vodhanel.minecraft.va_postal.store.DirectoryEntry e : all) {
+            if (!e.is_office()) {
+                counts.merge(e.server_id() + "/" + e.office(), 1, Integer::sum);
+            }
+        }
+        for (com.vodhanel.minecraft.va_postal.store.DirectoryEntry e : all) {
+            if (e.is_office()) {
+                send(sender, "&f" + e.server_id() + "&7 / &f" + e.office() + (e.central() ? " &7(Central)" : "")
+                        + "&7: " + counts.getOrDefault(e.server_id() + "/" + e.office(), 0) + " addresses");
+            } else if (server != null) {
+                send(sender, "&7   " + e.address() + (e.open() ? "" : " &c(closed)"));
+            }
+        }
+    }
+
     private static void send(CommandSender sender, String message) {
         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
     }

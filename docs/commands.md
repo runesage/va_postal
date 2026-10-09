@@ -33,6 +33,10 @@ Accepts (items in a chest at x y z, no COD) or refuses (items back where it was 
 Forces a record into a state, keeping where it is. Testing only; recorded in its history as forced by an admin.
 
 `last` can be used in place of a mail id for the newest mail.
+##### `store`
+The mail store's health: SQLite or MySQL, the schema version, this server's id, how many calls it has made and how long they take (average and slowest, and the time spent on the main thread), failures, and the servers sharing the database. With MySQL, watch the main-thread time: every call waits for the database.
+##### `directory [server]`
+The network directory: the offices each server has published, with their address counts, or one server's offices and addresses. Each server republishes its own every minute when they change.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
 ##### `bank [newday | report [days] | policy [<setting> <value>]]`
