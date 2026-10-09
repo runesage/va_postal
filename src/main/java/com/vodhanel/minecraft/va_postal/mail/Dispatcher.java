@@ -23,18 +23,19 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.function.Supplier;
 
 /**
- * The purser: the character who carries the mail between this server's Central and the mail ship (persistent-state
+ * The dispatcher: the character who carries the mail between this server's Central and the mail ship (persistent-state
  * §17). At a departure they walk in from a few dozen blocks away, open Central's chest, take the outbound letters
  * in a mailbag, say so, and walk off; the bell rings as the ship leaves. At an arrival they walk in carrying the
- * bag, ring the bell, leave the letters in the chest and walk off.
+ * bag, ring the bell, leave the letters in the chest and walk off. (Not to be confused with {@code VA_Dispatcher},
+ * which schedules the postmen's rounds: this is a character players see.)
  * <p>
- * The transfer itself (the letters' records and books) happens when the purser reaches the chest, through the
+ * The transfer itself (the letters' records and books) happens when the dispatcher reaches the chest, through the
  * {@code transfer} callback. They are only ever late, never in the way: with nobody near Central to see it,
  * without Citizens, or if anything goes wrong (a stuck walk past its time limit, an unloaded chunk, a shutdown),
  * the transfer runs at once. The NPC is never saved by Citizens.
  */
-public final class Purser {
-    /** How near Central a player must be for the purser to come in person. */
+public final class Dispatcher {
+    /** How near Central a player must be for the dispatcher to come in person. */
     static final double AUDIENCE = 48.0D;
     /** A walk that takes longer than this (in ticks) ends with a teleport. */
     static final int WALK_LIMIT = 600;
@@ -45,17 +46,17 @@ public final class Purser {
 
     private static Scene active;
 
-    private Purser() {
+    private Dispatcher() {
     }
 
-    /** True while a purser is on their way: Central's transfers wait for them. */
+    /** True while a dispatcher is on their way: Central's transfers wait for them. */
     public static boolean busy() {
         return active != null;
     }
 
     /**
      * Carries out {@code voyage} at the Central chest {@code chest}: {@code transfer} moves the letters and returns
-     * what the purser says (null: nothing moved, so nothing to say). Without a scene it runs now and the bell rings
+     * what the dispatcher says (null: nothing moved, so nothing to say). Without a scene it runs now and the bell rings
      * at Central.
      */
     public static void voyage(Voyage voyage, Block chest, Supplier<String> transfer) {
@@ -66,7 +67,7 @@ public final class Purser {
                 return;
             } catch (RuntimeException | LinkageError e) {
                 active = null;
-                Util.dinform("[Postal] Purser unavailable (" + e.getMessage() + "); moving the mail directly.");
+                Util.dinform("[Postal] Dispatcher unavailable (" + e.getMessage() + "); moving the mail directly.");
             }
         }
         if (transfer.get() != null) {
@@ -82,12 +83,12 @@ public final class Purser {
     }
 
     static boolean enabled() {
-        return VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.purser.enabled"), true);
+        return VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.dispatcher.enabled"), true);
     }
 
-    /** {@code Network.Purser.Always}: come even with nobody near Central to see it (for testing). */
+    /** {@code Network.Dispatcher.Always}: come even with nobody near Central to see it (for testing). */
     static boolean always() {
-        return VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.purser.always"), false);
+        return VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.dispatcher.always"), false);
     }
 
     static String config(String path, String fallback) {
@@ -97,7 +98,7 @@ public final class Purser {
 
     /** Fills a configured line: {@code %servers%} and {@code %count%}. */
     public static String line(Voyage voyage, String servers, int letters) {
-        String template = config(voyage == Voyage.DEPARTURE ? "network.purser.lines.departure" : "network.purser.lines.arrival",
+        String template = config(voyage == Voyage.DEPARTURE ? "network.dispatcher.lines.departure" : "network.dispatcher.lines.arrival",
                 voyage == Voyage.DEPARTURE ? "All aboard for %servers%! %count% for the voyage."
                         : "Mail from %servers%! %count% off the ship.");
         return template.replace("%servers%", servers).replace("%count%", letters + (letters == 1 ? " letter" : " letters"));
@@ -165,16 +166,16 @@ public final class Purser {
             if (beside == null) {
                 throw new IllegalStateException("no room beside Central's chest");
             }
-            int distance = Math.max(4, VA_postal.plugin.getConfig().getInt(GetConfig.path_format("network.purser.distance"), 24));
+            int distance = Math.max(4, VA_postal.plugin.getConfig().getInt(GetConfig.path_format("network.dispatcher.distance"), 24));
             Location from = Courier.stand_near(chest.getLocation(), distance);
             this.stand = beside;
             this.start = from != null ? from : beside;
             this.npc = CitizensAPI.getNPCRegistry().createNPC(EntityType.PLAYER,
-                    ChatColor.translateAlternateColorCodes('&', config("network.purser.name", "&3Purser")));
+                    ChatColor.translateAlternateColorCodes('&', config("network.dispatcher.name", "&3Dispatcher")));
             npc.data().set(NPC.Metadata.SHOULD_SAVE, false);
-            NpcLook.skin(npc, "purser");
+            NpcLook.skin(npc, "dispatcher");
             npc.spawn(start);
-            NpcLook.uniform(npc, "purser", VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.purser.uniform"), true));
+            NpcLook.uniform(npc, "dispatcher", VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.dispatcher.uniform"), true));
             NpcLook.hold(npc, voyage == Voyage.ARRIVAL ? mailbag() : null);
             npc.getNavigator().getDefaultParameters().speedModifier(1.0F).range(Math.max(32.0F, distance * 2.0F));
             npc.getNavigator().setTarget(stand);
@@ -269,8 +270,8 @@ public final class Purser {
 
         private void say(String line) {
             Util.cinform("[Postal] " + ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&',
-                    config("network.purser.name", "&3Purser"))) + " at Central: " + line);
-            String message = ChatColor.translateAlternateColorCodes('&', "&7<" + config("network.purser.name", "&3Purser")
+                    config("network.dispatcher.name", "&3Dispatcher"))) + " at Central: " + line);
+            String message = ChatColor.translateAlternateColorCodes('&', "&7<" + config("network.dispatcher.name", "&3Dispatcher")
                     + "&7> &f" + line);
             for (Player p : chest.getWorld().getPlayers()) {
                 if (p.getLocation().distanceSquared(chest_center) <= EARSHOT * EARSHOT) {
@@ -285,7 +286,7 @@ public final class Purser {
             }
             done = true;
             if (!transferred) {
-                // Whatever happened to the purser, the mail moves.
+                // Whatever happened to the dispatcher, the mail moves.
                 if (run_transfer() != null) {
                     bell(chest_center);
                 }

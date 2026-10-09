@@ -68,7 +68,7 @@ public final class NpcLook {
         skin(npc, local ? "local" : "central");
     }
 
-    /** {@code role}: {@code local} (postman), {@code central} (postmaster) or {@code purser} (the network's courier). */
+    /** {@code role}: {@code local} (postman), {@code central} (postmaster) or {@code dispatcher} (the network's courier). */
     public static void skin(NPC npc, String role) {
         if (npc == null) {
             return;

@@ -345,22 +345,22 @@ and there are **no duplicate or divergent records**.
   `/postal network`, for everyone, shows the schedule, the next departure, the letters waiting at Central for it,
   what's on its way here, and the other servers. A letter that reaches Central just after a departure waits
   for the next one. That's deliberate: it's a schedule.
-- **The purser.** A character carries the mail between Central and the ship, so the transfer is something players
-  see. At a departure the purser appears a few dozen blocks from Central (`Network.Purser.Distance`, 24), walks to
+- **The dispatcher.** A character carries the mail between Central and the ship, so the transfer is something players
+  see. At a departure the dispatcher appears a few dozen blocks from Central (`Network.Dispatcher.Distance`, 24), walks to
   the Central chest, opens it, takes the outbound letters in a mailbag and says so to anyone nearby ("All aboard
   for creative! 3 letters for the voyage."), closes the chest and walks off. The bell rings as the ship sails.
   At an arrival they walk in carrying the bag, ring the bell, leave the letters in the chest ("Mail from survival!
   2 letters off the ship.") and walk off empty-handed. There is no dock to build: they come from, and go to, a
-  free spot near Central. The name (`Network.Purser.Name`, "&3Purser"), the lines (`Network.Purser.Lines.*`),
-  the skin (`Settings.Skin.Purser`, the postmaster's bundled skin by default, or `custom`/a player name like the
-  others) and the uniform (`Settings.Uniform.Purser.*`: a postal-green cap and coat with the navy trousers and black boots the
+  free spot near Central. The name (`Network.Dispatcher.Name`, "&3Dispatcher"), the lines (`Network.Dispatcher.Lines.*`),
+  the skin (`Settings.Skin.Dispatcher`, the postmaster's bundled skin by default, or `custom`/a player name like the
+  others) and the uniform (`Settings.Uniform.Dispatcher.*`: a postal-green cap and coat with the navy trousers and black boots the
   postman and postmaster wear, so they're plainly Post Office staff but neither of the other two; on unless
-  `Network.Purser.Uniform` is false) are all configurable. The **transfer itself happens when the purser reaches the chest**: the letters'
-  records and books move then. The purser can only make it late, never stop it. With nobody within 48 blocks of
-  Central to see it, without Citizens, with `Network.Purser.Enabled: false`, or if anything goes wrong (a walk
+  `Network.Dispatcher.Uniform` is false) are all configurable. The **transfer itself happens when the dispatcher reaches the chest**: the letters'
+  records and books move then. The dispatcher can only make it late, never stop it. With nobody within 48 blocks of
+  Central to see it, without Citizens, with `Network.Dispatcher.Enabled: false`, or if anything goes wrong (a walk
   past 30 seconds ends in a teleport, an unloaded chunk, a shutdown), the transfer runs at once. One voyage runs at
-  a time; a departure that comes up while the purser is out keeps its slot and goes when they're back. Like the
-  parcel courier, the NPC is never saved by Citizens. `Network.Purser.Always` brings them even with nobody
+  a time; a departure that comes up while the dispatcher is out keeps its slot and goes when they're back. Like the
+  parcel courier, the NPC is never saved by Citizens. `Network.Dispatcher.Always` brings them even with nobody
   watching (the network test uses it).
 - **Letters only, at every layer** (§6): `/package` refuses another server's office, and `addr_worker` refuses
   a parcel for one; the store refuses to move a non-letter into `IN_NETWORK` or to claim one; the claim query
@@ -397,9 +397,9 @@ and there are **no duplicate or divergent records**.
   network, a parcel never outbound or claimable, local queries ignoring outbound letters, and one player row
   across servers (switching, renaming, stopping). `ci/network-test.sh` runs two Paper servers on one MariaDB, each
   with a Testville/Home, and sends a letter each way at the same time, with 1-minute departures, a 30-second trip
-  and the purser forced on. Each letter was delivered once, to the other server's Home and not the sender's
+  and the dispatcher forced on. Each letter was delivered once, to the other server's Home and not the sender's
   namesake; each record carries both servers' history (posted, Central and `IN_NETWORK` on the origin; claimed,
-  Central, postman and `DELIVERED` on the destination); both ships and both pursers announced themselves; and
+  Central, postman and `DELIVERED` on the destination); both ships and both dispatchers announced themselves; and
   the trip took about 2.5 minutes from posting to the mailbox, most of it the schedule and the postman's round.
 - **Found by the network test.** Two servers starting together on an empty MySQL database raced to create the schema,
   and one failed to open its store (MySQL commits DDL at once, so the migration transaction couldn't separate
