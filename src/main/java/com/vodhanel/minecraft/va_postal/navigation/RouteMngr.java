@@ -528,6 +528,11 @@ public class RouteMngr {
                 VA_postal.wtr_nav[id].getDefaultParameters().examiner(new net.citizensnpcs.api.astar.pathfinder.DoorExaminer());
             }
 
+            // Citizens walks on water (see DryGround); surveyed routes never touch it.
+            if (cit_avoidWater) {
+                DryGround.apply(VA_postal.wtr_nav[id].getDefaultParameters());
+            }
+
             for (BlockExaminer examiner : VA_postal.wtr_nav[id].getDefaultParameters().examiners())
                 Util.dinform("EXAMINER: " + examiner);
 

@@ -26,7 +26,12 @@ public class Stuck_NPC implements StuckAction {
                 // Citizens asks again every tick while the postman is stuck: only act (and log) every 750 ms.
                 return true;
             }
-            Util.dinform("STUCKACTION FOR " + id);
+            Location at = npc.getEntity() == null ? null : npc.getEntity().getLocation();
+            Location wp = VA_postal.wtr_waypoint[id];
+            Util.dinform("STUCKACTION FOR " + id + " at " + Util.location2str(at) + " wp#" + VA_postal.wtr_pos[id] + " "
+                    + Util.location2str(wp) + (at != null && wp != null && at.getWorld() == wp.getWorld()
+                    ? String.format(" d=%.2f", at.distance(wp.clone().add(0.5, 0, 0.5))) : "")
+                    + " nav=" + navigator.isNavigating() + " target=" + Util.location2str(navigator.getTargetAsLocation()));
 
 
             if (!ID_WTR.npc_should_run(id)) {
