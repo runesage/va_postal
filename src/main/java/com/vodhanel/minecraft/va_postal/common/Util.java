@@ -655,42 +655,52 @@ public class Util {
         }
     }
 
+    private static final java.util.regex.Pattern ANSI_ESCAPE = java.util.regex.Pattern.compile("\u001B\\[[0-9;]*m");
+    private static final java.util.regex.Pattern PROBLEM_WORDS =
+            java.util.regex.Pattern.compile("\\b(failed|cannot)\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** Removes ANSI colour escapes, and the leading "[Postal] " the plugin logger adds itself. */
+    static String strip_ansi(String message) {
+        String plain = ANSI_ESCAPE.matcher(message).replaceAll("");
+        return plain.startsWith("[Postal] ") ? plain.substring("[Postal] ".length()) : plain;
+    }
+
+    /** Warning for red messages and ones that say something failed or cannot be done; info otherwise. */
+    static java.util.logging.Level console_level(String message) {
+        return (message.contains(AnsiColor.RED) || PROBLEM_WORDS.matcher(message).find())
+                ? java.util.logging.Level.WARNING : java.util.logging.Level.INFO;
+    }
+
+    private static void console_log(String message, java.util.logging.Level level) {
+        try {
+            VA_postal.plugin.getLogger().log(level, strip_ansi(message));
+        } catch (Exception ignored) {
+        }
+    }
+
     public static void cinform(String message) {
         if ((!VA_postal.quiet) &&
                 (message != null) && (!message.isEmpty())) {
-            try {
-                System.out.println(message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, console_level(message));
         }
     }
 
     public static void perm_inform(String message) {
         if ((VA_postal.permtalk) &&
                 (message != null) && (!message.isEmpty())) {
-            message = "\033[1;32m[Postal] \033[1;37m" + message;
-            try {
-                System.out.println(message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, java.util.logging.Level.INFO);
         }
     }
 
     public static void con_type(String message) {
         if ((message != null) && (!message.isEmpty())) {
-            try {
-                System.out.println(message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, console_level(message));
         }
     }
 
     public static void dinform(String message) {
         if ((message != null) && (!message.isEmpty()) && (VA_postal.debug)) {
-            try {
-                System.out.println("\033[1;33m" + message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, java.util.logging.Level.INFO);
         }
     }
 
