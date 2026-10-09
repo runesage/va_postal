@@ -354,7 +354,9 @@ public class BukkitListener implements Listener {
             return;
         }
         Entity spawned = event.getEntity();
-        if (((spawned instanceof Monster)) &&
+        // Enemy, not just Monster: slimes, magma cubes, phantoms, ghasts, hoglins and shulkers are hostile without
+        // being Monsters, and a slime shoving a postman along a narrow path is enough to get him stuck.
+        if ((spawned instanceof Monster || spawned instanceof org.bukkit.entity.Enemy) &&
                 (!GetConfig.allow_monster_spawn())) {
             Chunk chunk = event.getLocation().getChunk();
             if (is_chunk_on_route(chunk)) {
