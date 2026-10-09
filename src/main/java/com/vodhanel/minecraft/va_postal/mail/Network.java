@@ -41,6 +41,8 @@ import java.util.UUID;
 public final class Network {
     /** How often the directory copy used for addressing is refreshed. */
     static final long DIRECTORY_MILLIS = 30_000L;
+    /** A name not in the copy re-reads the directory, but no more often than this. */
+    static final long REFRESH_MILLIS = 3_000L;
 
     private static BukkitTask task;
     private static volatile List<DirectoryEntry> directory = List.of();
@@ -180,13 +182,32 @@ public final class Network {
             if (server.equalsIgnoreCase(local_id)) {
                 return local(office);
             }
-            return remote(server, office);
+            return remote_fresh(server, office);
         }
         Resolved local = local(t);
         if (local.office() != null) {
             return local;
         }
-        return remote(null, t);
+        return remote_fresh(null, t);
+    }
+
+    /** Another server's office, re-reading the directory once if our copy doesn't have it (a server just started). */
+    private static Resolved remote_fresh(String server, String typed) {
+        Resolved found = remote(server, typed);
+        if (found.office() == null && found.choices().isEmpty() && refresh_directory()) {
+            found = remote(server, typed);
+        }
+        return found;
+    }
+
+    /** Re-reads the directory now, at most every few seconds. True if it was read. */
+    private static boolean refresh_directory() {
+        if (System.currentTimeMillis() - directory_at < REFRESH_MILLIS) {
+            return false;
+        }
+        directory_at = 0L;
+        directory();
+        return directory_at != 0L;
     }
 
     private static Resolved local(String office) {
@@ -224,6 +245,14 @@ public final class Network {
 
     /** An address at another server's office, completed from a unique part of its name; null if none. */
     public static String remote_address(Office office, String typed) {
+        String found = remote_address_in_copy(office, typed);
+        if (found == null && refresh_directory()) {
+            found = remote_address_in_copy(office, typed);
+        }
+        return found;
+    }
+
+    private static String remote_address_in_copy(Office office, String typed) {
         String t = typed.toLowerCase(Locale.ROOT).trim();
         String partial = null;
         int hits = 0;

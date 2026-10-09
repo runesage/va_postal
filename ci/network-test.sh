@@ -147,11 +147,12 @@ say beta "postal start"
 sleep 5
 say alpha "postal testletter testville beta:testville home"
 say beta "postal testletter testville alpha:testville home"
-id_of() { grep -oE "Test letter [0-9a-f-]{36} handed in" "$WORK_DIR/$1.log" | head -1 | awk '{print $3}'; }
+id_of() { { grep -aoE "Test letter [0-9a-f-]{36} handed in" "$WORK_DIR/$1.log" || true; } | head -1 | awk '{print $3}'; }
 A_ID="$(id_of alpha)"; B_ID="$(id_of beta)"
 echo "alpha's letter: ${A_ID:-none}, beta's letter: ${B_ID:-none}"
 
 has_letter() { # server-id mail-id: that letter (by its mail id) is in the server's Home mailbox now
+    [ -n "$2" ] || return 1
     say "$1" "data get block 40 -60 0 Items"
     tail -n 5 "$WORK_DIR/$1.log" | grep -q "$2"
 }
@@ -188,7 +189,7 @@ no_match() { ! grep -qE "$1" "$2"; }
 mailbox() { # server: the last answer to 'data get block 40 -60 0' (its Home mailbox)
     grep -a "40, -60, 0 has the following block data" "$WORK_DIR/$1.txt" | tail -1
 }
-in_mailbox() { mailbox "$1" | grep -q "$2"; }      # server mail-id
+in_mailbox() { [ -n "$2" ] && mailbox "$1" | grep -q "$2"; }      # server mail-id
 not_in_mailbox() { ! in_mailbox "$1" "$2"; }
 A="$WORK_DIR/alpha.txt"; B="$WORK_DIR/beta.txt"
 for s in alpha beta; do
