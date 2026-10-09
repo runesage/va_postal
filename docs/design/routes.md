@@ -208,7 +208,8 @@ for today's manual routes and the test bed for any of the options above. See `de
 - **Tests:** 58 new surveyor tests for shapes and edge cases, 75 in all.
 - **Results (October 2026), towns soak with surveyed routes (21 addresses, 20 minutes):**
   - Before these fixes: Canalside and Cellar rescued on every trip.
-  - After them: 21 of 21 walked, no rescues, no exceptions.
-  - Still open: a single soft reset (no rescue) on some trips at Riverside Doorstep, coming back out of the
-    house, and at the foot of Loft's ladder.
+  - After them: 21 of 21 walked, 85 round trips, no rescues, no stuck reports of any kind, no exceptions.
+- **Doors from inside:** the "near enough" radii never reach through a door, checked over every block between
+  him and the waypoint (a line to the waypoint's corner slipped past the door beside it, so coming out of a
+  house he "arrived" outside while still indoors and pushed against the closed door).
 
