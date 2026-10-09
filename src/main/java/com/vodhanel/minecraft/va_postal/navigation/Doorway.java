@@ -37,7 +37,10 @@ public final class Doorway {
     public static void reset(int id) {
         Crossing c = active.remove(id);
         if (c != null && c.opened) {
-            ID_WTR.set_door_open(c.door, false, true);
+            for (Block d : c.opened_doors) {
+                ID_WTR.set_door_open(d, false, true);
+            }
+            c.opened_doors.clear();
         }
     }
 
@@ -85,7 +88,7 @@ public final class Doorway {
         for (double t = 0.3D; t <= Math.min(len, AHEAD); t += 0.2D) {
             Block b = at.getWorld().getBlockAt((int) Math.floor(at.getX() + dir.getX() * t), at.getBlockY(),
                     (int) Math.floor(at.getZ() + dir.getZ() * t));
-            if (b.getType() != at.getBlock().getType() && ID_WTR.is_route_door(b.getType())
+            if (!b.equals(at.getBlock()) && ID_WTR.is_route_door(b.getType())
                     && b.getBlockData() instanceof Openable) {
                 // Cross along the door's axis: the larger component of the way he's going.
                 BlockFace axis = Math.abs(dir.getX()) >= Math.abs(dir.getZ())
@@ -97,9 +100,17 @@ public final class Doorway {
         return null;
     }
 
-    /** One door crossing: line up, open, pause, walk through, close. */
+    /** Most doors in a row one crossing takes (a door straight onto a fence gate, a double-thick entrance). */
+    static final int MAX_RUN = 3;
+
+    /**
+     * One crossing: line up, open, pause, walk through, close. Doors straight one after another (a door onto a fence
+     * gate) are crossed together: all opened, walked through to the first free block past the last, and closed.
+     */
     static final class Crossing {
         final Block door;
+        final java.util.List<Block> doors = new java.util.ArrayList<>();
+        final java.util.List<Block> opened_doors = new java.util.ArrayList<>();
         final Location before;
         final Location after;
         final Location face;
@@ -109,10 +120,16 @@ public final class Doorway {
 
         Crossing(Block door, BlockFace axis) {
             this.door = door;
-            Location centre = door.getLocation().add(0.5D, 0.0D, 0.5D);
-            this.before = centre.clone().subtract(axis.getModX(), 0, axis.getModZ());
-            this.after = centre.clone().add(axis.getModX(), 0, axis.getModZ());
-            this.face = centre.clone().add(0, 1.0D, 0);
+            Block b = door;
+            for (int i = 0; i < MAX_RUN && ID_WTR.is_route_door(b.getType()) && b.getBlockData() instanceof Openable; i++) {
+                doors.add(b);
+                b = b.getRelative(axis);
+            }
+            Location first = door.getLocation().add(0.5D, 0.0D, 0.5D);
+            Location last = doors.get(doors.size() - 1).getLocation().add(0.5D, 0.0D, 0.5D);
+            this.before = first.clone().subtract(axis.getModX(), 0, axis.getModZ());
+            this.after = last.clone().add(axis.getModX(), 0, axis.getModZ());
+            this.face = first.clone().add(0, 1.0D, 0);
         }
 
         /** Advances one tick; true when he's through. */
@@ -120,11 +137,13 @@ public final class Doorway {
             switch (phase) {
                 case 0: // line up in front of the door
                     if (move(e, before)) {
-                        Openable o = (Openable) door.getBlockData();
-                        if (!o.isOpen()) {
-                            ID_WTR.set_door_open(door, true, false);
-                            opened = true;
+                        for (Block d : doors) {
+                            if (!((Openable) d.getBlockData()).isOpen()) {
+                                ID_WTR.set_door_open(d, true, false);
+                                opened_doors.add(d);
+                            }
                         }
+                        opened = !opened_doors.isEmpty();
                         phase = 1;
                         wait = PAUSE;
                     }
@@ -135,15 +154,22 @@ public final class Doorway {
                         phase = 2;
                     }
                     return false;
-                default: // through, then close it behind him
+                default: // through, then close them behind him
                     if (move(e, after)) {
-                        if (opened) {
-                            ID_WTR.set_door_open(door, false, false);
-                        }
+                        close();
                         return true;
                     }
                     return false;
             }
+        }
+
+        /** Closes the doors this crossing opened. */
+        void close() {
+            for (Block d : opened_doors) {
+                ID_WTR.set_door_open(d, false, false);
+            }
+            opened_doors.clear();
+            opened = false;
         }
 
         /** Moves a step towards {@code to} (keeping his height), facing it; true once he's there. */

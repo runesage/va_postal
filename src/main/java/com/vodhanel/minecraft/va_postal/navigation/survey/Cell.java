@@ -83,6 +83,10 @@ public enum Cell {
         switch (n) {
             case "AIR", "CAVE_AIR", "VOID_AIR":
                 return OPEN;
+            case "SNOW", "LILY_PAD":
+                // A thin snow layer is stepped over (SurveyGrid makes deep ones ground); a lily pad is never a floor
+                // (the water under it isn't one either, so a route never crosses water on them).
+                return OPEN;
             case "WATER", "BUBBLE_COLUMN", "KELP", "KELP_PLANT", "SEAGRASS", "TALL_SEAGRASS":
                 return WATER;
             case "LAVA", "FIRE", "SOUL_FIRE", "MAGMA_BLOCK", "CACTUS", "SWEET_BERRY_BUSH", "POWDER_SNOW", "CAMPFIRE",
@@ -110,6 +114,9 @@ public enum Cell {
         }
         if (n.endsWith("_FENCE_GATE")) {
             return GATE;
+        }
+        if (n.endsWith("_CHAIN") || n.endsWith("_BARS")) {
+            return WALL; // IRON_CHAIN and the copper chains and bars (Minecraft 1.21.9)
         }
         if (n.endsWith("_FENCE") || n.endsWith("_LEAVES") || n.endsWith("_TRAPDOOR") || n.endsWith("SHULKER_BOX")
                 || n.endsWith("_PANE") || n.endsWith("_WALL") && !n.endsWith("_SIGN") || n.equals("COBBLESTONE_WALL")) {

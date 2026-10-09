@@ -33,7 +33,11 @@ public final class Surveyor {
      * A survey's outcome: the full path (every block), the waypoints cut from it, how many positions the search
      * looked at, and why it failed (null if it didn't).
      */
-    public record Result(List<Point> path, List<Point> waypoints, int expanded, String failure) {
+    public record Result(List<Point> path, List<Point> waypoints, int expanded, String failure, boolean hit_edge) {
+        public Result(List<Point> path, List<Point> waypoints, int expanded, String failure) {
+            this(path, waypoints, expanded, failure, false);
+        }
+
         public boolean ok() {
             return failure == null;
         }
@@ -43,6 +47,8 @@ public final class Surveyor {
     public static final double MAX_GAP = 8.0D;
     /** How far (horizontally) the search may stray outside the box around its two ends. */
     public static final int MARGIN = 32;
+    /** The margin for a second try when the first ran into the edge of its box (a long way round). */
+    public static final int WIDE_MARGIN = 96;
     /** How far up or down it may stray. */
     public static final int MARGIN_Y = 16;
     /** At most this many positions are looked at. */
@@ -125,6 +131,15 @@ public final class Surveyor {
 
     /** Surveys a route from (sx, sy, sz) to (gx, gy, gz): both are snapped to the nearest place to stand. */
     public Result survey(int sx, int sy, int sz, int gx, int gy, int gz) {
+        return survey(sx, sy, sz, gx, gy, gz, MARGIN);
+    }
+
+    /**
+     * As {@link #survey(int, int, int, int, int, int)}, straying at most {@code margin} blocks outside the box
+     * around the two ends. A failed result says whether the search ran into that edge ({@link Result#hit_edge}),
+     * in which case a wider margin might still find a way.
+     */
+    public Result survey(int sx, int sy, int sz, int gx, int gy, int gz, int margin) {
         int[] s = nearest_stand(sx, sy, sz);
         int[] t = nearest_stand(gx, gy, gz);
         if (s == null) {
@@ -133,8 +148,8 @@ public final class Surveyor {
         if (t == null) {
             return new Result(List.of(), List.of(), 0, "nowhere to stand at the end (" + gx + "," + gy + "," + gz + ")");
         }
-        int min_x = Math.min(s[0], t[0]) - MARGIN, max_x = Math.max(s[0], t[0]) + MARGIN;
-        int min_z = Math.min(s[2], t[2]) - MARGIN, max_z = Math.max(s[2], t[2]) + MARGIN;
+        int min_x = Math.min(s[0], t[0]) - margin, max_x = Math.max(s[0], t[0]) + margin;
+        int min_z = Math.min(s[2], t[2]) - margin, max_z = Math.max(s[2], t[2]) + margin;
         int min_y = Math.min(s[1], t[1]) - MARGIN_Y, max_y = Math.max(s[1], t[1]) + MARGIN_Y;
 
         PriorityQueue<Node> open = new PriorityQueue<>();
@@ -143,6 +158,7 @@ public final class Surveyor {
         open.add(start);
         best.put(key(s[0], s[1], s[2]), 0.0D);
         int expanded = 0;
+        boolean hit_edge = false;
         Node closest = start;
         double closest_d = Double.MAX_VALUE;
         List<Node> next = new ArrayList<>(12);
@@ -162,12 +178,13 @@ public final class Surveyor {
                 closest = n;
             }
             if (++expanded > max_expanded) {
-                return new Result(List.of(), List.of(), expanded, "gave up after looking at " + max_expanded + " positions");
+                return new Result(List.of(), List.of(), expanded, "gave up after looking at " + max_expanded + " positions", false);
             }
             next.clear();
             neighbours(n, t, next);
             for (Node m : next) {
                 if (m.x < min_x || m.x > max_x || m.z < min_z || m.z > max_z || m.y < min_y || m.y > max_y) {
+                    hit_edge = true;
                     continue;
                 }
                 long k = key(m.x, m.y, m.z);
@@ -178,9 +195,10 @@ public final class Surveyor {
                 }
             }
         }
-        return new Result(List.of(), List.of(), expanded, "no walkable way between them (got as close as "
+        return new Result(List.of(), List.of(), expanded, "no walkable way between them"
+                + (hit_edge ? " within " + margin + " blocks of either end" : "") + " (got as close as "
                 + closest.x + "," + closest.y + "," + closest.z + ", " + (int) closest_d + " blocks from the end at "
-                + t[0] + "," + t[1] + "," + t[2] + ")");
+                + t[0] + "," + t[1] + "," + t[2] + ")", hit_edge);
     }
 
     /** A lower bound on the cost to the goal: octile distance at road cost; climbing costs at least half. */

@@ -114,13 +114,25 @@ public final class RouteSurvey {
             return;
         }
         World world = from.getWorld();
+        survey_within(world, office, address, from, to, Surveyor.MARGIN, done);
+    }
+
+    /**
+     * Loads the chunks within {@code margin} of the two ends, snapshots them, and surveys off the main thread. If
+     * the search runs into the edge of that box, it tries once more with {@link Surveyor#WIDE_MARGIN}: the way
+     * round may just be long.
+     */
+    private static void survey_within(World world, String office, String address, Location from, Location to, int margin,
+                                      Consumer<Outcome> done) {
         int fx = from.getBlockX(), fy = from.getBlockY(), fz = from.getBlockZ();
         int tx = to.getBlockX(), ty = to.getBlockY(), tz = to.getBlockZ();
-        int pad = Surveyor.MARGIN + 3;
+        int pad = margin + 3;
         int cx1 = (Math.min(fx, tx) - pad) >> 4, cx2 = (Math.max(fx, tx) + pad) >> 4;
         int cz1 = (Math.min(fz, tz) - pad) >> 4, cz2 = (Math.max(fz, tz) + pad) >> 4;
         if ((long) (cx2 - cx1 + 1) * (cz2 - cz1 + 1) > MAX_CHUNKS) {
-            done.accept(new Outcome(office, address, false, "the address is too far from its post office to survey"));
+            done.accept(new Outcome(office, address, false, margin == Surveyor.MARGIN
+                    ? "the address is too far from its post office to survey"
+                    : "no route found within " + Surveyor.MARGIN + " blocks, and a wider search would cover too much of the map"));
             return;
         }
         List<CompletableFuture<Chunk>> loading = new ArrayList<>();
@@ -143,9 +155,15 @@ public final class RouteSurvey {
                     SurveyGrid grid = new SurveyGrid(snaps, world.getMinHeight(), world.getMaxHeight());
                     Bukkit.getScheduler().runTaskAsynchronously(VA_postal.plugin, () -> {
                         long t0 = System.nanoTime();
-                        Result r = new Surveyor(grid).survey(fx, fy, fz, tx, ty, tz);
+                        Result r = new Surveyor(grid).survey(fx, fy, fz, tx, ty, tz, margin);
                         long ms = (System.nanoTime() - t0) / 1_000_000L;
-                        Bukkit.getScheduler().runTask(VA_postal.plugin, () -> done.accept(save(world, office, address, r, ms)));
+                        Bukkit.getScheduler().runTask(VA_postal.plugin, () -> {
+                            if (!r.ok() && r.hit_edge() && margin < Surveyor.WIDE_MARGIN) {
+                                survey_within(world, office, address, from, to, Surveyor.WIDE_MARGIN, done);
+                            } else {
+                                done.accept(save(world, office, address, r, ms));
+                            }
+                        });
                     });
                 }));
     }

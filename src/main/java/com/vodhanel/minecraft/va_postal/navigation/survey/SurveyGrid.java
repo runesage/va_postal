@@ -12,6 +12,8 @@ import java.util.Map;
  */
 public final class SurveyGrid implements Grid {
     private static Map<Material, Cell> cells;
+    /** Snow deeper than this many layers is ground (a postman steps over half a block at most). */
+    static final int DEEP_SNOW = 4;
 
     private final Map<Long, ChunkSnapshot> chunks;
     private final int min_y;
@@ -53,7 +55,13 @@ public final class SurveyGrid implements Grid {
         if (snap == null) {
             return Cell.UNKNOWN;
         }
-        Cell c = cells.get(snap.getBlockType(x & 15, y, z & 15));
+        Material type = snap.getBlockType(x & 15, y, z & 15);
+        if (type == Material.SNOW) {
+            // Up to four layers (half a block) is stepped over; deeper snow is ground to climb onto.
+            org.bukkit.block.data.BlockData data = snap.getBlockData(x & 15, y, z & 15);
+            return data instanceof org.bukkit.block.data.type.Snow sn && sn.getLayers() > DEEP_SNOW ? Cell.GROUND : Cell.OPEN;
+        }
+        Cell c = cells.get(type);
         if (c == Cell.STEP) {
             // Stairs and slabs: which way, and which half, from the block data.
             org.bukkit.block.data.BlockData data = snap.getBlockData(x & 15, y, z & 15);
