@@ -373,6 +373,7 @@ check "phase9: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase9.log"
 check "phase9: no exception or stack trace" no_match "NullPointerException|Command exception: /?(postal|tlist|alist)|at .*com\.vodhanel\." "$WORK_DIR/phase9.log"
 check "phase9: dispatcher started with offline owners" grep -q "VA_Postal started" "$WORK_DIR/phase9.log"
 check "phase9: /tlist names Home's offline owner" grep -qE "Home[.]+ +$KNOWN_NAME" <(plain phase9)
+check "phase9: console /tlist lists the first office too" grep -qE "TESTVILLE[.]+ +${OWNER_UUID}" <(plain phase9)
 check "phase9: /alist names Home's offline owner" grep -qE "^.*Home +$KNOWN_NAME" <(plain phase9)
 check "phase9: Testville's sign carries the placeholder for a never-seen owner" grep -qF "\"${OWNER_UUID:0:15}\"" <(plain phase9)
 
