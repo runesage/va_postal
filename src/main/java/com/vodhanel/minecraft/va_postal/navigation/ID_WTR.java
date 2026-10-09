@@ -368,8 +368,11 @@ public class ID_WTR {
             // of the cellar's ladder the next two waypoints counted from there, and he set off for the mailbox still
             // holding on, and froze. And a waypoint on a ladder counts only at its column, where Postal climbs him:
             // from two blocks away he was left to Citizens, which can't climb.
-            if (Climb.climbable(npc_loc.getBlock()) || Climb.on_ladder(target)) {
+            if (Climb.on_ladder(target)) {
                 return Climb.in_column(npc_loc, target);
+            }
+            if (Climb.climbable(npc_loc.getBlock())) {
+                return false; // the corner allowance is for climbing onto a ladder, not for counting a step off it
             }
 
             // The top or foot of a climb (a stair, a step, a drop): close, and at its height. The usual 2 blocks let

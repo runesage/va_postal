@@ -28,6 +28,11 @@ public class Stuck_NPC implements StuckAction {
             }
             Location at = npc.getEntity() == null ? null : npc.getEntity().getLocation();
             Location wp = VA_postal.wtr_waypoint[id];
+            // On a ladder Postal climbs him itself (Climb); Citizens only sees him standing still.
+            if (at != null && wp != null && Climb.on_ladder(wp) && Climb.in_column(at, wp)) {
+                VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
+                return false;
+            }
             Util.dinform("STUCKACTION FOR " + id + " at " + Util.location2str(at) + " wp#" + VA_postal.wtr_pos[id] + " "
                     + Util.location2str(wp) + (at != null && wp != null && at.getWorld() == wp.getWorld()
                     ? String.format(" d=%.2f", at.distance(wp.clone().add(0.5, 0, 0.5))) : "")
@@ -46,11 +51,6 @@ public class Stuck_NPC implements StuckAction {
                 return false;
             }
 
-            // On a ladder Postal climbs him itself (Climb); Citizens only sees him standing still.
-            if (at != null && wp != null && Climb.on_ladder(wp) && Climb.in_column(at, wp)) {
-                VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
-                return false;
-            }
 
 
             String stuck_action = VA_postal.wtr_poffice[id] + "," + VA_postal.wtr_address[id] + "," + Util.int2str(VA_postal.wtr_pos[id]);
