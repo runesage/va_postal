@@ -154,7 +154,7 @@ public class Cmdexecutor implements CommandExecutor {
         String sub = args[0].toLowerCase().trim();
         if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
                 || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
-                || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub)) {
+                || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub) || "whois".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
                 return true;
@@ -170,6 +170,7 @@ public class Cmdexecutor implements CommandExecutor {
             else if ("setstate".equals(sub)) P_MailAdmin.setstate(player, args);
             else if ("store".equals(sub)) P_MailAdmin.store(player);
             else if ("directory".equals(sub)) P_MailAdmin.directory(player, args);
+            else if ("whois".equals(sub)) P_MailAdmin.whois(player, args);
             else P_MailAdmin.testletter(player, args);
             } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
                 // The database is down or failing: say so rather than "an internal error occurred".
@@ -336,6 +337,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("directory".equals(args[0].toLowerCase().trim())) {
             P_MailAdmin.directory(sender, args);
+            return true;
+        }
+        if ("whois".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.whois(sender, args);
             return true;
         }
         if ("reconcile".equals(args[0].toLowerCase().trim())) {

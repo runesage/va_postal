@@ -14,7 +14,7 @@ import java.sql.Statement;
 @EnabledIfEnvironmentVariable(named = "POSTAL_TEST_MYSQL_URL", matches = ".+")
 class MariaDbMailStoreTest extends MailStoreContract {
     private static final String[] TABLES = {"mail_event", "mail", "route_run", "postal_server", "directory_office",
-            "directory_address", "schema_version"};
+            "directory_address", "network_player", "schema_version"};
 
     @Override
     protected DataSource fresh_database() throws Exception {
