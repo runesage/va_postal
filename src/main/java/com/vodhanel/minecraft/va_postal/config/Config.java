@@ -152,6 +152,11 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.properties"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("network.server_id"), "main");
         VA_postal.plugin.getConfig().addDefault(path_format("network.poll_seconds"), 10);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.departure_minutes"), 10);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.transit_minutes"), 5);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.vehicle"), "the mail ship");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.broadcast"), true);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.sound"), "block.bell.use");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.letter.network"), "10");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");

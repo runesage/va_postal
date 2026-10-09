@@ -2,6 +2,10 @@
 Permissions: `none`
 Displays a menu with commands available to the player.
 <br>
+#### `/postal network`
+Permissions: `none`
+On a network of servers: when the mail ship (or whatever `Network.Vehicle` calls it) next leaves for the other servers, how many letters are waiting at Central for it, what's on its way here, and the other servers.
+<br>
 #### `/postal <start/stop/admin/chests/talk/quiet/speed>`
 Permissions: `postal.admin`
 Administrator commands for postal:

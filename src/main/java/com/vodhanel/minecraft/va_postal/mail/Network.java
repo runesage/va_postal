@@ -64,6 +64,7 @@ public final class Network {
         }
         directory = List.of();
         directory_at = 0L;
+        departed_slot = -1L;
     }
 
     static int poll_seconds() {
@@ -288,6 +289,44 @@ public final class Network {
 
     // ---- Moving letters between servers ----------------------------------------------------
 
+    // ---- The schedule: the mail ship (or train...) -------------------------------------------
+
+    /** How often mail leaves each server's Central for the network ({@code Network.Departure_minutes}). */
+    static long departure_millis() {
+        return minutes("network.departure_minutes", 10.0D);
+    }
+
+    /** How long the trip takes once it leaves ({@code Network.Transit_minutes}). */
+    static long transit_millis() {
+        return minutes("network.transit_minutes", 5.0D);
+    }
+
+    private static long minutes(String path, double fallback) {
+        double m = VA_postal.plugin.getConfig().getDouble(GetConfig.path_format(path), fallback);
+        return Math.max(0L, Math.round(m * 60_000D));
+    }
+
+    /**
+     * Departures are on the clock (every period since the epoch), so every server agrees when the mail leaves
+     * without talking to the others.
+     */
+    static long next_departure(long now) {
+        long period = Math.max(1_000L, departure_millis());
+        return (now / period + 1) * period;
+    }
+
+    /** What the vehicle is called in messages ({@code Network.Vehicle}): "the mail ship" by default. */
+    static String vehicle() {
+        String v = VA_postal.plugin.getConfig().getString(GetConfig.path_format("network.vehicle"), "the mail ship");
+        return v == null || v.isBlank() ? "the mail ship" : v.trim();
+    }
+
+    private static volatile long departed_slot = -1L;
+    private static volatile List<MailRecord> last_out = List.of();
+    private static volatile List<MailRecord> last_in = List.of();
+
+    // ---- Moving letters between servers ----------------------------------------------------
+
     private static void tick() {
         MailStore store = MailStores.active();
         String central = VA_postal.central_schest_location;
@@ -300,17 +339,15 @@ public final class Network {
             try {
                 List<MailRecord> out = store.outbound(key);
                 List<MailRecord> in = store.in_network();
+                last_out = out;
+                last_in = in;
                 if (System.currentTimeMillis() - directory_at > DIRECTORY_MILLIS) {
                     directory = store.directory(null);
                     directory_at = System.currentTimeMillis();
                 }
-                if (out.isEmpty() && in.isEmpty()) {
-                    busy = false;
-                    return;
-                }
                 Bukkit.getScheduler().runTask(VA_postal.plugin, () -> {
                     try {
-                        exchange(store, key, out, in);
+                        exchange(store, key, out, in, System.currentTimeMillis());
                     } finally {
                         busy = false;
                     }
@@ -324,56 +361,102 @@ public final class Network {
         });
     }
 
-    /** On the main thread: hands {@code out} to the network and claims {@code in} into the Central chest at {@code key}. */
-    static void exchange(MailStore store, String key, List<MailRecord> out, List<MailRecord> in) {
+    /**
+     * On the main thread: at a departure, hands {@code out} to the network; and claims the letters in {@code in}
+     * whose trip is over into the Central chest at {@code key}.
+     */
+    static void exchange(MailStore store, String key, List<MailRecord> out, List<MailRecord> in, long now) {
+        long period = Math.max(1_000L, departure_millis());
+        long slot = now / period;
+        boolean departure = departed_slot >= 0 && slot > departed_slot;
+        if (departed_slot < 0 || departure) {
+            departed_slot = slot; // the first check after a start waits for the next departure
+        }
+        List<MailRecord> arriving = new ArrayList<>();
+        for (MailRecord r : in) {
+            if (r.due_at <= now) {
+                arriving.add(r);
+            }
+        }
+        if ((!departure || out.isEmpty()) && arriving.isEmpty()) {
+            return;
+        }
         Inventory chest = Reconciler.chest(Custody.chest(key), true);
         if (chest == null) {
             return;
         }
-        for (MailRecord r : out) {
-            hand_off(store, chest, r);
+        if (departure && !out.isEmpty()) {
+            long arrives = slot * period + transit_millis();
+            java.util.Map<String, Integer> sent = new java.util.TreeMap<>();
+            for (MailRecord r : out) {
+                if (hand_off(store, chest, r, arrives)) {
+                    sent.merge(r.dest_server, 1, Integer::sum);
+                }
+            }
+            sent.forEach((server, n) -> announce(key, proper(vehicle()) + " departs for &f" + server + "&7 with " + letters(n)
+                    + "; it arrives in " + duration(arrives - now) + "."));
         }
-        for (MailRecord r : in) {
+        java.util.Map<String, Integer> received = new java.util.TreeMap<>();
+        for (MailRecord r : arriving) {
             if (chest.firstEmpty() < 0) {
                 break; // Central is full: the rest wait in the network
             }
-            claim(store, chest, key, r);
+            if (claim(store, chest, key, r)) {
+                received.merge(r.origin_server, 1, Integer::sum);
+            }
+        }
+        received.forEach((server, n) -> announce(key, proper(vehicle()) + " from &f" + server + "&7 has arrived with " + letters(n) + "."));
+    }
+
+    /** A broadcast ({@code Network.Broadcast}) and a sound at Central ({@code Network.Sound}). */
+    private static void announce(String central_key, String message) {
+        if (VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.broadcast"), true)) {
+            Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&9[Postal] &7" + message));
+        } else {
+            Util.cinform("[Postal] " + org.bukkit.ChatColor.stripColor(message.replace("&f", "").replace("&7", "")));
+        }
+        String sound = VA_postal.plugin.getConfig().getString(GetConfig.path_format("network.sound"), "block.bell.use");
+        org.bukkit.Location at = Util.str2location(VA_postal.central_schest_location);
+        if (sound != null && !sound.isBlank() && at != null && at.getWorld() != null) {
+            at.getWorld().playSound(at, sound.trim(), 4.0F, 1.0F);
         }
     }
 
     /** The origin's side: postage is settled here (the origin keeps it), then the book leaves Central. */
-    private static void hand_off(MailStore store, Inventory chest, MailRecord r) {
+    private static boolean hand_off(MailStore store, Inventory chest, MailRecord r, long arrives) {
         if (r.kind != MailKind.LETTER) {
-            return; // never: parcels can't be addressed to another server, and the store refuses them too
+            return false; // never: parcels can't be addressed to another server, and the store refuses them too
         }
         int slot = slot_of(chest, r.id);
         if (slot < 0) {
-            return; // not in the chest: reconciliation decides
+            return false; // not in the chest: reconciliation decides
         }
         try {
             String hold = HoldTag.read(chest.getItem(slot));
             P_Economy.settle_network_postage(hold != null ? hold : r.hold_id, r.origin_office);
             MailRecord moving = store.begin_move(r, MailState.IN_NETWORK, Custody.NONE, Actor.central(), "to " + r.dest_server);
             chest.setItem(slot, null);
-            store.commit_move(moving, Actor.central(), null);
+            store.depart(moving, arrives, Actor.central(), "left on " + vehicle());
             Util.dinform("[Postal] Letter " + r.id + " left for " + r.dest_server + ":" + r.dest_office);
+            return true;
         } catch (ConflictException e) {
-            // changed meanwhile: the next poll sees its new state
+            return false; // changed meanwhile: the next poll sees its new state
         } catch (StoreException e) {
             Util.cinform("[Postal] Letter " + r.id + " can't leave for " + r.dest_server + " now: " + e.getMessage());
+            return false;
         }
     }
 
     /** The destination's side: claim the row, rebuild the book in Central, and let Central deliver it as usual. */
-    private static void claim(MailStore store, Inventory chest, String key, MailRecord r) {
+    private static boolean claim(MailStore store, Inventory chest, String key, MailRecord r) {
         MailRecord claimed;
         try {
             claimed = store.claim(r, Custody.chest(key), Actor.central());
         } catch (ConflictException e) {
-            return; // another claim won, or it changed: not ours this time
+            return false; // another claim won, or it changed: not ours this time
         } catch (StoreException e) {
             Util.cinform("[Postal] Could not claim letter " + r.id + " from the network: " + e.getMessage());
-            return;
+            return false;
         }
         ItemStack book = Letters.materialise(claimed);
         try {
@@ -381,7 +464,7 @@ public final class Network {
                 store.commit_move(claimed, Actor.central(), "arrived from " + r.origin_server);
             } else {
                 store.cancel_move(claimed, Actor.central(), "Central chest full");
-                return;
+                return false;
             }
         } catch (ConflictException | StoreException e) {
             Util.cinform("[Postal] Could not record letter " + r.id + " arriving (reconciliation will): " + e.getMessage());
@@ -392,6 +475,60 @@ public final class Network {
         } else {
             C_Dispatcher.promote_central(r.dest_office, 5000);
         }
+        return true;
+    }
+
+    // ---- /postal network ---------------------------------------------------------------------
+
+    /** The schedule, what's waiting to leave, and what's on its way here (as of the last check). */
+    public static List<String> schedule() {
+        long now = System.currentTimeMillis();
+        List<String> lines = new ArrayList<>();
+        lines.add("&6[Postal] " + proper(vehicle()) + "&7 leaves every " + duration(departure_millis())
+                + " and takes " + duration(transit_millis()) + ".");
+        java.util.Map<String, Integer> waiting = new java.util.TreeMap<>();
+        for (MailRecord r : last_out) {
+            waiting.merge(r.dest_server, 1, Integer::sum);
+        }
+        StringBuilder to = new StringBuilder();
+        waiting.forEach((server, n) -> to.append(to.length() == 0 ? " (" : ", ").append(server).append(": ").append(n));
+        if (to.length() > 0) {
+            to.append(")");
+        }
+        lines.add("&7Next departure in &f" + duration(next_departure(now) - now) + "&7: " + letters(last_out.size())
+                + " waiting at Central" + to + ".");
+        long next = Long.MAX_VALUE;
+        for (MailRecord r : last_in) {
+            next = Math.min(next, r.due_at);
+        }
+        lines.add(last_in.isEmpty() ? "&7Nothing on its way here."
+                : "&7On its way here: " + letters(last_in.size()) + ", the next "
+                + (next <= now ? "arriving now" : "arriving in &f" + duration(next - now)) + "&7.");
+        java.util.Set<String> servers = new java.util.TreeSet<>();
+        for (DirectoryEntry e : directory()) {
+            servers.add(e.server_id());
+        }
+        servers.remove(local_server());
+        lines.add(servers.isEmpty() ? "&7No other servers on this network yet."
+                : "&7Other servers: &f" + String.join("&7, &f", servers));
+        return lines;
+    }
+
+    static String duration(long millis) {
+        long s = Math.max(0L, (millis + 999L) / 1000L);
+        if (s < 60) {
+            return s + "s";
+        }
+        long m = s / 60;
+        return m + " min" + (s % 60 == 0 ? "" : " " + (s % 60) + "s");
+    }
+
+    private static String letters(int n) {
+        return n + (n == 1 ? " letter" : " letters");
+    }
+
+    private static String proper(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private static int slot_of(Inventory chest, UUID id) {

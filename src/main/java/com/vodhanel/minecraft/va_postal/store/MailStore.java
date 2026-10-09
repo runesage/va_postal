@@ -100,6 +100,12 @@ public interface MailStore extends AutoCloseable {
     List<MailRecord> outbound(String chest);
 
     /**
+     * Phase 3 of handing a letter to the network ({@link #begin_move} to {@code IN_NETWORK}, the book out of
+     * Central, then this): it's in the network, and arrives at {@code arrives_at} (epoch millis).
+     */
+    MailRecord depart(MailRecord moving, long arrives_at, Actor actor, String detail);
+
+    /**
      * Phase 1 of taking a letter from the network: only a {@code LETTER} in {@code IN_NETWORK} addressed to this
      * server matches, so of two claimers only one wins (the other gets {@link ConflictException}). The record
      * then belongs to this server, moving to {@code AT_CENTRAL} at {@code to}; commit once the book is there.

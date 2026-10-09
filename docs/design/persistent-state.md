@@ -318,11 +318,16 @@ and there are **no duplicate or divergent records**.
 
 - **One row crosses.** A letter for another server has `dest_server` set when it's addressed. It travels this
   server's normal route to Central (office pickup, `AT_CENTRAL`), then:
-  1. **Hand-off (origin).** Every `Network.Poll_seconds` (default 10) the origin reads which letters at its
-     Central are bound elsewhere (`outbound`), off the main thread. On the main thread it settles their postage,
-     then moves each to `IN_NETWORK` with the usual two-phase move: begin (custody `NONE`), take the book out of
-     the Central chest, commit. Nothing of the letter stays on the origin but its record.
-  2. **Claim (destination).** The destination's poll reads the letters waiting for it (`in_network`). It claims each
+  1. **Hand-off (origin), on the mail ship's schedule.** Every `Network.Poll_seconds` (default 10) each server
+     reads, off the main thread, which letters at its Central are bound elsewhere (`outbound`) and which are on
+     their way to it (`in_network`). Letters leave only at a **departure**: every `Network.Departure_minutes`
+     (default 10), counted on the clock from the epoch, so every server agrees when the ship sails without
+     talking to the others. At a departure the origin settles each letter's postage, then moves it to
+     `IN_NETWORK` with the usual two-phase move: begin (custody `NONE`), take the book out of the Central chest,
+     and `depart`, which commits with the letter's arrival time (`due_at` = the departure +
+     `Network.Transit_minutes`, default 5). Nothing of the letter stays on the origin but its record.
+  2. **Claim (destination), when the trip is over.** The destination claims a waiting letter once its `due_at` has
+     passed. It claims each
      with one version-checked update that only matches `kind = 'LETTER' AND state = 'IN_NETWORK' AND
      dest_server = <this server>`, so of two claimers only one wins. The claim makes the record this server's
      (`custody_server`) with a move in flight to `AT_CENTRAL` in its Central chest. It then rebuilds the book
@@ -332,6 +337,14 @@ and there are **no duplicate or divergent records**.
   that made each step. Reconciliation finishes an interrupted hand-off (the book is taken out of Central and the
   move committed: the record carries the letter) and an interrupted claim (the book is rebuilt at the
   destination, as for any move in flight).
+- **The mail ship (RP).** Decided with the owner: town routing stays as it was, and the network gets the
+  flavour. The vehicle has a name (`Network.Vehicle`, "the mail ship"). A departure is announced to the server
+  ("The mail ship departs for creative with 3 letters; it arrives in 5 min."), as is an arrival ("The mail ship
+  from survival has arrived with 2 letters."), unless `Network.Broadcast` is false, when only the log gets them.
+  Each is marked by a sound at the Central chest (`Network.Sound`, `block.bell.use`; empty for none).
+  `/postal network`, for everyone, shows the schedule, the next departure, the letters waiting at Central for it,
+  what's on its way here, and the other servers. A letter that reaches Central just after a departure waits
+  for the next one. That's deliberate: it's a schedule.
 - **Letters only, at every layer** (§6): `/package` refuses another server's office, and `addr_worker` refuses
   a parcel for one; the store refuses to move a non-letter into `IN_NETWORK` or to claim one; the claim query
   matches only `LETTER`; the `CHECK` constraint rejects it in the database; and `LETTER_V1` has no item fields.
@@ -357,9 +370,8 @@ and there are **no duplicate or divergent records**.
   including another town's mail waiting there for Central if it had a same-named address (and now another
   server's). He now also checks the book is for his office. `by_destination` also checks `dest_server`, so a
   letter waiting to leave can't be marked out for delivery by a namesake office.
-- **Not built: the proxy bus.** Notifications through a Velocity relay plugin (§8) would only make delivery quicker;
-  polling makes it correct, and with `Poll_seconds: 10` the hand-off adds seconds to a trip that takes minutes
-  of walking. It stays an option behind the same design, as does a "you have mail" ping to a player online on
+- **Not built: the proxy bus.** Notifications through a Velocity relay plugin (§8) would only make delivery quicker,
+  and the mail ship's schedule makes the trip take minutes on purpose; polling makes it correct. It stays an option behind the same design, as does a "you have mail" ping to a player online on
   another server.
 - **Undeliverable network mail** (an office removed from the destination after the letter was addressed) is claimed
   and waits in the destination's Central chest, with a warning in its log, like a letter for a deleted local office.

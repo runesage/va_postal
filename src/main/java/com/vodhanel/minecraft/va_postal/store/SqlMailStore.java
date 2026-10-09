@@ -30,6 +30,9 @@ public final class SqlMailStore implements MailStore {
             + "pending_ref, sender_uuid, attention_uuid, cod_amount, postage_paid, payload_format, payload, "
             + "mc_data_version, created_at, updated_at, hold_id";
 
+    /** What a read returns: the written columns, plus the arrival time a letter in the network was given. */
+    private static final String READ_COLUMNS = COLUMNS + ", due_at";
+
     private final DataSource source;
     private final String server_id;
     private final AutoCloseable closer;
@@ -187,7 +190,7 @@ public final class SqlMailStore implements MailStore {
     @Override
     public Optional<MailRecord> get(UUID id) {
         try (Connection c = source.getConnection();
-             PreparedStatement ps = c.prepareStatement("SELECT " + COLUMNS + " FROM mail WHERE mail_id = ?")) {
+             PreparedStatement ps = c.prepareStatement("SELECT " + READ_COLUMNS + " FROM mail WHERE mail_id = ?")) {
             ps.setString(1, id.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(read(rs)) : Optional.empty();
@@ -276,18 +279,19 @@ public final class SqlMailStore implements MailStore {
     /** The one write path: version-checked update of state, custody and pending move, plus its event. */
     private MailRecord update(MailRecord current, MailState state, Custody custody, MailState pending_state,
                               Custody pending_custody, Actor actor, String detail) {
-        return update(current, state, custody, pending_state, pending_custody, actor, detail, "");
+        return update(current, state, custody, pending_state, pending_custody, actor, detail, "", null);
     }
 
     /** {@code guard}: extra conditions on the row ({@code AND ...}), with this server's id as its only parameter. */
     private MailRecord update(MailRecord current, MailState state, Custody custody, MailState pending_state,
-                              Custody pending_custody, Actor actor, String detail, String guard) {
+                              Custody pending_custody, Actor actor, String detail, String guard, Long due_at) {
         if (state == MailState.IN_NETWORK && current.kind != MailKind.LETTER) {
             throw new ConflictException("Only letters can cross servers (" + current.id + " is a " + current.kind + ")");
         }
         long now = System.currentTimeMillis();
         String sql = "UPDATE mail SET state = ?, version = ?, custody_server = ?, custody_kind = ?, custody_ref = ?, "
-                + "pending_state = ?, pending_kind = ?, pending_ref = ?, updated_at = ? WHERE mail_id = ? AND version = ?" + guard;
+                + "pending_state = ?, pending_kind = ?, pending_ref = ?, updated_at = ?" + (due_at == null ? "" : ", due_at = ?")
+                + " WHERE mail_id = ? AND version = ?" + guard;
         try (Connection c = source.getConnection()) {
             c.setAutoCommit(false);
             try {
@@ -303,6 +307,9 @@ public final class SqlMailStore implements MailStore {
                     ps.setString(i++, pending_custody == null ? null : pending_custody.kind.name());
                     ps.setString(i++, pending_custody == null ? null : pending_custody.ref);
                     ps.setLong(i++, now);
+                    if (due_at != null) {
+                        ps.setLong(i++, due_at);
+                    }
                     ps.setString(i++, current.id.toString());
                     ps.setInt(i++, current.version);
                     if (!guard.isEmpty()) {
@@ -350,14 +357,14 @@ public final class SqlMailStore implements MailStore {
 
     @Override
     public List<MailRecord> held_here() {
-        return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND (custody_kind <> 'NONE' OR "
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND (custody_kind <> 'NONE' OR "
                 + "pending_state IS NOT NULL) AND state NOT IN ('DELIVERED','RETURNED','REFUSED','ACCEPTED','EXPIRED','CLAIMED','RECOVERED')", server_id);
     }
 
     @Override
     public List<MailRecord> by_destination(MailState state, String office) {
         // dest_server too: a letter waiting here for the network can share an office name with one of ours.
-        return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND state = ? AND dest_office = ? AND dest_server = ?",
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND state = ? AND dest_office = ? AND dest_server = ?",
                 server_id, state.name(), MailRecord.lower(office), server_id);
     }
 
@@ -403,7 +410,7 @@ public final class SqlMailStore implements MailStore {
     public List<MailRecord> delivered_since(long since_millis) {
         List<MailRecord> out = new ArrayList<>();
         try (Connection c = source.getConnection();
-             PreparedStatement ps = c.prepareStatement("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? "
+             PreparedStatement ps = c.prepareStatement("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? "
                      + "AND state = 'DELIVERED' AND updated_at >= ?")) {
             ps.setString(1, server_id);
             ps.setLong(2, since_millis);
@@ -420,8 +427,8 @@ public final class SqlMailStore implements MailStore {
 
     @Override
     public List<MailRecord> recent(int limit) {
-        return query("SELECT " + COLUMNS + " FROM mail WHERE origin_server = ? ORDER BY created_at DESC LIMIT "
-                + Math.max(1, Math.min(100, limit)), server_id);
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE origin_server = ? OR custody_server = ? ORDER BY updated_at DESC LIMIT "
+                + Math.max(1, Math.min(100, limit)), server_id, server_id);
     }
 
     @Override
@@ -634,14 +641,22 @@ public final class SqlMailStore implements MailStore {
 
     @Override
     public List<MailRecord> in_network() {
-        return query("SELECT " + COLUMNS + " FROM mail WHERE state = 'IN_NETWORK' AND dest_server = ? AND kind = 'LETTER' "
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE state = 'IN_NETWORK' AND dest_server = ? AND kind = 'LETTER' "
                 + "AND pending_state IS NULL ORDER BY updated_at", server_id);
     }
 
     @Override
     public List<MailRecord> outbound(String chest) {
-        return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND state = 'AT_CENTRAL' AND dest_server <> ? "
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND state = 'AT_CENTRAL' AND dest_server <> ? "
                 + "AND custody_kind = 'CHEST' AND custody_ref = ? AND pending_state IS NULL ORDER BY updated_at", server_id, server_id, chest);
+    }
+
+    @Override
+    public MailRecord depart(MailRecord moving, long arrives_at, Actor actor, String detail) {
+        if (!moving.moving() || moving.pending_state != MailState.IN_NETWORK) {
+            throw new ConflictException(moving.id + " isn't being handed to the network");
+        }
+        return update(moving, MailState.IN_NETWORK, moving.pending_custody, null, null, actor, detail, "", arrives_at);
     }
 
     @Override
@@ -652,7 +667,7 @@ public final class SqlMailStore implements MailStore {
         }
         return update(current, current.state, current.custody, MailState.AT_CENTRAL, to, actor,
                 "claimed from the network by " + server_id + ", move to AT_CENTRAL@" + to,
-                " AND state = 'IN_NETWORK' AND kind = 'LETTER' AND pending_state IS NULL AND dest_server = ?");
+                " AND state = 'IN_NETWORK' AND kind = 'LETTER' AND pending_state IS NULL AND dest_server = ?", null);
     }
 
     @Override
@@ -758,7 +773,7 @@ public final class SqlMailStore implements MailStore {
                 uuid(rs.getString("sender_uuid")), uuid(rs.getString("attention_uuid")),
                 rs.getBigDecimal("cod_amount").doubleValue(), rs.getBigDecimal("postage_paid").doubleValue(),
                 rs.getString("payload_format"), rs.getBytes("payload"), rs.getInt("mc_data_version"),
-                rs.getLong("created_at"), rs.getLong("updated_at"), rs.getString("hold_id"));
+                rs.getLong("created_at"), rs.getLong("updated_at"), rs.getString("hold_id"), rs.getLong("due_at"));
     }
 
     private static MailState state(String s) {

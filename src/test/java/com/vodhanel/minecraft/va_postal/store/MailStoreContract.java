@@ -402,4 +402,16 @@ abstract class MailStoreContract {
         store.player_seen(other_sam, "Sam", true, 60L);
         assertEquals(other_sam, store.players_named("sam").get(0).id());
     }
+
+    @Test
+    void aDepartingLetterCarriesItsArrivalTime() {
+        SqlMailStore skyblock = new SqlMailStore(ds, "skyblock", null, dialect());
+        MailRecord r = letter_for_skyblock();
+        MailRecord moving = store.begin_move(r, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null);
+        MailRecord sent = store.depart(moving, 123_456_789L, Actor.central(), "left on the mail ship");
+        assertEquals(MailState.IN_NETWORK, sent.state);
+        assertEquals(Custody.NONE, sent.custody);
+        assertEquals(123_456_789L, skyblock.in_network().get(0).due_at);
+        assertThrows(ConflictException.class, () -> store.depart(sent, 1L, Actor.central(), null));
+    }
 }

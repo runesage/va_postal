@@ -152,6 +152,12 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         String sub = args[0].toLowerCase().trim();
+        if ("network".equals(sub)) {
+            for (String line : Network.schedule()) {
+                Util.pinform(player, line);
+            }
+            return true;
+        }
         if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
                 || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
                 || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub) || "whois".equals(sub)) {
@@ -341,6 +347,12 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("whois".equals(args[0].toLowerCase().trim())) {
             P_MailAdmin.whois(sender, args);
+            return true;
+        }
+        if ("network".equals(args[0].toLowerCase().trim())) {
+            for (String line : Network.schedule()) {
+                sender.sendMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', line));
+            }
             return true;
         }
         if ("reconcile".equals(args[0].toLowerCase().trim())) {

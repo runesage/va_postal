@@ -36,6 +36,9 @@ setup() { # server-id
     rm -rf "$d"
     install_server "$CACHE" "$d"
     cp "$POSTAL_JAR" "$d/plugins/Postal.jar"
+    # Libraries Paper and Citizens downloaded on an earlier run (Citizens' own downloads can fail).
+    [ -d "$CACHE/libraries" ] && cp -r "$CACHE/libraries" "$d/"
+    if [ -d "$CACHE/citizens-lib" ]; then mkdir -p "$d/plugins/Citizens" && cp -r "$CACHE/citizens-lib" "$d/plugins/Citizens/lib"; fi
     echo "eula=true" > "$d/eula.txt"
     cat > "$d/server.properties" <<EOF
 online-mode=false
@@ -88,7 +91,8 @@ configure() { # server-id: the seed network, MySQL, and this server's id
 import sys
 p, server, host, port, db, user, password = sys.argv[1:]
 want = {"Storage": {"Type": "mysql", "Host": host, "Port": port, "Database": db, "User": user, "Password": password},
-        "Network": {"Server_id": server, "Poll_seconds": "3"}}
+        "Network": {"Server_id": server, "Poll_seconds": "3", "Departure_minutes": "1", "Transit_minutes": "0.5",
+                    "Vehicle": "the test ship"}}
 out, block = [], None
 for line in open(p).read().split("\n"):
     if line and not line.startswith(" "):
@@ -114,6 +118,9 @@ for s in alpha beta; do setup "$s"; done
 start alpha "$WORK_DIR/alpha-phase1.log"
 wait_up alpha
 citizens_up alpha || { echo "Citizens couldn't load its libraries on alpha (a download failed); re-run."; exit 1; }
+rm -rf "$CACHE/libraries" "$CACHE/citizens-lib"
+cp -r "$(dir alpha)/libraries" "$CACHE/libraries"
+cp -r "$(dir alpha)/plugins/Citizens/lib" "$CACHE/citizens-lib" 2>/dev/null || true
 cp -r "$(dir alpha)/libraries" "$(dir beta)/"
 mkdir -p "$(dir beta)/plugins/Citizens"
 cp -r "$(dir alpha)/plugins/Citizens/lib" "$(dir beta)/plugins/Citizens/" 2>/dev/null || true
@@ -160,6 +167,7 @@ say beta "postal track $A_ID"
 say beta "postal track $B_ID"
 say alpha "postal store"
 say beta "postal whois nobody_here"
+say alpha "postal network"
 sleep 2
 for s in alpha beta; do stop "$s"; done
 
@@ -188,6 +196,9 @@ check "alpha's letter: delivered, one record" grep -qE "To .*beta:testville, hom
 check "alpha's letter: handed to the network on alpha" grep -qE "IN_NETWORK by central.* on alpha" "$WORK_DIR/alpha.log"
 check "alpha's letter: claimed and delivered on beta" grep -qE "DELIVERED by postman testville on beta" "$WORK_DIR/beta.log"
 check "beta's letter: delivered on alpha" grep -qE "To .*alpha:testville, home.*DELIVERED" "$WORK_DIR/beta.log"
+check "alpha: the ship departed for beta" grep -q "The test ship departs for beta with 1 letter" "$WORK_DIR/alpha.log"
+check "beta: the ship from alpha arrived" grep -q "The test ship from alpha has arrived with 1 letter" "$WORK_DIR/beta.log"
+check "alpha: /postal network shows the schedule" grep -q "The test ship leaves every 1 min and takes 30s" "$WORK_DIR/alpha.log"
 check "beta: unknown player reported" grep -q "No player called nobody_here" "$WORK_DIR/beta.log"
 
 if [ "$fail" -ne 0 ]; then

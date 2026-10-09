@@ -5,6 +5,7 @@ What P4 promises, and what this plan checks:
 - **Only letters cross.** Parcels and items never leave the server they were packed on.
 - **Any player can be named** on a letter: online or offline, on any server.
 - **The origin keeps the postage**, at the network rate.
+- **The mail ship** leaves on a schedule and announces departures and arrivals.
 - **One record, no copies.** `/postal track` shows the same letter, with its whole history, on both servers.
 
 **Most of this is covered automatically.** The store tests cover the claim race, letters-only, and one player row
@@ -33,6 +34,9 @@ Storage:
 Network:
   Server_id: 'survival'      # different on each server, e.g. 'survival' and 'creative'
   Poll_seconds: 10
+  Departure_minutes: 2       # 10 by default; shorter for testing
+  Transit_minutes: 1         # 5 by default
+  Vehicle: 'the mail ship'
 ```
 
 Each server needs a Central and at least one office with an address. Give both servers an office with the
@@ -54,8 +58,14 @@ Each server needs a Central and at least one office with an address. Give both s
    or on B.
 - [ ] The confirmation reads `B:Testville, Home, <friend> (online on B)` (or `last seen …`).
 - [ ] It says the letter goes to another server, and that postage is the network rate.
-2. Confirm with `/`, and post it in a mailbox or at the post office.
-- [ ] Within a few minutes it's delivered to Home **on B**, not to A's own Testville/Home.
+2. Confirm with `/`, and post it in a mailbox or at the post office. Once it reaches A's Central, run
+   `/postal network` on A.
+- [ ] It shows the next departure and `1 letter waiting at Central (B: 1)`.
+- [ ] At the departure, A broadcasts `The mail ship departs for B with 1 letter; it arrives in 1 min.`, and a
+  bell rings at A's Central.
+- [ ] A minute later, B broadcasts `The mail ship from A has arrived with 1 letter.`, and a bell rings at B's
+  Central.
+- [ ] Soon after, it's delivered to Home **on B**, not to A's own Testville/Home.
 - [ ] The letter on B has the right title, text and author, and names your friend.
 3. `/postal track last` on A, and `/postal track <id>` on B.
 - [ ] Both show the same letter, `DELIVERED`, with steps `on A` up to `IN_NETWORK` and `on B` after.
