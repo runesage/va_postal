@@ -280,8 +280,13 @@ P1 follows this design, with these differences:
 
 - **MySQL/MariaDB.** `Storage.Type: mysql` opens the same `SqlMailStore` over the MariaDB driver (loaded through
   `plugin.yml` `libraries:`, like SQLite's). Settings: `Storage.Mysql.Host`, `Port`, `Database`, `User`,
-  `Password`, `Pool_size` (default 6) and `Properties` (extra JDBC parameters, e.g. `useSsl=true`). Connections
-  time out after 3 seconds, so a database that's down makes calls fail rather than hang the server.
+  `Password`, `Pool_size` (default 6) and `Properties` (extra JDBC parameters, e.g. `useSsl=true`).
+- **Outages.** Connections time out after 1 second, and a lost connection trips a circuit breaker: store calls
+  then fail at once (mail stays where it is, and new mail travels untracked, as when the store can't open)
+  until a background check every 5 seconds finds the database again. Measured by killing MariaDB for 70
+  seconds mid-run: TPS stayed at 19-20, a letter waiting at the office was delivered on the first round after
+  the store came back, and the only stall was the first call after the database died (one connection
+  timeout).
 - **Dialect variants.** The schema stays in the shared subset. A migration may have a variant
   (`V3__wide_payload.mysql.sql` beside `V3__wide_payload.sql`) where the two can't agree: schema 3 widens the
   parcel payload to `LONGBLOB` on MySQL, where a `BLOB` holds only 64 KB (SQLite has no such limit).
@@ -295,9 +300,9 @@ P1 follows this design, with these differences:
   heartbeat takes the row over, so a restart or a crashed server's leftover row is no false alarm.
 - **Store health.** Every store call is timed (`StoreStats`, a proxy around the store): `/postal store` shows the
   backend, schema, call rate, average and slowest call, main-thread time, failures and the registered servers.
-- **Still synchronous.** Store calls stay on the calling thread, as in P1, rather than the async pipeline of §4:
-  measured below, with MySQL on the same machine they cost well under a millisecond each and the server keeps
-  20 TPS. A remote database adds its round trip to every call; `/postal store` shows what that costs. The
+- **Still synchronous.** Store calls stay on the calling thread, as in P1, rather than the async pipeline of §4.
+  Measured on the SMP load test (12 towns, 240 addresses, 15 minutes) with MariaDB on the same machine: 909
+  calls averaging 1.04 ms, 0.9 seconds of main-thread time in all, TPS at least 18.9, the same as on SQLite. A remote database adds its round trip to every call; `/postal store` shows what that costs. The
   async pipeline remains the plan if real networks need it.
 - **Parity tests.** The store tests are one contract suite (`MailStoreContract`) run on SQLite and on
   MariaDB (`MariaDbMailStoreTest`, enabled by `POSTAL_TEST_MYSQL_URL`). CI's build job has a MariaDB service, and

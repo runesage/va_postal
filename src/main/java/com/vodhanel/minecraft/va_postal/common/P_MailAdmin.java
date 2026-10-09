@@ -375,7 +375,13 @@ public final class P_MailAdmin {
             send(sender, "&cNot open: mail isn't being tracked. See the server log for why.");
             return;
         }
-        send(sender, "&7Server id &f" + store.server_id() + "&7, schema &f" + store.schema_version());
+        String schema;
+        try {
+            schema = String.valueOf(store.schema_version());
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            schema = "unknown (unreachable)";
+        }
+        send(sender, "&7Server id &f" + store.server_id() + "&7, schema &f" + schema);
         com.vodhanel.minecraft.va_postal.store.StoreStats st = MailStores.stats();
         if (st != null) {
             long minutes = Math.max(1L, (System.currentTimeMillis() - st.since) / 60000L);
@@ -390,7 +396,14 @@ public final class P_MailAdmin {
             }
         }
         long now = System.currentTimeMillis();
-        for (com.vodhanel.minecraft.va_postal.store.ServerInfo s : store.servers()) {
+        java.util.List<com.vodhanel.minecraft.va_postal.store.ServerInfo> servers;
+        try {
+            servers = store.servers();
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            send(sender, "&cCan't list the servers: " + e.getMessage());
+            return;
+        }
+        for (com.vodhanel.minecraft.va_postal.store.ServerInfo s : servers) {
             String seen = s.last_seen() == 0 ? "stopped" : ((now - s.last_seen()) / 1000L) + " s ago";
             boolean me = s.server_id().equals(store.server_id());
             send(sender, "&7Server &f" + s.server_id() + (me ? " &7(this one)" : "") + "&7: last seen " + seen
@@ -413,7 +426,13 @@ public final class P_MailAdmin {
             return;
         }
         String server = args.length > 1 ? args[1] : null;
-        java.util.List<com.vodhanel.minecraft.va_postal.store.DirectoryEntry> all = store.directory(server);
+        java.util.List<com.vodhanel.minecraft.va_postal.store.DirectoryEntry> all;
+        try {
+            all = store.directory(server);
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            send(sender, "&cCan't read the directory: " + e.getMessage());
+            return;
+        }
         if (all.isEmpty()) {
             send(sender, "&7Nothing published" + (server == null ? "" : " by " + server) + " yet (it's published a few"
                     + " seconds after start, then every minute when something changes).");

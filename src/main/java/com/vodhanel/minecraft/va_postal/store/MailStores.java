@@ -59,9 +59,11 @@ public final class MailStores {
                 config.setUsername(s.user());
                 config.setPassword(s.password());
                 config.setMaximumPoolSize(Math.max(2, s.pool_size()));
-                // Short waits: a database that's down must not hang the server; calls fail and are retried later.
-                config.setConnectionTimeout(3000L);
-                config.setValidationTimeout(2000L);
+                // Short waits: a database that's down must not hang the server. The first call after it goes
+                // waits this long (possibly on the main thread); then the breaker in StoreStats fails calls at
+                // once until it's back. A database on the network connects in milliseconds.
+                config.setConnectionTimeout(1000L);
+                config.setValidationTimeout(500L);
                 description = "MySQL (" + s.host() + ":" + s.port() + "/" + s.database() + ")";
                 if ("main".equals(server_id)) {
                     log.warning("Storage.Type is mysql but Network.Server_id is 'main'. Fine for one server; every "

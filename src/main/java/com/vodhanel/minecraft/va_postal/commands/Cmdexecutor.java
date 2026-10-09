@@ -158,6 +158,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.pinform(player, "Required permission not present.");
                 return true;
             }
+            try {
             if ("bank".equals(sub)) P_Bank.command(player, args);
             else if ("track".equals(sub)) P_MailAdmin.track(player, args);
             else if ("reconcile".equals(sub)) P_MailAdmin.reconcile(player);
@@ -169,6 +170,10 @@ public class Cmdexecutor implements CommandExecutor {
             else if ("store".equals(sub)) P_MailAdmin.store(player);
             else if ("directory".equals(sub)) P_MailAdmin.directory(player, args);
             else P_MailAdmin.testletter(player, args);
+            } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                // The database is down or failing: say so rather than "an internal error occurred".
+                Util.pinform(player, "&cThe mail store is unavailable: " + e.getMessage());
+            }
             return true;
         }
         if ("speed".equals(args[0].toLowerCase().trim())) {
@@ -2798,7 +2803,14 @@ public class Cmdexecutor implements CommandExecutor {
         // Anything that isn't a player (console, RCON, command blocks, other plugins) gets the console
         // commands; only players reach the player-only commands below.
         if (!(sender instanceof Player)) {
-            if (cmd.getName().equalsIgnoreCase("postal")) result = postal_con(true, sender, cmd.getName(), args);
+            if (cmd.getName().equalsIgnoreCase("postal")) {
+                try {
+                    result = postal_con(true, sender, cmd.getName(), args);
+                } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                    sender.sendMessage("The mail store is unavailable: " + e.getMessage());
+                    result = true;
+                }
+            }
 
             if (cmd.getName().equalsIgnoreCase("alist")) result = alist_con(true, sender, cmd.getName(), args);
 

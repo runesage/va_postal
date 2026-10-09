@@ -69,10 +69,13 @@ dev/test-server.sh start --seed
 
 1. With the server running on MySQL, stop the database (`sudo systemctl stop mariadb`).
 2. `/postal testletter Testville Testville Home`, and `/postal store`.
-- [ ] The server keeps running: no freeze longer than a few seconds. `/postal store` shows failures and the
-  last error.
+- [ ] The server keeps running: at most one short freeze (about a second) when the first call finds the
+  database gone. The log says "The mail store can't be reached"; `/postal store` says it's unavailable and how
+  long for. The test letter is handed in "untracked" (it still travels the old way).
 3. Start the database again (`sudo systemctl start mariadb`).
-- [ ] New mail is tracked again (`/postal testletter …`, then `/postal track last`).
+- [ ] Within about 5 seconds the log says "The mail store is back after … seconds".
+- [ ] New mail is tracked again (`/postal testletter …`, then `/postal track last`), and any tracked letter that
+  was waiting during the outage is delivered on the postman's next round.
 
 ## 5. Two servers, one id (optional; needs a second server)
 
