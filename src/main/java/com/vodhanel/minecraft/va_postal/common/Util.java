@@ -50,10 +50,15 @@ public class Util {
             for (int a = 0; a < 3; a++) {
                 parsed[a] = ((int) Double.parseDouble(arg[(a + 1)].trim()));
             }
-            location = new Location(Bukkit.getWorld(arg[0]), parsed[0], parsed[1], parsed[2], 0.0F, 0.0F);
-            // Util.dinform("str2location: LOC IS "+location);
-        } catch (NumberFormatException numberFormatException) {
-            Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: " + str + " " + numberFormatException);
+            World world = Bukkit.getWorld(arg[0].trim());
+            if (world == null) {
+                Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: world not loaded: " + str);
+                return null;
+            }
+            location = new Location(world, parsed[0], parsed[1], parsed[2], 0.0F, 0.0F);
+        } catch (RuntimeException e) {
+            // Malformed string (NumberFormatException, ArrayIndexOutOfBoundsException, ...)
+            Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: " + str + " " + e);
             return null;
         }
         return location;
@@ -549,12 +554,15 @@ public class Util {
             for (int a = 0; a < 3; a++) {
                 parsed[a] = Double.parseDouble(arg[(a + 1)].trim());
             }
-            location = new Location(Bukkit.getWorld(arg[0]), parsed[0], parsed[1], parsed[2]);
-        } catch (NumberFormatException numberFormatException) {
-            return null;
+            World w = Bukkit.getWorld(arg[0].trim());
+            if (w == null) {
+                return null; // world removed/renamed/not loaded
+            }
+            location = new Location(w, parsed[0], parsed[1], parsed[2]);
+            return w.getBlockAt(location);
+        } catch (RuntimeException e) {
+            return null; // malformed string
         }
-        World w = location.getWorld();
-        return w.getBlockAt(location);
     }
 
     public static World str2world(String sworld) {
