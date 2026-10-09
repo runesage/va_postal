@@ -33,14 +33,18 @@ public final class Doorway {
     private Doorway() {
     }
 
+    /** Shutdown or reload: every crossing and climb is over, and every door and hatch postmen opened is closed. */
+    public static void shutdown() {
+        active.clear();
+        Climb.forget_all();
+        Openings.release_all();
+    }
+
     /** Forgets any crossing in progress (route cancelled or finished). */
     public static void reset(int id) {
         Crossing c = active.remove(id);
-        if (c != null && c.opened) {
-            for (Block d : c.opened_doors) {
-                ID_WTR.set_door_open(d, false, true);
-            }
-            c.opened_doors.clear();
+        if (c != null) {
+            c.close(true);
         }
     }
 
@@ -53,6 +57,12 @@ public final class Doorway {
             return false;
         }
         Crossing c = active.get(id);
+        if (c != null && (!same_block(c.target, target)
+                || e.getLocation().distanceSquared(c.door.getLocation().add(0.5D, 0.0D, 0.5D)) > STALE * STALE)) {
+            // Left over from before a teleport (stall watchdog, stuck recovery, respawn) or a new waypoint: drop it.
+            reset(id);
+            c = null;
+        }
         if (c == null) {
             c = start(e.getLocation(), target);
             if (c == null) {
@@ -90,14 +100,70 @@ public final class Doorway {
                     (int) Math.floor(at.getZ() + dir.getZ() * t));
             if (!b.equals(at.getBlock()) && ID_WTR.is_route_door(b.getType())
                     && b.getBlockData() instanceof Openable) {
-                // Cross along the door's axis: the larger component of the way he's going.
-                BlockFace axis = Math.abs(dir.getX()) >= Math.abs(dir.getZ())
-                        ? (dir.getX() > 0 ? BlockFace.EAST : BlockFace.WEST)
-                        : (dir.getZ() > 0 ? BlockFace.SOUTH : BlockFace.NORTH);
-                return new Crossing(b, axis);
+                BlockFace axis = axis(b, at, dir);
+                Crossing c = new Crossing(b, axis, target);
+                return c.sound() ? c : null; // nowhere clear to stand either side: leave it to Citizens
             }
         }
         return null;
+    }
+
+    /** True if a route door or gate stands on the straight line from {@code at} to {@code target}, at his feet. */
+    static boolean door_between(Location at, Location target) {
+        if (at == null || target == null || !at.getWorld().equals(target.getWorld())) {
+            return false;
+        }
+        Vector dir = target.toVector().subtract(at.toVector()).setY(0);
+        double len = dir.length();
+        if (len < 0.3D) {
+            return false;
+        }
+        dir.multiply(1.0D / len);
+        for (double t = 0.3D; t < len; t += 0.25D) {
+            Block b = at.getWorld().getBlockAt((int) Math.floor(at.getX() + dir.getX() * t), at.getBlockY(),
+                    (int) Math.floor(at.getZ() + dir.getZ() * t));
+            if (!b.equals(at.getBlock()) && ID_WTR.is_route_door(b.getType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A crossing more than this far (blocks) from where he is now is stale: he was teleported away from it. */
+    static final double STALE = 4.0D;
+
+    static boolean same_block(Location a, Location b) {
+        return a != null && b != null && a.getWorld().equals(b.getWorld()) && a.getBlockX() == b.getBlockX()
+                && a.getBlockY() == b.getBlockY() && a.getBlockZ() == b.getBlockZ();
+    }
+
+    /**
+     * The way through a door: along the door's own facing (a door or gate is walked through along the direction it
+     * faces), towards the side he's heading for. Not his approach angle, which from a diagonal would put him into the
+     * wall beside the door.
+     */
+    static BlockFace axis(Block door, Location at, Vector dir) {
+        boolean along_x;
+        if (door.getBlockData() instanceof org.bukkit.block.data.Directional d) {
+            BlockFace f = d.getFacing();
+            along_x = f == BlockFace.EAST || f == BlockFace.WEST;
+        } else {
+            along_x = Math.abs(dir.getX()) >= Math.abs(dir.getZ());
+        }
+        double toward = along_x ? dir.getX() : dir.getZ();
+        if (Math.abs(toward) < 1.0E-3D) { // heading along the door's plane: go away from the side he's on
+            toward = along_x ? door.getX() + 0.5D - at.getX() : door.getZ() + 0.5D - at.getZ();
+        }
+        if (along_x) {
+            return toward > 0 ? BlockFace.EAST : BlockFace.WEST;
+        }
+        return toward > 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+    }
+
+    /** True if a postman can stand at {@code at}: feet and head clear. */
+    static boolean clear(Location at) {
+        Block feet = at.getBlock();
+        return feet.isPassable() && feet.getRelative(BlockFace.UP).isPassable();
     }
 
     /** Most doors in a row one crossing takes (a door straight onto a fence gate, a double-thick entrance). */
@@ -109,6 +175,9 @@ public final class Doorway {
      */
     static final class Crossing {
         final Block door;
+        final Location target;
+        /** The block past the last door of the run: must be clear (not a fourth door, not a wall). */
+        final Block beyond;
         final java.util.List<Block> doors = new java.util.ArrayList<>();
         final java.util.List<Block> opened_doors = new java.util.ArrayList<>();
         final Location before;
@@ -118,18 +187,26 @@ public final class Doorway {
         int phase;
         int wait;
 
-        Crossing(Block door, BlockFace axis) {
+        Crossing(Block door, BlockFace axis, Location target) {
             this.door = door;
+            this.target = target;
             Block b = door;
             for (int i = 0; i < MAX_RUN && ID_WTR.is_route_door(b.getType()) && b.getBlockData() instanceof Openable; i++) {
                 doors.add(b);
                 b = b.getRelative(axis);
             }
+            this.beyond = b;
             Location first = door.getLocation().add(0.5D, 0.0D, 0.5D);
             Location last = doors.get(doors.size() - 1).getLocation().add(0.5D, 0.0D, 0.5D);
             this.before = first.clone().subtract(axis.getModX(), 0, axis.getModZ());
             this.after = last.clone().add(axis.getModX(), 0, axis.getModZ());
             this.face = first.clone().add(0, 1.0D, 0);
+        }
+
+        /** True if the crossing can be made: somewhere clear to stand before the first door and past the last. */
+        boolean sound() {
+            boolean beyond_is_door = ID_WTR.is_route_door(beyond.getType());
+            return !beyond_is_door && clear(before) && clear(after);
         }
 
         /** Advances one tick; true when he's through. */
@@ -138,8 +215,7 @@ public final class Doorway {
                 case 0: // line up in front of the door
                     if (move(e, before)) {
                         for (Block d : doors) {
-                            if (!((Openable) d.getBlockData()).isOpen()) {
-                                ID_WTR.set_door_open(d, true, false);
+                            if (Openings.hold(d, false)) {
                                 opened_doors.add(d);
                             }
                         }
@@ -156,17 +232,17 @@ public final class Doorway {
                     return false;
                 default: // through, then close them behind him
                     if (move(e, after)) {
-                        close();
+                        close(false);
                         return true;
                     }
                     return false;
             }
         }
 
-        /** Closes the doors this crossing opened. */
-        void close() {
+        /** Lets go of the doors this crossing opened (each closes once no other postman is in it). */
+        void close(boolean quiet) {
             for (Block d : opened_doors) {
-                ID_WTR.set_door_open(d, false, false);
+                Openings.release(d, quiet);
             }
             opened_doors.clear();
             opened = false;

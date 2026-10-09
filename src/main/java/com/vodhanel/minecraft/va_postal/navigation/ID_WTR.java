@@ -331,7 +331,10 @@ public class ID_WTR {
 
             // At the wrong height he isn't there, however close: beside a bridge isn't on it (and from there,
             // heading for the far end of the deck, he walked into the river under it).
-            if (Math.abs(npc_loc.getY() - target.getBlockY()) > 0.9D) {
+            // Up to just under a block below it, though: on a carpet or a thin snow layer he stands a little above the
+            // block the waypoint was put on top of.
+            double dy = npc_loc.getY() - target.getBlockY();
+            if (dy > 0.9D || dy < -0.95D) {
                 return false;
             }
 
@@ -357,6 +360,11 @@ public class ID_WTR {
                 return Math.sqrt(dx * dx + dz * dz) <= 1.25D && Math.abs(npc_loc.getY() - target.getBlockY()) <= 0.6D;
             }
 
+            // The generous radii below never reach through a door: he'd "arrive" from the wrong side of it.
+            if (Doorway.door_between(npc_loc, target)) {
+                return false;
+            }
+
             //Util.dinform(AnsiColor.CYAN + "DISTANCE: "+npc_loc.distance(target));
             if (VA_postal.lossy_pathfinding && npc_loc.distance(target) <= 2D) {
                 return true;
@@ -374,6 +382,7 @@ public class ID_WTR {
     }
 
     public static void invoke_next_waypoint(int id) {
+        Doorway.reset(id); // a crossing for the waypoint he's leaving is over (a finished one has removed itself)
         if (!VA_postal.wtr_waypoint_completed[id]) {
             VA_postal.wtr_waypoint_completed[id] = true;
             VA_postal.wtr_watchdog_stuck_retry[id] = 0;
@@ -511,7 +520,8 @@ public class ID_WTR {
     }
 
     static void set_door_open(Block block, boolean open, boolean quiet) {
-        if (block == null || !is_route_door(block.getType())) {
+        boolean hatch = block != null && Tag.TRAPDOORS.isTagged(block.getType());
+        if (block == null || !is_route_door(block.getType()) && !hatch) {
             return;
         }
         BlockData data = block.getBlockData();
@@ -524,6 +534,8 @@ public class ID_WTR {
             Sound sound;
             if (Tag.FENCE_GATES.isTagged(block.getType())) {
                 sound = open ? Sound.BLOCK_FENCE_GATE_OPEN : Sound.BLOCK_FENCE_GATE_CLOSE;
+            } else if (hatch) {
+                sound = open ? Sound.BLOCK_WOODEN_TRAPDOOR_OPEN : Sound.BLOCK_WOODEN_TRAPDOOR_CLOSE;
             } else {
                 sound = open ? Sound.BLOCK_WOODEN_DOOR_OPEN : Sound.BLOCK_WOODEN_DOOR_CLOSE;
             }

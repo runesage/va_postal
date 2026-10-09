@@ -59,7 +59,7 @@ public final class Climb {
         open.removeIf(b -> {
             boolean clear = b.getX() != at.getBlockX() || b.getZ() != at.getBlockZ() || b.getY() < feet || b.getY() > feet + 1;
             if (clear) {
-                ID_WTR.set_door_open(b, false, true);
+                Openings.release(b, false);
             }
             return clear;
         });
@@ -68,12 +68,17 @@ public final class Climb {
         }
     }
 
+    /** Forgets every climb (shutdown; {@link Openings#release_all} closes the hatches). */
+    static void forget_all() {
+        hatches.clear();
+    }
+
     /** Closes any hatch postman {@code id} opened (his route was cancelled or finished). */
     public static void reset(int id) {
         java.util.List<Block> open = hatches.remove(id);
         if (open != null) {
             for (Block b : open) {
-                ID_WTR.set_door_open(b, false, true);
+                Openings.release(b, true);
             }
         }
     }
@@ -86,9 +91,9 @@ public final class Climb {
         int feet = (int) Math.floor(next.getY());
         for (int y = feet - 1; y <= feet + 2; y++) {
             Block b = next.getWorld().getBlockAt(next.getBlockX(), y, next.getBlockZ());
-            if (hatch(b) && b.getBlockData() instanceof org.bukkit.block.data.Openable o && !o.isOpen()) {
-                ID_WTR.set_door_open(b, true, false);
-                hatches.computeIfAbsent(id, k -> new java.util.ArrayList<>()).add(b);
+            java.util.List<Block> mine = hatches.computeIfAbsent(id, k -> new java.util.ArrayList<>());
+            if (hatch(b) && !mine.contains(b) && Openings.hold(b, false)) {
+                mine.add(b);
             }
         }
     }

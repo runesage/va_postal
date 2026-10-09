@@ -108,6 +108,28 @@ public final class Surveyor {
         return best;
     }
 
+    /** At most this many places to stand around the end are goals for one survey. */
+    static final int MAX_GOALS = 8;
+
+    /**
+     * The places to stand within two blocks of (x, y, z), nearest first (at most {@code limit}). The end of a route
+     * is any of them: a mailbox in a wall is reached from whichever side of the wall a postman can get to.
+     */
+    public List<int[]> stands_near(int x, int y, int z, int limit) {
+        List<int[]> found = new ArrayList<>();
+        for (int dy = -2; dy <= 2; dy++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (stand(x + dx, y + dy, z + dz)) {
+                        found.add(new int[]{x + dx, y + dy, z + dz, dx * dx + dz * dz + 2 * dy * dy});
+                    }
+                }
+            }
+        }
+        found.sort((a, b) -> Integer.compare(a[3], b[3]));
+        return found.size() > limit ? new ArrayList<>(found.subList(0, limit)) : found;
+    }
+
     // ---- Search -----------------------------------------------------------------------------
 
     private static final class Node implements Comparable<Node> {
@@ -149,16 +171,35 @@ public final class Surveyor {
      */
     public Result survey(int sx, int sy, int sz, int gx, int gy, int gz, int margin) {
         int[] s = nearest_stand(sx, sy, sz);
-        int[] t = nearest_stand(gx, gy, gz);
+        List<int[]> goals = stands_near(gx, gy, gz, MAX_GOALS);
         if (s == null) {
             return new Result(List.of(), List.of(), 0, "nowhere to stand at the start (" + sx + "," + sy + "," + sz + ")");
         }
-        if (t == null) {
+        if (goals.isEmpty()) {
             return new Result(List.of(), List.of(), 0, "nowhere to stand at the end (" + gx + "," + gy + "," + gz + ")");
         }
+        int[] t = goals.get(0);
+        // The nearest place to stand by the address first; if there's no way to it (a mailbox in a wall, reached
+        // from the wall's other side), any other place within two blocks of the address.
+        Result r = search(s, t, java.util.Set.of(key(t[0], t[1], t[2])), margin);
+        if (r.ok() || goals.size() == 1 || r.failure().startsWith("gave up")) {
+            return r;
+        }
+        java.util.Set<Long> others = new java.util.HashSet<>();
+        for (int[] g : goals.subList(1, goals.size())) {
+            others.add(key(g[0], g[1], g[2]));
+        }
+        Result other = search(s, t, others, margin);
+        return other.ok() ? other : r;
+    }
+
+    /** A* from {@code s} to any of {@code goal_keys}, heading for {@code t} (one of them, or right beside them). */
+    private Result search(int[] s, int[] t, java.util.Set<Long> goal_keys, int margin) {
+        // The wider retry goes higher and lower too: a way over a tall hill is a long way round upwards.
+        int margin_y = Math.max(MARGIN_Y, margin / 2);
         int min_x = Math.min(s[0], t[0]) - margin, max_x = Math.max(s[0], t[0]) + margin;
         int min_z = Math.min(s[2], t[2]) - margin, max_z = Math.max(s[2], t[2]) + margin;
-        int min_y = Math.min(s[1], t[1]) - MARGIN_Y, max_y = Math.max(s[1], t[1]) + MARGIN_Y;
+        int min_y = Math.min(s[1], t[1]) - margin_y, max_y = Math.max(s[1], t[1]) + margin_y;
 
         PriorityQueue<Node> open = new PriorityQueue<>();
         Map<Long, Double> best = new HashMap<>();
@@ -176,7 +217,7 @@ public final class Surveyor {
             if (known != null && known < n.g) {
                 continue; // a better way here was found since this was queued
             }
-            if (n.x == t[0] && n.y == t[1] && n.z == t[2]) {
+            if (goal_keys.contains(key(n.x, n.y, n.z))) {
                 List<Point> path = path(n);
                 return new Result(path, waypoints(path), expanded, null);
             }

@@ -206,6 +206,8 @@ public class RouteMngr {
     }
 
     public static synchronized void delete_npc(int id) {
+        Doorway.reset(id); // never leave a door or hatch open behind a postman who's gone
+        Climb.reset(id);
         if (VA_postal.wtr_nav[id] != null) VA_postal.wtr_nav[id] = null;
         if (VA_postal.wtr_goal[id] != null) VA_postal.wtr_goal[id] = null;
         if (VA_postal.wtr_goalselector[id] != null) VA_postal.wtr_goalselector[id] = null;
@@ -230,6 +232,8 @@ public class RouteMngr {
             return;
         }
 
+        Doorway.reset(id); // nothing carried over from his last route
+        Climb.reset(id);
         VA_postal.wtr_last_stuck_action[id] = "";
         VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
         VA_postal.wtr_watchdog_stuck_stamp[id] = System.currentTimeMillis();
@@ -324,6 +328,8 @@ public class RouteMngr {
                 if (VA_postal.dynmap_configured) P_Dynmap.update_pos(id, false, false, false);
             }
         } else {
+            Doorway.reset(id);
+            Climb.reset(id);
             lookclose_on_route(id, false);
             VA_postal.wtr_goal_active[id] = false;
             com.vodhanel.minecraft.va_postal.mail.Letters.route_finished(id);

@@ -112,7 +112,9 @@ public class Stuck_NPC implements StuckAction {
         }
         double n_elev = npc.getEntity().getLocation().getY();
         Location target = npc.getEntity().getLocation();
-        if (t_elev > n_elev) {
+        // Up onto a step at most: with his waypoint a floor or more above him (a ladder, an upper storey), lifting him
+        // to its height where he stands would put him into a roof or in mid-air.
+        if (t_elev > n_elev && t_elev - n_elev <= 1.0D) {
             target.setY(t_elev);
         } else {
             target.setY(n_elev);
