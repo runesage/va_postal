@@ -510,7 +510,8 @@ public class C_Dispatcher {
 
         String path = GetConfig.path_format("address");
         ConfigurationSection po_addr = VA_postal.configsettings.getConfigurationSection(path);
-        Set<String> po_addr_keys = po_addr.getKeys(false);
+        // No Address section at all (Central set, no /setlocal yet) reads the same as an empty one.
+        Set<String> po_addr_keys = po_addr == null ? java.util.Collections.<String>emptySet() : po_addr.getKeys(false);
         Iterator<String> itr_poffice = po_addr_keys.iterator();
         if (!itr_poffice.hasNext()) {
             VA_postal.needs_configuration = true;

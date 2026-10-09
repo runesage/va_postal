@@ -95,6 +95,8 @@ public class VA_Dispatcher {
         String[] town_list = C_Arrays.town_list();
         if ((town_list == null) || (town_list.length <= 0)) {
             Util.con_type(AnsiColor.RED + "VA_Postal start aborted - could not compile town list.");
+            // Say what is missing (Central, a local office, an address) rather than leaving it at that.
+            C_Dispatcher.reality_check_n_chunk_list();
             return;
         }
         // Clear PostMen/PostMasters left by an earlier run before creating this run's.

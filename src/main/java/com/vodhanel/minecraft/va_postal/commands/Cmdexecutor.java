@@ -1833,10 +1833,14 @@ public class Cmdexecutor implements CommandExecutor {
                     boolean is_po = false;
                     if (saddr.equalsIgnoreCase("post_office")) {
                         is_po = true;
-                        if (C_Owner.is_local_po_owner_defined(stown))
-                            sownr = Util.df(C_Owner.get_owner_local_po(stown).getDisplayName());
-                    } else if (C_Owner.is_address_owner_defined(stown, saddr))
-                        sownr = Util.df(C_Owner.get_owner_address(stown, saddr).getDisplayName());
+                        String po_owner_name = C_Owner.get_owner_local_po_name(stown);
+                        if (po_owner_name != null)
+                            sownr = Util.df(po_owner_name);
+                    } else {
+                        String addr_owner_name = C_Owner.get_owner_address_name(stown, saddr);
+                        if (addr_owner_name != null)
+                            sownr = Util.df(addr_owner_name);
+                    }
 
                     sownr = fixed_len(Util.df(sownr), 14, "-");
                     String hding = parts[3];
