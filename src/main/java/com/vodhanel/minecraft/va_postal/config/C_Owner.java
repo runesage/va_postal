@@ -145,6 +145,38 @@ public class C_Owner {
         return parse_owner(owner_uuid("address." + stown + "." + saddress + ".owner"));
     }
 
+    /**
+     * Account name of a local post office's owner, or null when it has none (or the server owns it).
+     * Works whether or not the owner is online; see {@link #account_name(UUID)}.
+     */
+    public static synchronized String get_owner_local_po_name(String stown) {
+        return account_name(get_owner_local_po_id(stown));
+    }
+
+    /** Account name of an address's owner, or null when it has none (or the server owns it). */
+    public static synchronized String get_owner_address_name(String stown, String saddress) {
+        return account_name(get_owner_address_id(stown, saddress));
+    }
+
+    /**
+     * The account name for a player UUID, online or not. A UUID the server has never seen has no name, so the
+     * UUID text stands in (the same placeholder an offline owner's {@link Util#UUID2Player} stand-in carries,
+     * so sign lookups by owner name still match). Null for a null id.
+     */
+    public static String account_name(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        try {
+            String name = org.bukkit.Bukkit.getOfflinePlayer(id).getName();
+            if (name != null && !name.isEmpty()) {
+                return name;
+            }
+        } catch (Exception ignored) {
+        }
+        return id.toString();
+    }
+
     /** The owner UUID stored at {@code owner_path}.uuid, or null. */
     private static String owner_uuid(String owner_path) {
         return VA_postal.plugin.getConfig().getString(GetConfig.path_format(owner_path + ".uuid"));

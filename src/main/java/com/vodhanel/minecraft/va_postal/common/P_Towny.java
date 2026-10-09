@@ -438,8 +438,9 @@ public class P_Towny {
 
                     if (detail) {
                         sowner = " server";
-                        if (C_Owner.is_address_owner_defined(poffice, address)) {
-                            sowner = " " + C_Owner.get_owner_address(poffice, address).getDisplayName().toLowerCase();
+                        String addr_owner_name = C_Owner.get_owner_address_name(poffice, address);
+                        if (addr_owner_name != null) {
+                            sowner = " " + addr_owner_name.toLowerCase();
                         }
                         disp = fmt_addr + fixed_len(Util.df(address), 16, fmt_fill);
                         disp = disp + fmt_ownr + sowner;

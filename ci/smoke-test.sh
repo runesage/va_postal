@@ -180,6 +180,63 @@ run_server "$WORK_DIR/phase7.log" "postal bank" "postal office testville" "posta
     "postal bank newday" "sleep:1" "postal bank policy upkeep.base 5000" "postal bank newday" "sleep:1" \
     "postal office testville" "postal bank policy dividend.cap 0.9" "postal bank report" "postal bank" "sleep:1"
 
+# Phase 8 (#13): `postal start` after /setcentral but before the first /setlocal. The config is cut back to the
+# settings above the seeded network plus Central, so there is no local office and no Address section.
+echo "== Phase 8: postal start with Central set but no local office or addresses"
+cp "$CONFIG" "$WORK_DIR/config.full.yml"
+python3 - "$CONFIG" <<'PY'
+import sys
+p = sys.argv[1]
+text = open(p).read()
+head = text.split("\nPostoffice:\n", 1)[0]
+open(p, "w").write(head + "\nPostoffice:\n  Central:\n    Location: world,0.0,-60.0,2.0\n")
+PY
+run_server "$WORK_DIR/phase8.log" "postal start" "sleep:3" "postal stop" "sleep:2"
+cp "$WORK_DIR/config.full.yml" "$CONFIG"
+
+# Phase 9 (#12): owners who are not online. The smoke server has no players, so any owner is offline. Home is owned
+# by a player the server has seen (their saved player data supplies the name), Testville by one it has never seen.
+# Starting the dispatcher rewrites Testville's office sign, and /tlist and /alist list the owners.
+echo "== Phase 9: offline owners are listed and signed by account name"
+KNOWN_UUID="7c2e9f10-5a4b-4c3d-8e6f-1a2b3c4d5e6f"
+KNOWN_NAME="PostalOwner"
+python3 - "$CONFIG" "$OWNER_UUID" "$KNOWN_UUID" "$KNOWN_NAME" "$SERVER/world/players/data" <<'PY'
+import gzip, os, struct, sys
+path, unknown, known, name, datadir = sys.argv[1:]
+# The server learns an offline player's name from their player data (Bukkit's lastKnownName), so write a
+# minimal file for the known owner: {bukkit: {lastKnownName: <name>}}.
+def tag_str(key, val):
+    k, v = key.encode(), val.encode()
+    return b"\x08" + struct.pack(">H", len(k)) + k + struct.pack(">H", len(v)) + v
+inner = tag_str("lastKnownName", name) + b"\x00"
+nbt = b"\x0a\x00\x00" + b"\x0a" + struct.pack(">H", 6) + b"bukkit" + inner + b"\x00"
+os.makedirs(datadir, exist_ok=True)
+with gzip.open(os.path.join(datadir, known + ".dat"), "wb") as f:
+    f.write(nbt)
+text = open(path).read()
+# Phase 7 gave both Testville and Home the unknown owner; Home's (the last one in the file) goes to the known player.
+old = "Uuid: " + unknown
+i = text.rindex(old)
+open(path, "w").write(text[:i] + "Uuid: " + known + text[i + len(old):])
+PY
+run_server "$WORK_DIR/phase9.log" "tlist testville" "alist Testville" "postal start" "sleep:15" \
+    "data get block 20 -60 1 front_text.messages" "data get block 40 -60 1 front_text.messages" \
+    "postal stop" "sleep:3"
+
+# Phase 10 (#12): an owner entry with no usable UUID (hand-edited or damaged config) reads as no owner.
+echo "== Phase 10: an owner entry without a usable UUID is treated as no owner"
+python3 - "$CONFIG" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+text, n = re.subn(r"(\n( +)Owner:\n\2 +Uuid: )[0-9a-f-]+", r"\1not-a-uuid", text)
+assert n == 2, n
+open(path, "w").write(text)
+PY
+run_server "$WORK_DIR/phase10.log" "tlist testville" "alist Testville" "postal start" "sleep:15" \
+    "data get block 20 -60 1 front_text.messages" "data get block 40 -60 1 front_text.messages" \
+    "postal stop" "sleep:3"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -302,6 +359,28 @@ check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for jo
 # duplicates on each restart).
 check "phase2: no PostMan/PostMaster saved by Citizens" \
     test "$(grep -c "name: '&cPost" "$SERVER/plugins/Citizens/saves.yml" 2>/dev/null || true)" -eq 0
+
+
+# Phase 8 (#13): the unconfigured start is refused with guidance, not an exception.
+check "phase8: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase8.log"
+check "phase8: no exception on postal start" no_match "NullPointerException|Command exception: /?postal|at .*com\.vodhanel\." "$WORK_DIR/phase8.log"
+check "phase8: postal start aborts cleanly" grep -q "could not compile town list" "$WORK_DIR/phase8.log"
+check "phase8: postal start says a local post office is needed" grep -q "cannot find a local post office to service" "$WORK_DIR/phase8.log"
+check "phase8: the dispatcher did not start" no_match "VA_Postal started" "$WORK_DIR/phase8.log"
+
+# Phase 9 (#12): offline owners show by account name; a player the server has never seen shows a placeholder.
+check "phase9: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase9.log"
+check "phase9: no exception or stack trace" no_match "NullPointerException|Command exception: /?(postal|tlist|alist)|at .*com\.vodhanel\." "$WORK_DIR/phase9.log"
+check "phase9: dispatcher started with offline owners" grep -q "VA_Postal started" "$WORK_DIR/phase9.log"
+check "phase9: /tlist names Home's offline owner" grep -qE "Home[.]+ +$KNOWN_NAME" <(plain phase9)
+check "phase9: /alist names Home's offline owner" grep -qE "^.*Home +$KNOWN_NAME" <(plain phase9)
+check "phase9: Testville's sign carries the placeholder for a never-seen owner" grep -qF "\"${OWNER_UUID:0:15}\"" <(plain phase9)
+
+# Phase 10 (#12): no usable owner UUID reads as no owner.
+check "phase10: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase10.log"
+check "phase10: no exception or stack trace" no_match "NullPointerException|Command exception: /?(postal|tlist|alist)|at .*com\.vodhanel\." "$WORK_DIR/phase10.log"
+check "phase10: dispatcher started" grep -q "VA_Postal started" "$WORK_DIR/phase10.log"
+check "phase10: /tlist lists the office and address as server-owned" grep -qE "Home[.]+ +server" <(plain phase10)
 
 echo
 echo "---- Postal output (phase 2) ----"

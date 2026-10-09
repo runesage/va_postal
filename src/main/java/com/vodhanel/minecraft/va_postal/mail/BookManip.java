@@ -471,11 +471,15 @@ public class BookManip {
         line_3 = Util.df(saddr);
         if (sowner == null) {
             if (saddr.contains("[Local]")) {
-                if (C_Owner.is_local_po_owner_defined(stown)) {
-                    line_4 = C_Owner.get_owner_local_po(stown).getName();
+                String owner_name = C_Owner.get_owner_local_po_name(stown);
+                if (owner_name != null) {
+                    line_4 = owner_name;
                 }
-            } else if (C_Owner.is_address_owner_defined(stown, saddr)) {
-                line_4 = C_Owner.get_owner_address(stown, saddr).getName();
+            } else {
+                String owner_name = C_Owner.get_owner_address_name(stown, saddr);
+                if (owner_name != null) {
+                    line_4 = owner_name;
+                }
             }
         }
         //Util.dinform("sowner for "+stown+" "+saddr+" was "+sowner);
