@@ -158,7 +158,7 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("network.broadcast"), true);
         VA_postal.plugin.getConfig().addDefault(path_format("network.sound"), "block.bell.use");
         VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.enabled"), true);
-        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.name"), "&3Dispatcher");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.name"), "&3Central Dispatcher");
         VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.distance"), 24);
         VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.uniform"), true);
         VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.always"), false);

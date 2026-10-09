@@ -34,7 +34,7 @@ import java.util.function.Supplier;
  * without Citizens, or if anything goes wrong (a stuck walk past its time limit, an unloaded chunk, a shutdown),
  * the transfer runs at once. The NPC is never saved by Citizens.
  */
-public final class Dispatcher {
+public final class CentralDispatcher {
     /** How near Central a player must be for the dispatcher to come in person. */
     static final double AUDIENCE = 48.0D;
     /** A walk that takes longer than this (in ticks) ends with a teleport. */
@@ -46,7 +46,7 @@ public final class Dispatcher {
 
     private static Scene active;
 
-    private Dispatcher() {
+    private CentralDispatcher() {
     }
 
     /** True while a dispatcher is on their way: Central's transfers wait for them. */
@@ -67,7 +67,7 @@ public final class Dispatcher {
                 return;
             } catch (RuntimeException | LinkageError e) {
                 active = null;
-                Util.dinform("[Postal] Dispatcher unavailable (" + e.getMessage() + "); moving the mail directly.");
+                Util.dinform("[Postal] Central dispatcher unavailable (" + e.getMessage() + "); moving the mail directly.");
             }
         }
         if (transfer.get() != null) {
@@ -171,7 +171,7 @@ public final class Dispatcher {
             this.stand = beside;
             this.start = from != null ? from : beside;
             this.npc = CitizensAPI.getNPCRegistry().createNPC(EntityType.PLAYER,
-                    ChatColor.translateAlternateColorCodes('&', config("network.dispatcher.name", "&3Dispatcher")));
+                    ChatColor.translateAlternateColorCodes('&', config("network.dispatcher.name", "&3Central Dispatcher")));
             npc.data().set(NPC.Metadata.SHOULD_SAVE, false);
             NpcLook.skin(npc, "dispatcher");
             npc.spawn(start);
@@ -270,8 +270,8 @@ public final class Dispatcher {
 
         private void say(String line) {
             Util.cinform("[Postal] " + ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&',
-                    config("network.dispatcher.name", "&3Dispatcher"))) + " at Central: " + line);
-            String message = ChatColor.translateAlternateColorCodes('&', "&7<" + config("network.dispatcher.name", "&3Dispatcher")
+                    config("network.dispatcher.name", "&3Central Dispatcher"))) + " at Central: " + line);
+            String message = ChatColor.translateAlternateColorCodes('&', "&7<" + config("network.dispatcher.name", "&3Central Dispatcher")
                     + "&7> &f" + line);
             for (Player p : chest.getWorld().getPlayers()) {
                 if (p.getLocation().distanceSquared(chest_center) <= EARSHOT * EARSHOT) {

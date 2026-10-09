@@ -214,8 +214,8 @@ check "alpha's letter: claimed and delivered on beta" grep -qiE -e "-> DELIVERED
 check "beta's letter: delivered on alpha" grep -qE "To alpha:testville, home from beta:testville: DELIVERED" "$A"
 check "alpha: the ship departed for beta" grep -q "The test ship departs for beta with 1 letter" "$A"
 check "beta: the ship from alpha arrived" grep -q "The test ship from alpha has arrived with 1 letter" "$B"
-check "alpha: the dispatcher carried the mail out" grep -q "Dispatcher at Central: All aboard for beta! 1 letter for the voyage." "$A"
-check "beta: the dispatcher brought the mail in" grep -q "Dispatcher at Central: Mail from alpha! 1 letter off the ship." "$B"
+check "alpha: the dispatcher carried the mail out" grep -q "Central Dispatcher at Central: All aboard for beta! 1 letter for the voyage." "$A"
+check "beta: the dispatcher brought the mail in" grep -q "Central Dispatcher at Central: Mail from alpha! 1 letter off the ship." "$B"
 check "alpha: /postal network shows the schedule" grep -q "The test ship leaves every 1 min and takes 30s" "$A"
 check "beta: unknown player reported" grep -q "No player called nobody_here" "$B"
 

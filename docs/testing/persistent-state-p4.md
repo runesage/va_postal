@@ -61,16 +61,16 @@ Each server needs a Central and at least one office with an address. Give both s
 2. Confirm with `/`, and post it in a mailbox or at the post office. Once it reaches A's Central, run
    `/postal network` on A.
 - [ ] It shows the next departure and `1 letter waiting at Central (B: 1)`.
-- [ ] At the departure, standing near A's Central: the **Dispatcher** walks in from a few dozen blocks away, opens the
+- [ ] At the departure, standing near A's Central: the **Central Dispatcher** walks in from a few dozen blocks away, opens the
   chest, takes the letter (now holding a mailbag), says `All aboard for B! 1 letter for the voyage.`, closes
   the chest and walks off. A bell rings as they leave. A broadcasts `The mail ship departs for B with 1 letter;
   it arrives in 1 min.`
-- [ ] A minute later, standing near B's Central: the Dispatcher walks in with the bag, a bell rings, they leave the
+- [ ] A minute later, standing near B's Central: the Central Dispatcher walks in with the bag, a bell rings, they leave the
   letter in the chest (`Mail from A! 1 letter off the ship.`) and walk off empty-handed. B broadcasts `The mail
   ship from A has arrived with 1 letter.`
-- [ ] The Dispatcher wears a postal-green cap and coat with navy trousers and black boots: clearly Post Office staff,
+- [ ] The Central Dispatcher wears a postal-green cap and coat with navy trousers and black boots: clearly Post Office staff,
   and distinguishable from both the postman (light-blue shirt) and the postmaster (maroon).
-- [ ] Away from Central (more than 48 blocks), the same departure happens with no Dispatcher: the letter just leaves
+- [ ] Away from Central (more than 48 blocks), the same departure happens with no Central Dispatcher: the letter just leaves
   on time.
 - [ ] Soon after, it's delivered to Home **on B**, not to A's own Testville/Home.
 - [ ] The letter on B has the right title, text and author, and names your friend.

@@ -396,7 +396,7 @@ public final class Network {
      * out, the next waits for them (a departure keeps its time, since its slot isn't marked done).
      */
     static void exchange(MailStore store, String key, List<MailRecord> out, List<MailRecord> in, long now) {
-        if (Dispatcher.busy()) {
+        if (CentralDispatcher.busy()) {
             return;
         }
         long period = Math.max(1_000L, departure_millis());
@@ -418,9 +418,9 @@ public final class Network {
         org.bukkit.block.Block block = at.getBlock();
         if (departure && !out.isEmpty()) {
             long arrives = slot * period + transit_millis();
-            Dispatcher.voyage(Dispatcher.Voyage.DEPARTURE, block, () -> depart(store, key, out, arrives));
+            CentralDispatcher.voyage(CentralDispatcher.Voyage.DEPARTURE, block, () -> depart(store, key, out, arrives));
         } else if (!arriving.isEmpty()) {
-            Dispatcher.voyage(Dispatcher.Voyage.ARRIVAL, block, () -> arrive(store, key, arriving));
+            CentralDispatcher.voyage(CentralDispatcher.Voyage.ARRIVAL, block, () -> arrive(store, key, arriving));
         }
     }
 
@@ -442,7 +442,7 @@ public final class Network {
         long now = System.currentTimeMillis();
         sent.forEach((server, n) -> announce(proper(vehicle()) + " departs for &f" + server + "&7 with " + letters(n)
                 + "; it arrives in " + duration(arrives - now) + "."));
-        return Dispatcher.line(Dispatcher.Voyage.DEPARTURE, and(sent.keySet()), total(sent));
+        return CentralDispatcher.line(CentralDispatcher.Voyage.DEPARTURE, and(sent.keySet()), total(sent));
     }
 
     /** The dispatcher brings the arrived letters: returns their line, or null if none could be claimed. */
@@ -464,7 +464,7 @@ public final class Network {
             return null;
         }
         received.forEach((server, n) -> announce(proper(vehicle()) + " from &f" + server + "&7 has arrived with " + letters(n) + "."));
-        return Dispatcher.line(Dispatcher.Voyage.ARRIVAL, and(received.keySet()), total(received));
+        return CentralDispatcher.line(CentralDispatcher.Voyage.ARRIVAL, and(received.keySet()), total(received));
     }
 
     private static int total(java.util.Map<String, Integer> counts) {
@@ -483,7 +483,7 @@ public final class Network {
         return String.join(", ", list.subList(0, list.size() - 1)) + " and " + list.get(list.size() - 1);
     }
 
-    /** A broadcast ({@code Network.Broadcast}), or just the log. The bell is the dispatcher's (or {@link Dispatcher#voyage}'s). */
+    /** A broadcast ({@code Network.Broadcast}), or just the log. The bell is the dispatcher's (or {@link CentralDispatcher#voyage}'s). */
     private static void announce(String message) {
         if (VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.broadcast"), true)) {
             Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&9[Postal] &7" + message));
