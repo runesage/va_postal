@@ -108,22 +108,27 @@ public final class Doorway {
         return null;
     }
 
-    /** True if a route door or gate stands on the straight line from {@code at} to {@code target}, at his feet. */
+    /** True if a route door or gate stands between {@code at} and {@code target}, at his feet. */
     static boolean door_between(Location at, Location target) {
         if (at == null || target == null || !at.getWorld().equals(target.getWorld())) {
             return false;
         }
-        Vector dir = target.toVector().subtract(at.toVector()).setY(0);
-        double len = dir.length();
-        if (len < 0.3D) {
+        // Every block in the box between his block and the waypoint's, not just a line to the waypoint's corner: from
+        // just inside a house, the line to a waypoint outside its door crossed the wall beside the door, so he
+        // "arrived" outside while still indoors and then pushed against the closed door. (Only used for the short
+        // "near enough" radii, so the box is a few blocks at most.)
+        int x1 = Math.min(at.getBlockX(), target.getBlockX()), x2 = Math.max(at.getBlockX(), target.getBlockX());
+        int z1 = Math.min(at.getBlockZ(), target.getBlockZ()), z2 = Math.max(at.getBlockZ(), target.getBlockZ());
+        if (x2 - x1 > 8 || z2 - z1 > 8) {
             return false;
         }
-        dir.multiply(1.0D / len);
-        for (double t = 0.3D; t < len; t += 0.25D) {
-            Block b = at.getWorld().getBlockAt((int) Math.floor(at.getX() + dir.getX() * t), at.getBlockY(),
-                    (int) Math.floor(at.getZ() + dir.getZ() * t));
-            if (!b.equals(at.getBlock()) && ID_WTR.is_route_door(b.getType())) {
-                return true;
+        Block from = at.getBlock();
+        for (int x = x1; x <= x2; x++) {
+            for (int z = z1; z <= z2; z++) {
+                Block b = at.getWorld().getBlockAt(x, at.getBlockY(), z);
+                if (!b.equals(from) && ID_WTR.is_route_door(b.getType())) {
+                    return true;
+                }
             }
         }
         return false;
