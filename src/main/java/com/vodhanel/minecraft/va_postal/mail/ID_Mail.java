@@ -749,7 +749,10 @@ public class ID_Mail {
                 } else {
                     String mail_address = book.getAuthor().toLowerCase().trim();
                     String this_address = VA_postal.wtr_address[id].toLowerCase().trim();
-                    if (mail_address.equals(this_address)) {
+                    // Its office too: mail waiting here for Central (another town's, or another server's) can have
+                    // an address with the same name as one of ours.
+                    boolean for_this_office = book.getTitle().toLowerCase().trim().equals(stown.toLowerCase().trim());
+                    if (mail_address.equals(this_address) && for_this_office) {
                         // Never picked up because its postage expired: it waits to be re-addressed.
                         if (book.getPages()[0].contains("[not-processed]") && P_Economy.postage_expired(ind_item)) {
                             continue;

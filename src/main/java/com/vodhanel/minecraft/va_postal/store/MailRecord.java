@@ -84,7 +84,15 @@ public final class MailRecord {
     public static MailRecord new_letter(UUID id, String server, String origin_office, String dest_office,
                                         String dest_address, UUID sender, UUID attention, byte[] payload,
                                         int mc_data_version, long now, String hold_id) {
-        return new MailRecord(id, MailKind.LETTER, MailState.POSTED, 0, server, server, lower(origin_office),
+        return new_letter(id, server, server, origin_office, dest_office, dest_address, sender, attention, payload,
+                mc_data_version, now, hold_id);
+    }
+
+    /** A letter for an office on {@code dest_server} (another server's, for a letter that crosses the network). */
+    public static MailRecord new_letter(UUID id, String server, String dest_server, String origin_office, String dest_office,
+                                        String dest_address, UUID sender, UUID attention, byte[] payload,
+                                        int mc_data_version, long now, String hold_id) {
+        return new MailRecord(id, MailKind.LETTER, MailState.POSTED, 0, server, dest_server, lower(origin_office),
                 lower(dest_office), lower(dest_address), server, Custody.NONE, null, null, sender, attention, 0.0D,
                 0.0D, "LETTER_V1", payload, mc_data_version, now, now, hold_id);
     }
@@ -96,6 +104,11 @@ public final class MailRecord {
         return new MailRecord(id, MailKind.PARCEL, MailState.POSTED, 0, server, server, lower(origin_office),
                 lower(dest_office), lower(dest_address), server, Custody.NONE, null, null, sender, attention, 0.0D,
                 0.0D, "PARCEL_V1", payload, mc_data_version, now, now, hold_id);
+    }
+
+    /** True for a letter that crosses servers. */
+    public boolean networked() {
+        return origin_server != null && !origin_server.equals(dest_server);
     }
 
     public boolean moving() {

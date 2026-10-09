@@ -91,6 +91,32 @@ public interface MailStore extends AutoCloseable {
     /** The directory: every server's offices and addresses ({@code server_id} null), or one server's. */
     List<DirectoryEntry> directory(String server_id);
 
+    // ---- Cross-server letters (persistent-state phase P4) -------------------------------------
+
+    /** Letters waiting in the network for this server to claim, oldest first. */
+    List<MailRecord> in_network();
+
+    /** Letters this server holds at {@code chest} (its Central) that are bound for another server. */
+    List<MailRecord> outbound(String chest);
+
+    /**
+     * Phase 1 of taking a letter from the network: only a {@code LETTER} in {@code IN_NETWORK} addressed to this
+     * server matches, so of two claimers only one wins (the other gets {@link ConflictException}). The record
+     * then belongs to this server, moving to {@code AT_CENTRAL} at {@code to}; commit once the book is there.
+     */
+    MailRecord claim(MailRecord current, Custody to, Actor actor);
+
+    /** Records that {@code player} joined this server ({@code online}) or left it. */
+    void player_seen(UUID player, String name, boolean online, long now);
+
+    /** Marks this server's players offline, then {@code online} as on it (at startup, and after a reload). */
+    void sync_players(List<NetworkPlayer> online, long now);
+
+    /** Players whose name is {@code name} (any case), most recently seen first. */
+    List<NetworkPlayer> players_named(String name);
+
+    java.util.Optional<NetworkPlayer> player(UUID id);
+
     @Override
     void close();
 }

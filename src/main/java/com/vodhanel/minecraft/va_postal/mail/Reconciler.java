@@ -112,6 +112,20 @@ public final class Reconciler {
                 if (!load && System.currentTimeMillis() - r.updated_at < IN_FLIGHT_MILLIS) {
                     return; // the dispatcher is mid-move; leave it to finish (at startup nothing is mid-move)
                 }
+                if (r.pending_state == MailState.IN_NETWORK) {
+                    // Handed to the network (persistent-state §17): the record carries the letter from here, so
+                    // finish it — take the book out of Central if it's still there.
+                    Inventory from = chest(r.custody, load);
+                    if (from == null && r.custody.kind == Custody.Kind.CHEST) {
+                        return; // can't see the chest now: next pass
+                    }
+                    if (from != null) {
+                        remove(from, r.id);
+                    }
+                    store.commit_move(r, Actor.reconcile(), "handed to the network");
+                    report.committed++;
+                    return;
+                }
                 Inventory to = chest(r.pending_custody, load);
                 Inventory from = r.custody.kind == Custody.Kind.CHEST ? chest(r.custody, load) : null;
                 if (to == null || (r.custody.kind == Custody.Kind.CHEST && from == null)) {

@@ -335,11 +335,13 @@ public class BukkitListener implements Listener {
             Util.pinform(player, msg);
         }
         Util.list_newmail(player);
+        com.vodhanel.minecraft.va_postal.mail.Network.player_joined(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public static void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        com.vodhanel.minecraft.va_postal.mail.Network.player_left(player);
 
         if ((VA_postal.plistener_player != null) &&
                 (VA_postal.plistener_player == player)) {

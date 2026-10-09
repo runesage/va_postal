@@ -6,6 +6,7 @@ import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
 import com.vodhanel.minecraft.va_postal.listeners.RouteEditor;
 import com.vodhanel.minecraft.va_postal.listeners.RouteView;
+import com.vodhanel.minecraft.va_postal.mail.Network;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
 import org.bukkit.Location;
@@ -1386,24 +1387,36 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
             return true;
         }
-        String stown = C_Postoffice.town_complete(args[0]);
-        if ("null".equals(stown)) {
+        Network.Resolved resolved = Network.resolve_office(args[0]);
+        if (resolved.office() == null) {
+            if (!resolved.choices().isEmpty()) {
+                Util.pinform(player, "&7&oSeveral servers have a post office called that. Write one as &f&rserver:office&7&o:");
+                Util.pinform(player, "&9&o" + String.join(", ", resolved.choices()));
+                return true;
+            }
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
                 P_Towny.list_towny_tree(player, false, null, false);
             else Util.list_postal_tree(player, false, null);
             Util.pinform(player, "&7&oNeed more letters for post office. See list:");
             return true;
         }
+        Network.Office office = resolved.office();
+        String stown = office.office();
         if (!near_post_office(player)) {
             return true;
         }
-        double price = P_Economy.postage_to_hold(stack, BookManip.is_shipping_label(stack));
+        double price = P_Economy.postage_to_hold(stack, BookManip.is_shipping_label(stack), office.remote());
         if ((price > 0.0D) && (!P_Economy.does_player_have_amount(player, price))) {
             Util.pinform(player, "&f&oYou don't have enough money to cover postage.");
             return true;
         }
-        String saddress = C_Address.addresses_complete(stown, args[1]);
-        if ("null".equals(saddress)) {
+        String saddress = office.remote() ? Network.remote_address(office, args[1]) : C_Address.addresses_complete(stown, args[1]);
+        if (saddress == null || "null".equals(saddress)) {
+            if (office.remote()) {
+                Util.pinform(player, "&7&oNo address at &9&o" + office.label() + "&7&o matches that. Its addresses: &9&o"
+                        + String.join(", ", Network.remote_addresses(office)));
+                return true;
+            }
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
                 P_Towny.list_towny_tree(player, true, stown, false);
             else Util.list_postal_tree(player, true, stown);
@@ -1412,24 +1425,35 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         String attention = "[Resident]";
-        Player originalAttention = null;
-        if (args.length == 3) {
-            Player player = Util.player_complete(args[2]);
-            if (player != null) {
-                attention = player.getDisplayName();
-                originalAttention = player;
+        java.util.UUID originalAttention = null;
+        String where = null;
+        if (args.length == 3 && !"[Resident]".equalsIgnoreCase(args[2])) {
+            // Any player the network knows, online or not, on any server: the letter still goes to the address.
+            Network.Recipient recipient = Network.find_player(args[2]);
+            if (recipient == null) {
+                Util.pinform(player, "&7&oNo player called &f&r" + args[2] + "&7&o is known on this network.");
+                return true;
             }
+            attention = recipient.name();
+            originalAttention = recipient.id();
+            where = recipient.where();
         }
 
 
         if (is_player_comfirmation_registered(player)) {
-            Cmd_static.addr_worker(player, null, stack, attention, originalAttention, stown, saddress);
+            Cmd_static.addr_worker(player, null, stack, attention, originalAttention, stown, saddress, null, office.server());
             deregister_player_comfirmation(player);
         } else {
-            Util.pinform(player, "&7&oReady to address to: &9&o" + Util.df(stown) + ", " + Util.df(saddress) + ", " + Util.df(attention));
-            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage, held until delivery; local mail gets the difference back.");
+            Util.pinform(player, "&7&oReady to address to: &9&o" + (office.remote() ? office.server() + ":" : "") + Util.df(stown)
+                    + ", " + Util.df(saddress) + ", " + Util.df(attention) + (where == null ? "" : " &7&o(" + where + ")"));
+            if (office.remote()) {
+                Util.pinform(player, "&7&oThis letter goes to another server. Only the letter travels: nothing else in it.");
+                if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage to another server.");
+            } else if (price > 0.0D) {
+                Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage, held until delivery; local mail gets the difference back.");
+            }
 
-            String scommand = "/addr " + stown + " " + saddress + " " + attention;
+            String scommand = "/addr " + office.label() + " " + saddress + " " + attention;
             register_player_comfirmation(player, scommand);
         }
 
@@ -1628,6 +1652,12 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
+        Network.Resolved resolved = Network.resolve_office(args[0]);
+        if (resolved.office() != null && resolved.office().remote() || !resolved.choices().isEmpty()) {
+            // Items never cross servers (persistent-state §6): parcels can only go to this server's offices.
+            Util.pinform(player, "&7&oParcels can't be sent to another server; only letters can.");
+            return true;
+        }
         String stown = C_Postoffice.town_complete(args[0]);
         if ("null".equals(stown)) {
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
@@ -1654,10 +1684,15 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         String attention = "[Resident]";
-        Player Attention = null;
-        if (args.length == 3) {
-            Attention = Util.player_complete(args[2]);
-            if (Attention != null) attention = Attention.getDisplayName();
+        java.util.UUID Attention = null;
+        if (args.length == 3 && !"[Resident]".equalsIgnoreCase(args[2])) {
+            Network.Recipient recipient = Network.find_player(args[2]);
+            if (recipient == null) {
+                Util.pinform(player, "&7&oNo player called &f&r" + args[2] + "&7&o is known on this network.");
+                return true;
+            }
+            attention = recipient.name();
+            Attention = recipient.id();
         }
 
         if (is_player_comfirmation_registered(player)) {
@@ -1736,13 +1771,15 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         String attention = "[Resident]";
-        Player original = null;
-        if (args.length >= 1) {
-            Player player = Util.player_complete(args[0]);
-            if (player != null) {
-                attention = player.getDisplayName();
-                original = player;
+        java.util.UUID original = null;
+        if (args.length >= 1 && !"[Resident]".equalsIgnoreCase(args[0])) {
+            Network.Recipient recipient = Network.find_player(args[0]);
+            if (recipient == null) {
+                Util.pinform(player, "&7&oNo player called &f&r" + args[0] + "&7&o is known on this network.");
+                return true;
             }
+            attention = recipient.name();
+            original = recipient.id();
         }
 
         if (!Cmd_static.att_worker(false, player, stack, attention, original)) return true;

@@ -339,6 +339,7 @@ public class VA_postal extends JavaPlugin {
                 getConfig().getString(GetConfig.path_format("storage.mysql.properties"), "")),
                 org.bukkit.Bukkit::isPrimaryThread, getLogger());
         com.vodhanel.minecraft.va_postal.mail.Directory.start();
+        com.vodhanel.minecraft.va_postal.mail.Network.start();
         // Reconcile once the server is up (it may load chunks), then every 5 minutes for loaded chunks only.
         getServer().getScheduler().runTaskLater(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(true), 40L);
         getServer().getScheduler().runTaskTimer(this, () -> com.vodhanel.minecraft.va_postal.mail.Reconciler.run(false), 6000L, 6000L);
@@ -396,6 +397,7 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.economy.EconomyState.save();
         com.vodhanel.minecraft.va_postal.listeners.RouteView.hide_all();
         com.vodhanel.minecraft.va_postal.mail.Courier.shutdown();
+        com.vodhanel.minecraft.va_postal.mail.Network.stop();
         com.vodhanel.minecraft.va_postal.mail.Directory.stop();
         SHUTDOWN();
         PostalEconomy.shutdown();

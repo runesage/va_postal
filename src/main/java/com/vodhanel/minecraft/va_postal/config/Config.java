@@ -151,6 +151,8 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.pool_size"), 6);
         VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.properties"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("network.server_id"), "main");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.poll_seconds"), 10);
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.letter.network"), "10");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.day_seconds"), "86400");

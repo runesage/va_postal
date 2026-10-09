@@ -22,7 +22,8 @@ import java.util.UUID;
  */
 public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
-    static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql"};
+    static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql",
+            "V5__network_player.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -248,6 +249,9 @@ public final class SqlMailStore implements MailStore {
         if (to == MailState.IN_NETWORK && current.kind != MailKind.LETTER) {
             throw new ConflictException("Only letters can cross servers (" + current.id + " is a " + current.kind + ")");
         }
+        if (to == MailState.IN_NETWORK && server_id.equals(current.dest_server)) {
+            throw new ConflictException(current.id + " is addressed to this server; it doesn't go through the network");
+        }
         return update(current, current.state, current.custody, to, to_custody, actor,
                 "move to " + to + "@" + to_custody + (detail == null ? "" : ": " + detail));
     }
@@ -272,12 +276,18 @@ public final class SqlMailStore implements MailStore {
     /** The one write path: version-checked update of state, custody and pending move, plus its event. */
     private MailRecord update(MailRecord current, MailState state, Custody custody, MailState pending_state,
                               Custody pending_custody, Actor actor, String detail) {
+        return update(current, state, custody, pending_state, pending_custody, actor, detail, "");
+    }
+
+    /** {@code guard}: extra conditions on the row ({@code AND ...}), with this server's id as its only parameter. */
+    private MailRecord update(MailRecord current, MailState state, Custody custody, MailState pending_state,
+                              Custody pending_custody, Actor actor, String detail, String guard) {
         if (state == MailState.IN_NETWORK && current.kind != MailKind.LETTER) {
             throw new ConflictException("Only letters can cross servers (" + current.id + " is a " + current.kind + ")");
         }
         long now = System.currentTimeMillis();
         String sql = "UPDATE mail SET state = ?, version = ?, custody_server = ?, custody_kind = ?, custody_ref = ?, "
-                + "pending_state = ?, pending_kind = ?, pending_ref = ?, updated_at = ? WHERE mail_id = ? AND version = ?";
+                + "pending_state = ?, pending_kind = ?, pending_ref = ?, updated_at = ? WHERE mail_id = ? AND version = ?" + guard;
         try (Connection c = source.getConnection()) {
             c.setAutoCommit(false);
             try {
@@ -295,6 +305,9 @@ public final class SqlMailStore implements MailStore {
                     ps.setLong(i++, now);
                     ps.setString(i++, current.id.toString());
                     ps.setInt(i++, current.version);
+                    if (!guard.isEmpty()) {
+                        ps.setString(i++, server_id);
+                    }
                     rows = ps.executeUpdate();
                 }
                 if (rows != 1) {
@@ -343,8 +356,9 @@ public final class SqlMailStore implements MailStore {
 
     @Override
     public List<MailRecord> by_destination(MailState state, String office) {
-        return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND state = ? AND dest_office = ?",
-                server_id, state.name(), MailRecord.lower(office));
+        // dest_server too: a letter waiting here for the network can share an office name with one of ours.
+        return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND state = ? AND dest_office = ? AND dest_server = ?",
+                server_id, state.name(), MailRecord.lower(office), server_id);
     }
 
     private List<MailRecord> query(String sql, String... args) {
@@ -511,6 +525,7 @@ public final class SqlMailStore implements MailStore {
     @Override
     public void sign_off(UUID instance) {
         exec("UPDATE postal_server SET last_seen = 0 WHERE server_id = ? AND instance = ?", server_id, instance.toString());
+        exec("UPDATE network_player SET online = 0 WHERE server_id = ?", server_id);
     }
 
     @Override
@@ -611,6 +626,121 @@ public final class SqlMailStore implements MailStore {
             }
         } catch (SQLException e) {
             throw new StoreException("Could not read the directory", e);
+        }
+        return out;
+    }
+
+    // ---- Cross-server letters --------------------------------------------------------------
+
+    @Override
+    public List<MailRecord> in_network() {
+        return query("SELECT " + COLUMNS + " FROM mail WHERE state = 'IN_NETWORK' AND dest_server = ? AND kind = 'LETTER' "
+                + "AND pending_state IS NULL ORDER BY updated_at", server_id);
+    }
+
+    @Override
+    public List<MailRecord> outbound(String chest) {
+        return query("SELECT " + COLUMNS + " FROM mail WHERE custody_server = ? AND state = 'AT_CENTRAL' AND dest_server <> ? "
+                + "AND custody_kind = 'CHEST' AND custody_ref = ? AND pending_state IS NULL ORDER BY updated_at", server_id, server_id, chest);
+    }
+
+    @Override
+    public MailRecord claim(MailRecord current, Custody to, Actor actor) {
+        if (current.kind != MailKind.LETTER || current.state != MailState.IN_NETWORK || current.moving()
+                || !server_id.equals(current.dest_server)) {
+            throw new ConflictException(current.id + " isn't a letter waiting in the network for " + server_id);
+        }
+        return update(current, current.state, current.custody, MailState.AT_CENTRAL, to, actor,
+                "claimed from the network by " + server_id + ", move to AT_CENTRAL@" + to,
+                " AND state = 'IN_NETWORK' AND kind = 'LETTER' AND pending_state IS NULL AND dest_server = ?");
+    }
+
+    @Override
+    public void player_seen(UUID player, String name, boolean online, long now) {
+        if (online) {
+            try (Connection c = source.getConnection()) {
+                upsert_player(c, player, name, now);
+            } catch (SQLException e) {
+                throw new StoreException("Could not record player " + name, e);
+            }
+        } else {
+            // Only if they're still recorded here: switching servers can record the join before the quit.
+            exec("UPDATE network_player SET online = 0, last_seen = ? WHERE player_uuid = ? AND server_id = ?",
+                    now, player.toString(), server_id);
+        }
+    }
+
+    @Override
+    public void sync_players(List<NetworkPlayer> online, long now) {
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement("UPDATE network_player SET online = 0 WHERE server_id = ? AND online <> 0")) {
+                    ps.setString(1, server_id);
+                    ps.executeUpdate();
+                }
+                for (NetworkPlayer p : online) {
+                    upsert_player(c, p.id(), p.name(), now);
+                }
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not record this server's players", e);
+        }
+    }
+
+    private void upsert_player(Connection c, UUID player, String name, long now) throws SQLException {
+        String n = name.length() > 16 ? name.substring(0, 16) : name;
+        try (PreparedStatement ps = c.prepareStatement("UPDATE network_player SET name = ?, name_lower = ?, server_id = ?, "
+                + "online = 1, last_seen = ? WHERE player_uuid = ?")) {
+            ps.setString(1, n);
+            ps.setString(2, n.toLowerCase(java.util.Locale.ROOT));
+            ps.setString(3, server_id);
+            ps.setLong(4, now);
+            ps.setString(5, player.toString());
+            if (ps.executeUpdate() > 0) {
+                return;
+            }
+        }
+        try (PreparedStatement ps = c.prepareStatement("INSERT INTO network_player (player_uuid, name, name_lower, server_id, "
+                + "online, last_seen) VALUES (?,?,?,?,1,?)")) {
+            ps.setString(1, player.toString());
+            ps.setString(2, n);
+            ps.setString(3, n.toLowerCase(java.util.Locale.ROOT));
+            ps.setString(4, server_id);
+            ps.setLong(5, now);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public List<NetworkPlayer> players_named(String name) {
+        return players("WHERE name_lower = ? ORDER BY last_seen DESC", name.toLowerCase(java.util.Locale.ROOT).trim());
+    }
+
+    @Override
+    public Optional<NetworkPlayer> player(UUID id) {
+        return players("WHERE player_uuid = ?", id.toString()).stream().findFirst();
+    }
+
+    private List<NetworkPlayer> players(String where, String arg) {
+        List<NetworkPlayer> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT player_uuid, name, server_id, online, last_seen FROM network_player " + where)) {
+            ps.setString(1, arg);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new NetworkPlayer(UUID.fromString(rs.getString(1)), rs.getString(2), rs.getString(3),
+                            rs.getInt(4) != 0, rs.getLong(5)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read players", e);
         }
         return out;
     }

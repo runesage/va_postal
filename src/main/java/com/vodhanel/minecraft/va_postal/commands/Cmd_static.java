@@ -301,7 +301,7 @@ public class Cmd_static {
         return book.extractEmbeddedAuthor();
     }
 
-    public static boolean parcel_worker(Player player, String attention, Player Attention, String stown, String saddress) {
+    public static boolean parcel_worker(Player player, String attention, java.util.UUID Attention, String stown, String saddress) {
         Block block = ChestManip.get_parcel_chest(player);
         String slocation = Util.location2str(block.getLocation());
 
@@ -372,12 +372,26 @@ public class Cmd_static {
         return true;
     }
 
-    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress) {
-        return addr_worker(player, inventory, stack, attention, OriginalPlayerAttention, stown, saddress, null);
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, java.util.UUID OriginalPlayerAttention, String stown, String saddress) {
+        return addr_worker(player, inventory, stack, attention, OriginalPlayerAttention, stown, saddress, null, null);
     }
 
-    /** {@code parcel_chest}: the chest a new parcel is being packed from (null when addressing a letter). */
-    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress, Block parcel_chest) {
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, java.util.UUID OriginalPlayerAttention, String stown, String saddress, Block parcel_chest) {
+        return addr_worker(player, inventory, stack, attention, OriginalPlayerAttention, stown, saddress, parcel_chest, null);
+    }
+
+    /**
+     * {@code parcel_chest}: the chest a new parcel is being packed from (null when addressing a letter).
+     * {@code dest_server}: the server {@code stown} is on, for a letter to another server (null: this one); its
+     * title is then {@code server:office}.
+     */
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, java.util.UUID OriginalPlayerAttention, String stown, String saddress, Block parcel_chest, String dest_server) {
+        boolean network = dest_server != null;
+        if (network && (inventory != null || parcel_chest != null)) {
+            // Items never cross servers (persistent-state §6): parcels stay on the server they were packed on.
+            Util.pinform(player, "&7&oOnly letters can be sent to another server.");
+            return false;
+        }
         Book book = new Book(stack);
         String title;
         String author;
@@ -389,7 +403,7 @@ public class Cmd_static {
         boolean re_address = false;
         if (page1.contains("[not-processed]")) {
             re_address = true;
-            town = Util.df(stown);
+            town = network ? dest_server + ":" + Util.df(stown) : Util.df(stown);
             address = Util.df(saddress);
             String[] parts = page1.split("\n");
             title = Util.df(parts[10].substring(2).trim());
@@ -398,7 +412,7 @@ public class Cmd_static {
         } else {
             title = proper(book.getTitle());
             author = book.getAuthor();
-            town = Util.df(stown);
+            town = network ? dest_server + ":" + Util.df(stown) : Util.df(stown);
             address = Util.df(saddress);
             existing_pages = book.getPages_with_blank_first_page();
         }
@@ -409,25 +423,33 @@ public class Cmd_static {
         Date date = new Date();
         String fdate = formatter.format(date);
 
-        existing_pages[0] = Book.makeFirstMailPage(town, address, attention, null, null, author, title, fdate, pauthor, OriginalPlayerAttention);
+        existing_pages[0] = Book.makeFirstMailPageById(town, address, attention, null, null, author, title, fdate,
+                pauthor != null ? pauthor.getUniqueId() : null, OriginalPlayerAttention);
 
         Book new_book = new Book(town, address, existing_pages);
         ItemStack new_stack = new_book.generateItemStack();
         // Postage is held now and settled on delivery by the offices that handle it (re-addressing keeps the hold).
         boolean parcel = (inventory != null) || title.equalsIgnoreCase(Util.df("[shipping label]"));
+        if (parcel && network) {
+            Util.pinform(player, "&7&oOnly letters can be sent to another server.");
+            return false;
+        }
+        if (network && com.vodhanel.minecraft.va_postal.store.MailStores.active() == null) {
+            Util.pinform(player, "&7&oLetters to another server can't be sent while the mail store is closed.");
+            return false;
+        }
         if (parcel && parcel_chest == null) {
             // A parcel's destination is part of its record; re-addressing would leave the two disagreeing.
             Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
             return false;
         }
-        new_stack = P_Economy.hold_postage(player, stack, new_stack, parcel);
+        new_stack = P_Economy.hold_postage(player, stack, new_stack, parcel, network);
         if (new_stack == null) {
             return false;
         }
         if (parcel) {
             ItemStack recorded = com.vodhanel.minecraft.va_postal.mail.Parcels.packaged(new_stack, player, parcel_chest,
-                    Letters.nearest_office(player), stown, saddress,
-                    OriginalPlayerAttention == null ? null : OriginalPlayerAttention.getUniqueId());
+                    Letters.nearest_office(player), stown, saddress, OriginalPlayerAttention);
             if (recorded == null) {
                 P_Economy.cancel_hold(HoldTag.read(new_stack)); // nothing was shipped: give the postage back
                 return false;
@@ -435,8 +457,17 @@ public class Cmd_static {
             new_stack = recorded;
         } else {
             // A letter: record it and tag the book with its mail id.
-            new_stack = Letters.posted(MailIds.carry(stack, new_stack), player.getUniqueId(), Letters.nearest_office(player),
-                    stown, saddress, OriginalPlayerAttention == null ? null : OriginalPlayerAttention.getUniqueId());
+            ItemStack posted = Letters.posted(MailIds.carry(stack, new_stack), player.getUniqueId(), Letters.nearest_office(player),
+                    dest_server, stown, saddress, OriginalPlayerAttention);
+            if (network && !Letters.record(posted).filter(r -> dest_server.equals(r.dest_server)).isPresent()) {
+                // Only a tracked letter can cross: an untracked one would never leave Central.
+                if (P_Economy.active_hold(stack) == null) {
+                    P_Economy.cancel_hold(HoldTag.read(new_stack), "&6Postal refunded the postage for the letter it couldn't send.");
+                }
+                Util.pinform(player, "&7&oThe mail store couldn't record this letter, so it can't go to another server now. Try again shortly.");
+                return false;
+            }
+            new_stack = posted;
         }
         if ((inventory != null) &&
                 (title.equals(Util.df("[shipping label]")))) {
@@ -625,7 +656,7 @@ public class Cmd_static {
         return result;
     }
 
-    public static boolean att_worker(boolean create, Player player, ItemStack stack, String attention, Player original) {
+    public static boolean att_worker(boolean create, Player player, ItemStack stack, String attention, java.util.UUID original) {
         Book book = new Book(stack);
         String title;
         String author;
@@ -656,7 +687,8 @@ public class Cmd_static {
             Date date = new Date();
             String fdate = formatter.format(date);
             // Same layout as /addr: the stamping code reads fixed columns and the sender/recipient UUID lines.
-            existing_pages[0] = Book.makeFirstMailPage(town, address, attention, null, null, author, title, fdate, pauthor, original);
+            existing_pages[0] = Book.makeFirstMailPageById(town, address, attention, null, null, author, title, fdate,
+                    pauthor != null ? pauthor.getUniqueId() : book.extractEmbeddedAuthorId(), original);
             Book new_book = new Book(town, address, existing_pages);
             ItemStack new_stack = HoldTag.carry(stack, MailIds.carry(stack, new_book.generateItemStack()));
             player.getInventory().setItemInMainHand(new_stack);
