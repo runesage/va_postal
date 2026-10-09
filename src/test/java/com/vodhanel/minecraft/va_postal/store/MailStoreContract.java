@@ -3,11 +3,9 @@ package com.vodhanel.minecraft.va_postal.store;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
+import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -16,17 +14,23 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class SqlMailStoreTest {
-    @TempDir
-    Path dir;
-    private SQLiteDataSource ds;
-    private SqlMailStore store;
+/**
+ * The {@link SqlMailStore} contract, run against every backend (docs/design/persistent-state.md §11): SQLite
+ * ({@link SqliteMailStoreTest}) and MySQL/MariaDB ({@link MariaDbMailStoreTest}), so both dialects behave the same.
+ */
+abstract class MailStoreContract {
+    protected DataSource ds;
+    protected SqlMailStore store;
+
+    /** A data source on an empty database (no Postal tables). */
+    protected abstract DataSource fresh_database() throws Exception;
+
+    protected abstract Dialect dialect();
 
     @BeforeEach
-    void open() {
-        ds = new SQLiteDataSource();
-        ds.setUrl("jdbc:sqlite:" + dir.resolve("postal.db"));
-        store = new SqlMailStore(ds, "main", null);
+    void open() throws Exception {
+        ds = fresh_database();
+        store = new SqlMailStore(ds, "main", null, dialect());
     }
 
     @AfterEach
@@ -143,7 +147,7 @@ class SqlMailStoreTest {
     void reopeningDoesNotReapplyMigrations() {
         MailRecord r = letter();
         store.close();
-        store = new SqlMailStore(ds, "main", null);
+        store = new SqlMailStore(ds, "main", null, dialect());
         assertTrue(store.get(r.id).isPresent());
     }
 
@@ -178,8 +182,97 @@ class SqlMailStoreTest {
     }
 
     @Test
+    void parcelKeepsItsHoldAndTerms() {
+        MailRecord p = store.create(MailRecord.new_parcel(UUID.randomUUID(), "main", "Testville", "Testville", "Home",
+                UUID.randomUUID(), null, new byte[]{1, 2, 3}, 4440, 1L, "hold-1"), Actor.system("test"), "packaged");
+        assertEquals(MailKind.PARCEL, p.kind);
+        assertEquals("PARCEL_V1", p.payload_format);
+        assertEquals("hold-1", p.hold_id);
+        assertArrayEquals(new byte[]{1, 2, 3}, p.payload);
+
+        MailRecord cod = store.set_terms(p, 350.0D, "hold-2", Actor.player(p.sender), "COD set to 350");
+        assertEquals(350.0D, cod.cod_amount);
+        assertEquals("hold-2", cod.hold_id);
+        assertEquals(MailState.POSTED, cod.state);
+        assertEquals(p.version + 1, cod.version);
+        assertEquals(2, store.history(p.id).size());
+        assertThrows(ConflictException.class, () -> store.set_terms(p, 1.0D, null, Actor.system("test"), "stale"));
+    }
+
+    @Test
+    void acceptingADeliveredParcelHappensOnce() {
+        MailRecord p = store.create(MailRecord.new_parcel(UUID.randomUUID(), "main", "Testville", "Testville", "Home",
+                UUID.randomUUID(), null, new byte[0], 4440, 1L, null), Actor.system("test"), "packaged");
+        MailRecord delivered = store.transition(p, MailState.DELIVERED, Custody.chest("world,40,-60,0"), Actor.system("test"), null);
+        store.transition(delivered, MailState.ACCEPTED, Custody.NONE, Actor.system("test"), "accepted");
+        // A second accept from the same (now stale) record loses: items are handed over exactly once.
+        assertThrows(ConflictException.class,
+                () -> store.transition(delivered, MailState.ACCEPTED, Custody.NONE, Actor.system("test"), "again"));
+        assertTrue(MailState.ACCEPTED.terminal());
+        assertTrue(store.held_here().stream().noneMatch(r -> r.id.equals(p.id)));
+    }
+
+    @Test
     void migrationScriptSplitsAndDropsComments() {
         List<String> parts = SqlMailStore.statements("-- c\nCREATE TABLE a (x INT); -- trailing\nCREATE TABLE b (y INT);\n");
         assertEquals(List.of("CREATE TABLE a (x INT)", "CREATE TABLE b (y INT)"), parts);
+    }
+
+    // ---- P3: the network-ready parts ---------------------------------------------------------
+
+    @Test
+    void migratesToTheLatestSchema() {
+        assertEquals(SqlMailStore.MIGRATIONS.length, store.schema_version());
+        assertEquals(dialect(), store.dialect());
+    }
+
+    @Test
+    void keepsAParcelPayloadLargerThan64Kb() {
+        byte[] big = new byte[300_000];
+        new java.util.Random(1).nextBytes(big);
+        MailRecord r = store.create(MailRecord.new_parcel(UUID.randomUUID(), "main", "Testville", "Riverside", "Mill",
+                UUID.randomUUID(), null, big, 4440, 1L, null), Actor.system("test"), "packaged");
+        assertArrayEquals(big, store.get(r.id).orElseThrow().payload);
+    }
+
+    @Test
+    void publishesAndReplacesThisServersDirectory() {
+        UUID owner = UUID.randomUUID();
+        store.publish_directory(List.of(
+                new DirectoryEntry("main", "Testville", null, owner, true, false, "world,20,-60,2"),
+                new DirectoryEntry("main", "Testville", "Home", null, true, false, "world,40,-60,2"),
+                new DirectoryEntry("main", "Testville", "Bakery", null, false, false, "world,50,-60,2")), 1L);
+        List<DirectoryEntry> all = store.directory(null);
+        assertEquals(3, all.size());
+        DirectoryEntry office = all.stream().filter(DirectoryEntry::is_office).findFirst().orElseThrow();
+        assertEquals("testville", office.office());
+        assertEquals(owner, office.owner());
+        assertTrue(all.stream().anyMatch(e -> "bakery".equals(e.address()) && !e.open()));
+        // Republishing replaces the rows: Bakery is gone.
+        store.publish_directory(List.of(
+                new DirectoryEntry("main", "Testville", null, owner, true, false, "world,20,-60,2"),
+                new DirectoryEntry("main", "Testville", "Home", null, true, false, "world,40,-60,2")), 2L);
+        assertEquals(2, store.directory("main").size());
+        // Another server's rows are its own.
+        SqlMailStore other = new SqlMailStore(ds, "skyblock", null, dialect());
+        other.publish_directory(List.of(new DirectoryEntry("skyblock", "Isle", null, null, true, false, null)), 3L);
+        assertEquals(3, store.directory(null).size());
+        assertEquals(2, store.directory("main").size());
+        assertEquals(1, store.directory("skyblock").size());
+    }
+
+    @Test
+    void noticesTwoServersSharingAnId() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        assertNull(store.heartbeat(a, 1L, 10L, true));
+        assertNull(store.heartbeat(a, 1L, 20L, false));
+        // A restart (or a crashed server's leftover row) is simply taken over on the first beat.
+        assertNull(store.heartbeat(b, 30L, 30L, true));
+        // But now a's next beat finds b's instance: two live servers on one id.
+        assertEquals(b, store.heartbeat(a, 1L, 40L, false));
+        assertEquals(a, store.heartbeat(b, 30L, 50L, false));
+        assertEquals(1, store.servers().size());
+        store.sign_off(b);
+        assertEquals(0L, store.servers().get(0).last_seen());
     }
 }

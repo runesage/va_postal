@@ -1,6 +1,6 @@
 # Design: persistent mail state (single-server and Velocity)
 
-**Status:** P1 implemented (letters on SQLite; see §14 for where it differs from this design). **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (persistent in-transit state)
+**Status:** P1 and P2 implemented (letters and parcels on SQLite; see §14 and §15 for where they differ from this design). **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (persistent in-transit state)
 and §5 (multi-server exchange).
 
 ## 1. Goals
@@ -236,7 +236,7 @@ follow-up, the v4-compatibility shims added during the port can be removed (done
 |---|---|---|
 | **P1** | `MailStore`/SQLite, schema and migrations, `mail_id` PDC, ledger-first moves for **letters**, reconciliation, `route_run` resume, removal of the v4-compatibility shims | Restart-safe and crash-safe letters; the foundation for everything else |
 | **P2** | Parcels on full `ItemStack` payloads, COD and postage settled against records, `MISSING` → claim hooks | Fixes parcel item loss; the insurance fund can be built |
-| **P3** | `directory_*` tables, MySQL backend and parity CI, `server-id` | Network-ready storage while still running one server |
+| **P3** | `directory_*` tables, MySQL backend and parity CI, `server-id` (built: §16) | Network-ready storage while still running one server |
 | **P4** | `ProxyBus`, the Velocity relay plugin, `IN_NETWORK` claiming, a two-server CI | Cross-server letters |
 
 P1–P3 change nothing for players on a single server beyond reliability. P4 is only switched on by config.
@@ -274,4 +274,81 @@ P1 follows this design, with these differences:
 - **Admin commands.** `/postal track <id | recent>` shows a letter's record and history;
   `/postal testletter <from> <to> <address>` hands in a tracked letter without a player (used by the smoke
   test).
-- **Parcels stay untracked** until P2: only letters get a `mail_id`.
+- **Parcels stayed untracked** in P1: only letters got a `mail_id` (parcels followed in P2, below).
+
+## 16. P3 as built
+
+- **MySQL/MariaDB.** `Storage.Type: mysql` opens the same `SqlMailStore` over the MariaDB driver (loaded through
+  `plugin.yml` `libraries:`, like SQLite's). Settings: `Storage.Mysql.Host`, `Port`, `Database`, `User`,
+  `Password`, `Pool_size` (default 6) and `Properties` (extra JDBC parameters, e.g. `useSsl=true`).
+- **Outages.** Connections time out after 1 second, and a lost connection trips a circuit breaker: store calls
+  then fail at once (mail stays where it is, and new mail travels untracked, as when the store can't open)
+  until a background check every 5 seconds finds the database again. Measured by killing MariaDB for 70
+  seconds mid-run: TPS stayed at 19-20, a letter waiting at the office was delivered on the first round after
+  the store came back, and the only stall was the first call after the database died (one connection
+  timeout).
+- **Dialect variants.** The schema stays in the shared subset. A migration may have a variant
+  (`V3__wide_payload.mysql.sql` beside `V3__wide_payload.sql`) where the two can't agree: schema 3 widens the
+  parcel payload to `LONGBLOB` on MySQL, where a `BLOB` holds only 64 KB (SQLite has no such limit).
+- **Directory** (schema 4). `directory_office` and `directory_address`, as in §5 (`is_open`, `is_central`,
+  `location_key`). Each server republishes its own rows a few seconds after start and then every minute if
+  they changed, in one transaction (delete its rows, insert the new ones). P4 reads it to address mail to
+  another server; `/postal directory` shows it.
+- **Server registry** (schema 4, `postal_server`). Every server records a heartbeat each minute. If another
+  instance has written the same server id since this one last did, two live servers share a
+  `Network.Server_id`: the log says so (severe) every minute, and `/postal store` shows it. A server's first
+  heartbeat takes the row over, so a restart or a crashed server's leftover row is no false alarm.
+- **Store health.** Every store call is timed (`StoreStats`, a proxy around the store): `/postal store` shows the
+  backend, schema, call rate, average and slowest call, main-thread time, failures and the registered servers.
+- **Still synchronous.** Store calls stay on the calling thread, as in P1, rather than the async pipeline of §4.
+  Measured on the SMP load test (12 towns, 240 addresses, 15 minutes) with MariaDB on the same machine: 909
+  calls averaging 1.04 ms, 0.9 seconds of main-thread time in all, TPS at least 18.9, the same as on SQLite. A remote database adds its round trip to every call; `/postal store` shows what that costs. The
+  async pipeline remains the plan if real networks need it.
+- **Parity tests.** The store tests are one contract suite (`MailStoreContract`) run on SQLite and on
+  MariaDB (`MariaDbMailStoreTest`, enabled by `POSTAL_TEST_MYSQL_URL`). CI's build job has a MariaDB service, and
+  the smoke test runs twice: on SQLite and on MariaDB (`STORAGE=mysql`).
+
+## 15. P2 as built
+
+- **Parcels are records.** At `/package` the chest's items go into the parcel's record (`PARCEL_V1`: the label
+  as text, the chest's position and facing, and each item's `ItemStack.serializeAsBytes()` with its slot), so
+  enchantments, names, lore and everything else survive. The chest is emptied at once, so nothing can be
+  duplicated while the label travels, but it stays where it was, locked by its `[Postal_Ship]` sign, for
+  immersion.
+- **A courier collects the chest.** When the label is posted (left in a mailbox or a post office chest), or at
+  its first pickup if that comes first, if a player is within 40 blocks, a postal
+  courier NPC walks up to the chest, picks it up and walks off (at most three at once); otherwise the chest is
+  simply removed. Anything a hopper pushed in meanwhile is dropped, not lost. The courier is never saved by
+  Citizens, and every failure path still removes the chest.
+- **The label travels like a letter**, through the same tracked moves, reconciliation and stale-copy removal.
+- **Exactly once.** `/accept`, `/refuse` and `/package cancel` are each one version-checked transition
+  (`DELIVERED` → `ACCEPTED`/`REFUSED`, `POSTED` → `RETURNED`), made before any items are handed over, so a
+  parcel's items come out once. A copied label (crafting copies the book's data, mail id included) is the
+  same parcel: whichever label goes first gets the items, and the other is refused. The record, not the label's text, decides what a label can do, so a label rebuilt from its record
+  works.
+- **COD and postage on the record.** The COD amount is recorded on the parcel (`/accept` charges what the
+  record says), and every letter and parcel records its postage hold (`hold_id`, schema V2). A book rebuilt
+  from its record gets its hold back, and delivery settles from the record if a book's hold tag was lost: the
+  gap left in P1.
+- **A crash right after packing.** If the world is rolled back past a `/package` (the chest full again) while
+  the label survived (say the player logged out first), the parcel would be duplicated. The chest carries a
+  `postal:packed` mark from packing; at the label's first pickup, a chest that has items and no mark means a
+  rollback, so the parcel is cancelled (`RETURNED`, postage refunded), the label is never routed, and the chest
+  is unlocked with the real items in it.
+- **Items removed from the game.** Paper upgrades an item's stored data when it's read back, so renamed ids
+  and changed components carry over between Minecraft versions. If an item no longer exists at all, the parcel
+  is still opened (accepted, refused, cancelled or recovered) with everything else in it. Whoever opens it is
+  told which item was left out (its old id is read from the stored bytes), and the log and the parcel's history
+  note it too. The record keeps the item's data, so nothing is erased. `/postal track` lists such an item as
+  "no longer in the game".
+- **`/package cancel`** (an unposted label in hand) puts the items back in the chest they were packed in
+  (unlocking it), or a new chest in front of the sender, and refunds the postage.
+- **Claim hook.** `MailMissingEvent` (Bukkit event, `com.vodhanel.minecraft.va_postal.api`) fires whenever a
+  letter or parcel is marked `MISSING`, with its id, kind, sender, destination, last place and COD amount: the
+  hook for lost-mail claims and an insurance fund. `/postal recover <id>` rebuilds lost mail from its record and
+  closes it as `RECOVERED`, so the original (if it turns up) is never routed or accepted.
+- **Re-addressing a shipping label** is refused (the destination is part of the record); cancel and package
+  again.
+- **Test helpers** (admin): `/postal testparcel` (with `retired` for an item gone from the game), `/postal accept|refuse <id>`, `/postal recover <id>`,
+  `/postal setstate <id> <state>`; `last` stands for the newest mail id.
+- **Fixed from P1:** a letter already `MISSING` was marked `MISSING` again on every reconciliation pass.

@@ -386,7 +386,11 @@ public class P_Economy {
         if (!VA_postal.economy_configured || dest_office == null) {
             return;
         }
-        Hold hold = EconomyState.remove_hold(HoldTag.read(item));
+        String id = HoldTag.read(item);
+        if (id == null) {
+            id = com.vodhanel.minecraft.va_postal.mail.Letters.hold_of(item); // a book rebuilt from its record
+        }
+        Hold hold = EconomyState.remove_hold(id);
         if (hold == null) {
             return;
         }
@@ -401,6 +405,18 @@ public class P_Economy {
         if (split.refund > 0.005D) {
             refund_postage(hold.payer, split.refund, "&6Postal refunded " + ef(split.refund)
                     + " of your postage: your mail was delivered by its local office.");
+        }
+    }
+
+    /** Refunds a hold in full and closes it: a parcel cancelled by its sender before it was posted. */
+    public static void cancel_hold(String hold_id) {
+        if (!VA_postal.economy_configured || hold_id == null) {
+            return;
+        }
+        Hold hold = EconomyState.remove_hold(hold_id);
+        if (hold != null) {
+            refund_postage(hold.payer, hold.total(), "&6Postal refunded " + ef(hold.total())
+                    + " of postage for the parcel you cancelled.");
         }
     }
 

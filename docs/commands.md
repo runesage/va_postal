@@ -25,6 +25,20 @@ Shows a tracked letter's state, where it is, and its full history; `recent` list
 Runs the mail reconciliation check now (normally every 5 minutes), for loaded chunks: finishes interrupted moves, marks letters missing from their chests as MISSING, removes stale copies and flags forged postal books.
 ##### `survey <PostOffice> [address | missing | all]`
 Surveys routes: Postal finds a walking route from the post office to the address over the blocks as they are now, and saves it as an ordinary route (so `/showroute` shows it and `/setroute` can still adjust it). `missing` (the default) surveys the addresses that have no route, `all` replaces every route in the office. A new address is surveyed automatically when it's registered with `/setaddr`. The survey keeps to roads and stairs, walks through doors and gates, climbs ladders, and won't swim, cross crops or drop more than three blocks; if there's no such way, it says how close it got.
+##### `testparcel <from PostOffice> <to PostOffice> <address> [cod] [retired]`
+Packs a test parcel (an enchanted, renamed diamond sword, oak logs, golden apples) in a chest beside the from-office, locks it and hands its label in at that office, as a player would after `/package`. Optional COD amount. With `retired`, the parcel also carries an item recorded under an id this Minecraft doesn't have, as if an upgrade had removed it: whoever opens the parcel gets everything else, plus a message naming what was left out.
+##### `recover <mail id> [x y z]`
+Rebuilds lost mail from its record: a parcel's items in a new chest at x y z (or two blocks in front of you), a letter into your inventory. The record closes as RECOVERED, so the original is never routed or accepted.
+##### `accept <mail id> [x y z]` / `refuse <mail id>`
+Accepts (items in a chest at x y z, no COD) or refuses (items back where it was packed) a delivered parcel for its recipient. For testing without a second player.
+##### `setstate <mail id> <state>`
+Forces a record into a state, keeping where it is. Testing only; recorded in its history as forced by an admin.
+
+`last` can be used in place of a mail id for the newest mail.
+##### `store`
+The mail store's health: SQLite or MySQL, the schema version, this server's id, how many calls it has made and how long they take (average and slowest, and the time spent on the main thread), failures, and the servers sharing the database. With MySQL, watch the main-thread time: every call waits for the database.
+##### `directory [server]`
+The network directory: the offices each server has published, with their address counts, or one server's offices and addresses. Each server republishes its own every minute when they change.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
 ##### `bank [newday | report [days] | policy [<setting> <value>]]`
@@ -59,7 +73,10 @@ No argument defaults the addressed to "`[resident]`"
 Permissions: `postal.package`
 Alias: `/pk`
 Package a chest full of goods, the player must stand near the chest, with it having no signs near or on.
-Otherwise, this command is used in the same was as `/addr`
+Otherwise, this command is used in the same was as `/addr`.
+The goods go into the post office's records straight away (with all their enchantments, names and data); the empty chest stays, locked by its `[Postal_Ship]` sign, until a courier collects it when the label is first picked up.
+
+`/package cancel`, holding the label before it's posted, unpacks the goods back into that chest and refunds the postage.
 <br>
 #### `/cod <price>`
 Permissions: `postal.cod`
@@ -73,6 +90,7 @@ Permissions: `postal.accept, postal.refuse`
 `/accept` will accept the package and the attached COD payments, if the player can't pay these, the command is denied.
 It will place the package (chest) in front of the player.
 `/refuse` will refuse the package for the player, and place it back at it's origin, it will display an error when it cannot place it back.
+A parcel is accepted or refused only once: its items come from the post office's record, not the label, so a copy of a label can't get them a second time.
 <br>
 #### `/dist <"all"/"owners"> [PostOffice] [Expiration Days]`
 Permissions: `postal.distr`

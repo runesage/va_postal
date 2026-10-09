@@ -159,15 +159,29 @@ public class Cmdexecutor implements CommandExecutor {
             com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(player, args);
             return true;
         }
-        if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)) {
+        if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
+                || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
+                || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
                 return true;
             }
+            try {
             if ("bank".equals(sub)) P_Bank.command(player, args);
             else if ("track".equals(sub)) P_MailAdmin.track(player, args);
             else if ("reconcile".equals(sub)) P_MailAdmin.reconcile(player);
+            else if ("testparcel".equals(sub)) P_MailAdmin.testparcel(player, args);
+            else if ("recover".equals(sub)) P_MailAdmin.recover(player, args);
+            else if ("accept".equals(sub)) P_MailAdmin.accept(player, args);
+            else if ("refuse".equals(sub)) P_MailAdmin.refuse(player, args);
+            else if ("setstate".equals(sub)) P_MailAdmin.setstate(player, args);
+            else if ("store".equals(sub)) P_MailAdmin.store(player);
+            else if ("directory".equals(sub)) P_MailAdmin.directory(player, args);
             else P_MailAdmin.testletter(player, args);
+            } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                // The database is down or failing: say so rather than "an internal error occurred".
+                Util.pinform(player, "&cThe mail store is unavailable: " + e.getMessage());
+            }
             return true;
         }
         if ("speed".equals(args[0].toLowerCase().trim())) {
@@ -306,7 +320,8 @@ public class Cmdexecutor implements CommandExecutor {
         if (args.length == 0) {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
-            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/track/testletter/reconcile/survey>");
+            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/survey>");
+            Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate/store/directory>");
             return true;
         }
 
@@ -326,9 +341,35 @@ public class Cmdexecutor implements CommandExecutor {
             P_MailAdmin.track(sender, args);
             return true;
         }
+        if ("store".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.store(sender);
+            return true;
+        }
+        if ("directory".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.directory(sender, args);
+            return true;
+        }
         if ("reconcile".equals(args[0].toLowerCase().trim())) {
             P_MailAdmin.reconcile(sender);
             return true;
+        }
+        switch (args[0].toLowerCase().trim()) {
+            case "testparcel":
+                P_MailAdmin.testparcel(sender, args);
+                return true;
+            case "recover":
+                P_MailAdmin.recover(sender, args);
+                return true;
+            case "accept":
+                P_MailAdmin.accept(sender, args);
+                return true;
+            case "refuse":
+                P_MailAdmin.refuse(sender, args);
+                return true;
+            case "setstate":
+                P_MailAdmin.setstate(sender, args);
+                return true;
+            default:
         }
         if ("testletter".equals(args[0].toLowerCase().trim())) {
             P_MailAdmin.testletter(sender, args);
@@ -1352,6 +1393,11 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oYou must have a signed book in your hand.");
             return true;
         }
+        if (BookManip.is_shipping_label(stack)) {
+            // Refused straight away, not after a confirmation: a parcel's destination is part of its record.
+            Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
+            return true;
+        }
         String stown = C_Postoffice.town_complete(args[0]);
         if ("null".equals(stown)) {
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
@@ -1482,13 +1528,22 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
+        // The parcel's record decides whether it can be accepted (delivered, not yet filled), not the label's text.
         ItemStack stack = player.getInventory().getItemInMainHand();
-        if (!BookManip.holding_valid_shipper(player, stack, true)) {
+        if (BookManip.is_parcel_statement(stack)) {
+            Util.pinform(player, "&c&oThat's a statement: this parcel has already been accepted or refused.");
+            return true;
+        }
+        if (!BookManip.is_shipping_label(stack)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
         }
+        // Checked before asking for confirmation, so a parcel that can't be accepted is refused at once.
+        if (!com.vodhanel.minecraft.va_postal.mail.Parcels.can_open(player, stack)) {
+            return true;
+        }
 
-        double price = Cmd_static.cod_amount(stack);
+        double price = com.vodhanel.minecraft.va_postal.mail.Parcels.cod_of(stack);
         if ((price > 0.0D) &&
                 (!P_Economy.does_player_have_amount(player, price))) {
             Util.pinform(player, "&7&oYou don't have enough money to pay for this COD.");
@@ -1530,30 +1585,16 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         ItemStack stack = player.getInventory().getItemInMainHand();
-        if (!BookManip.holding_valid_shipper(player, stack, true)) {
-            Util.pinform(player, "&7&oYou must have a valid parcel statement in your hand.");
+        if (BookManip.is_parcel_statement(stack)) {
+            Util.pinform(player, "&c&oThat's a statement: this parcel has already been accepted or refused.");
+            return true;
+        }
+        if (!BookManip.is_shipping_label(stack)) {
+            Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
         }
 
-        Block block = ChestManip.parcel_place_chest_refuse(stack);
-        if (block == null) {
-            Util.pinform(player, "&7&oUnable to place parcel at origin.");
-            return true;
-        }
-
-
-        Inventory inventory = BookManip.parcel_fill_chest(block, stack);
-        if (inventory == null) {
-            Util.pinform(player, "&7&oUnable to complete shipment return.");
-            return true;
-        }
-
-
-        ItemStack stamped = BookManip.stamp_parcel_statement(player, stack, false);
-        player.getInventory().setItemInMainHand(null);
-        BookManip.parcel_stmnt_to_chest(inventory, stamped, block, 4);
-        Util.pinform(player, "&7&oShipment has been returned to sender.");
-
+        com.vodhanel.minecraft.va_postal.mail.Parcels.refuse(player, stack);
         return true;
     }
 
@@ -1562,8 +1603,19 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
+        if ((args.length == 1) && ("cancel".equalsIgnoreCase(args[0]))) {
+            // A parcel not yet posted: its items go back in the chest it was packed in.
+            ItemStack label = player.getInventory().getItemInMainHand();
+            if (!BookManip.holding_valid_shipper(player, label, false)) {
+                Util.pinform(player, "&7&oHold the unposted shipping label you want to cancel.");
+                return true;
+            }
+            com.vodhanel.minecraft.va_postal.mail.Parcels.cancel(player, label);
+            return true;
+        }
         if ((args.length < 2) || ("?".equals(args[0]))) {
             Util.pinform(player, "&7&oUsage: &f&r/package <PostOffice> <Address> [player] &7&oto package a chest in front of you");
+            Util.pinform(player, "&7&o       &f&r/package cancel &7&oholding an unposted label, to unpack it");
             return true;
         }
         Block block = ChestManip.at_chest(player);
@@ -2763,7 +2815,14 @@ public class Cmdexecutor implements CommandExecutor {
         // Anything that isn't a player (console, RCON, command blocks, other plugins) gets the console
         // commands; only players reach the player-only commands below.
         if (!(sender instanceof Player)) {
-            if (cmd.getName().equalsIgnoreCase("postal")) result = postal_con(true, sender, cmd.getName(), args);
+            if (cmd.getName().equalsIgnoreCase("postal")) {
+                try {
+                    result = postal_con(true, sender, cmd.getName(), args);
+                } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                    sender.sendMessage("The mail store is unavailable: " + e.getMessage());
+                    result = true;
+                }
+            }
 
             if (cmd.getName().equalsIgnoreCase("alist")) result = alist_con(true, sender, cmd.getName(), args);
 
