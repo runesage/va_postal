@@ -79,6 +79,24 @@ The P1 merge (8bcebb0, #7) passed the owner's in-game test plan. Run against a j
 The console supplies what the bot can't do itself: `minecraft:give` for the book (EssentialsX's `/give` doesn't
 parse item components), `eco give` for postage, and `minecraft:tp` to stand near the office.
 
+## Live trials on P2 and P3
+
+The same idea as the P1 trial, with two more scenarios (parcels; the mail store) and a MariaDB mode:
+
+- **P2 (7eba28c), SQLite:** every parcel check passes: packing (the chest empties, the record lists the named,
+  enchanted blade), COD, cancelling (items back in the chest), re-addressing a label refused, then four test
+  parcels delivered to Home and accepted, accepted twice (refused), a copied label (refused), COD charged 25,
+  refused, and a retired item left out with a message. The only failures are the compass bug (#37) and
+  `/postal store`/`directory`, which arrived in P3.
+- **P3 (b50658a), MariaDB:** all of the above on MariaDB, plus `/postal store` (MySQL, no failures),
+  `/postal directory`, and the database stopped mid-run: a letter is handed in untracked, `/postal store` says the
+  store is unavailable, and after the restart the store is back and mail is tracked again. Only the compass bug
+  fails.
+
+The console stands in for hands: `setblock` with items places a filled chest for `/package`, and
+`item replace entity <bot> weapon.mainhand from block <mailbox> container.N` copies a delivered label into the bot's
+hand (a copy, which is also the copied-label case). The world is peaceful: a slime killed the bot in an early run.
+
 ## In CI
 
 The `bot` job in `.github/workflows/ci.yml` runs `ci/bot-test.sh` on Java 25 alongside the smoke tests, caching

@@ -90,10 +90,14 @@ jobs:
           if-no-files-found: ignore
 
   bot:
-    name: Bot player test on Paper 26.1.2
+    name: Bot player test on Paper 26.1.2 (${{ matrix.storage }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        storage: [sqlite, mysql]
     # A headless player (ci/bot, MCProtocolLib) checks what the console can't: compass targets and other
     # player-only behaviour. Runs alongside the smoke tests, so it adds no wall time.
     steps:
@@ -113,16 +117,22 @@ jobs:
             ~/.m2/repository
             bot-work/cache
           key: bot-${{ hashFiles('ci/bot/pom.xml', 'ci/lib.sh') }}
+      # The mysql run also stops and restarts the database mid-run (MARIADB_CONTAINER).
+      - name: Start MariaDB
+        if: matrix.storage == 'mysql'
+        run: ci/start-mariadb.sh postal
       - name: Run bot test
         env:
           PAPER_VERSION: "26.1.2"
           WORK_DIR: bot-work
+          STORAGE: ${{ matrix.storage }}
+          MARIADB_CONTAINER: ${{ matrix.storage == 'mysql' && 'postal-mariadb' || '' }}
         run: ci/bot-test.sh dist/va_postal-*.jar
       - name: Upload bot and server logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bot-logs
+          name: bot-logs-${{ matrix.storage }}
           path: |
             bot-work/*.log
             bot-work/server/logs/
