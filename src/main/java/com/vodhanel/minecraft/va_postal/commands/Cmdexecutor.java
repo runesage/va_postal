@@ -2484,20 +2484,19 @@ public class Cmdexecutor implements CommandExecutor {
 
         int a_hits = 0;
         int p_hits = 0;
-        Player srch_param = arg_player;
+        java.util.UUID srch_id = arg_player.getUniqueId();
         Util.pinform(player, "");
-        Util.pinform(player, "&f&l" + arg_player);
+        Util.pinform(player, "&f&l" + arg_player.getName()); // not the Player's toString, "CraftPlayer{name=...}"
         String[] town_list = C_Arrays.town_list();
         if (town_list == null) return true;
         for (String stown : town_list) {
             String sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(stown));
             String dstown = fixed_len(Util.df(stown), 15, "-");
             sworld = Util.df(sworld);
-            Player po_owner;
             String saddress = fixed_len("Post-Office", 15, "-");
             if (C_Owner.is_local_po_owner_defined(stown)) {
-                po_owner = C_Owner.get_owner_local_po(stown);
-                if (po_owner == srch_param) {
+                // By UUID: an offline owner is a fresh stand-in object every time, so == never matched.
+                if (srch_id.equals(C_Owner.get_owner_local_po_id(stown))) {
                     Util.pinform(player, "    &6&o" + dstown + "  &6&o" + saddress + "  &f&o" + sworld);
                     p_hits++;
                 }
@@ -2506,8 +2505,7 @@ public class Cmdexecutor implements CommandExecutor {
             if (addr_list != null) for (String anAddr_list : addr_list) {
                 saddress = anAddr_list;
                 if (C_Owner.is_address_owner_defined(stown, saddress)) {
-                    Player addr_owner = C_Owner.get_owner_address(stown, saddress);
-                    if (addr_owner == srch_param) {
+                    if (srch_id.equals(C_Owner.get_owner_address_id(stown, saddress))) {
                         saddress = fixed_len(Util.df(saddress), 15, "-");
                         Util.pinform(player, "    &a&o" + dstown + "  &a&o" + saddress + "  &f&o" + sworld);
                         a_hits++;
@@ -2515,7 +2513,9 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
-
+        if (p_hits + a_hits == 0) {
+            Util.pinform(player, "    &7&oOwns no post offices or addresses.");
+        }
         return true;
     }
 
@@ -2536,20 +2536,19 @@ public class Cmdexecutor implements CommandExecutor {
 
         int a_hits = 0;
         int p_hits = 0;
-        Player srch_param = arg_player;
+        java.util.UUID srch_id = arg_player.getUniqueId();
         Util.con_type("");
-        Util.con_type(arg_player.toString());
+        Util.con_type(arg_player.getName());
         String[] town_list = C_Arrays.town_list();
         if (town_list == null) return true;
         for (String stown : town_list) {
             String sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(stown));
             String dstown = fixed_len(Util.df(stown), 15, "-");
             sworld = Util.df(sworld);
-            Player po_owner;
             String saddress = fixed_len("Post-Office", 15, "-");
             if (C_Owner.is_local_po_owner_defined(stown)) {
-                po_owner = C_Owner.get_owner_local_po(stown);
-                if (po_owner == srch_param) {
+                // By UUID: an offline owner is a fresh stand-in object every time, so == never matched.
+                if (srch_id.equals(C_Owner.get_owner_local_po_id(stown))) {
                     Util.con_type("\033[0;33m    " + dstown + "  " + saddress + "  " + sworld);
                     p_hits++;
                 }
@@ -2558,8 +2557,7 @@ public class Cmdexecutor implements CommandExecutor {
             if (addr_list != null) for (String anAddr_list : addr_list) {
                 saddress = anAddr_list;
                 if (C_Owner.is_address_owner_defined(stown, saddress)) {
-                    Player addr_owner = C_Owner.get_owner_address(stown, saddress);
-                    if (addr_owner == srch_param) {
+                    if (srch_id.equals(C_Owner.get_owner_address_id(stown, saddress))) {
                         saddress = fixed_len(Util.df(saddress), 15, "-");
                         Util.con_type("\033[0;32m    " + dstown + "  " + saddress + "  " + sworld);
                         a_hits++;
@@ -2567,7 +2565,9 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
-
+        if (p_hits + a_hits == 0) {
+            Util.con_type("    Owns no post offices or addresses.");
+        }
         return true;
     }
 
