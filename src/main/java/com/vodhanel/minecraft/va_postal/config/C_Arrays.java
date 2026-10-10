@@ -188,7 +188,6 @@ public class C_Arrays {
         if (player == null) {
             return null;
         }
-        Util.calibrate_compass(player);
         List<String> list = new ArrayList();
         Location location = player.getLocation();
         if (location == null) {
@@ -239,7 +238,6 @@ public class C_Arrays {
         if (player == null) {
             return null;
         }
-        Util.calibrate_compass(player);
         List<String> list = new ArrayList<>();
         Location location = player.getLocation();
         if (location == null) {
@@ -348,7 +346,6 @@ public class C_Arrays {
         if (player == null) {
             return null;
         }
-        Util.calibrate_compass(player);
         ArrayList<String> list = new ArrayList<>();
         Location location = player.getLocation();
         if (location == null) {
