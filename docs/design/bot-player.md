@@ -67,6 +67,18 @@ event log; the exit status is non-zero on any FAIL. Server log: `$WORK_DIR/serve
 The script restarts the server (up to 3 tries) when a plugin fails to enable: Citizens downloads libraries on first start through the sandbox proxy and that sometimes fails, which also takes Postal down. Local result (Paper 26.1.2 build 74, MCProtocolLib 26.1-1): all checks pass, on two runs (one of them after such a retry); the bot joins in about 1 s after the
 server is up and the scenario takes a few seconds.
 
+## Live trial on the P1 build
+
+The P1 merge (8bcebb0, #7) passed the owner's in-game test plan. Run against a jar built from it, the bot:
+
+- **agreed on letters:** `/addr` with a book in hand gives a `POSTED` record, and re-addressing closes it as
+  `RETURNED` and opens a new `POSTED` one (test plan 1a and 1c), the same as on master;
+- **found the compass bug** the test plan never checked: `/tlist`, and also `/addr` and `/postal track`, moved the
+  compass to `0 0 -12550820` (the old reset point, 7 times in one run). #37 fixed it; master shows no stray moves.
+
+The console supplies what the bot can't do itself: `minecraft:give` for the book (EssentialsX's `/give` doesn't
+parse item components), `eco give` for postage, and `minecraft:tp` to stand near the office.
+
 ## In CI
 
 The `bot` job in `.github/workflows/ci.yml` runs `ci/bot-test.sh` on Java 25 alongside the smoke tests, caching
