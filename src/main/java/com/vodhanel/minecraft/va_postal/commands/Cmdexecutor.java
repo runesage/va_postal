@@ -193,7 +193,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.pinform(player, "&7&cProblem with the number you used.");
                 return true;
             }
-            if ((result < 0.5F) || (result > 2.0F)) {
+            if (!((result >= 0.5F) && (result <= 2.0F))) { // so NaN is refused too
                 Util.pinform(player, "&7&cSpeed must be 0.5 - 2.0");
                 return true;
             }
@@ -411,7 +411,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.con_type("Must be a floating point number.");
                 return true;
             }
-            if ((result < 0.5F) || (result > 2.0F)) {
+            if (!((result >= 0.5F) && (result <= 2.0F))) { // so NaN is refused too
                 Util.con_type("Speed factor must be 0.5 - 2.0");
                 return true;
             }
@@ -1702,7 +1702,7 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         double cod_price = Util.str2double(args[0]);
-        if (cod_price <= 0.0D) {
+        if (!Double.isFinite(cod_price) || cod_price < 0.01D) { // NaN and Infinity parse, and a label shows cents
             Util.pinform(player, "&f&oProblem reading the price: " + args[0]);
             return true;
         }
