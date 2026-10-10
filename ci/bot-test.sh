@@ -2,8 +2,9 @@
 # Boots a throwaway Paper server with Postal on the seeded test network, joins it with the headless bot
 # player in ci/bot/ (MCProtocolLib), and checks what only a player can see: the compass target.
 #
-# Scenario: op the bot; /gps testville + "/" (Postal's confirmation) must point the compass at Testville's
-# post office; a following /tlist must NOT move it (the bug fixed in PR #37).
+# Scenarios: op the bot; /gps testville + "/" (Postal's confirmation) must point the compass at Testville's
+# post office, and a following /tlist must NOT move it (the bug fixed in PR #37). Then /addr a signed book in hand
+# (POSTED) and re-address it (old record RETURNED, a new one POSTED), as in the P1 test plan's 1a and 1c.
 #
 # Usage: ci/bot-test.sh <path-to-postal.jar>
 # Env:   JAVA      Java 25 runtime for the Paper server (default: java)
@@ -164,6 +165,32 @@ check "/tlist answers" bot_cmd "/tlist" 'CHAT TESTVILLE'
 sleep 2
 check "/tlist did not change the compass target" test "$(compass_events)" = "$after_gps"
 check "the compass target is still Testville's post office" test "$(last_compass)" = "$EXPECTED"
+
+# ---- Letters: addressing and re-addressing a book in hand (P1 test plan 1a and 1c) ----------------------------------
+# Only a player can do this: /addr works on the signed book in the player's main hand, near a post office. The
+# console supplies what the bot can't do itself: the book, the money for postage, and the walk to the office.
+console "eco give $BOT_NAME 10000"
+console "minecraft:tp $BOT_NAME 20 -59 4"
+console "minecraft:give $BOT_NAME written_book[written_book_content={title:\"Bot letter\",author:\"$BOT_NAME\",pages:[\"Hello from the bot\"]}]"
+sleep 2
+track_ids() { # state: ids of Testville, Home letters in that state, from the last /postal track recent
+    tail -n +"$1" "$BOT_LOG" | grep -E "CHAT [0-9a-f-]{36} [Tt]estville, [Hh]ome: $2" | awk '{print $3}' | sort -u || true
+}
+check "/addr asks for confirmation" bot_cmd "/addr testville home" 'CHAT .*Ready to address to'
+check "confirming /addr is accepted" bot_cmd "/" 'CHAT .*'
+sleep 1
+from=$(( $(lines "$BOT_LOG") + 1 ))
+check "the letter is tracked as POSTED" bot_cmd "/postal track recent" 'CHAT [0-9a-f-]{36} [Tt]estville, [Hh]ome: POSTED'
+first_id=$(track_ids "$from" POSTED | head -1)
+
+check "re-addressing asks for confirmation" bot_cmd "/addr testville home" 'CHAT .*Ready to address to'
+check "confirming the re-address is accepted" bot_cmd "/" 'CHAT .*'
+sleep 1
+from=$(( $(lines "$BOT_LOG") + 1 ))
+bot_cmd "/postal track recent" 'CHAT [0-9a-f-]{36} [Tt]estville, [Hh]ome' || true
+sleep 1
+check "the first record is closed as RETURNED" bash -c "[ -n '$first_id' ] && tail -n +$from '$BOT_LOG' | grep -qE 'CHAT $first_id [Tt]estville, [Hh]ome: RETURNED'"
+check "a new record is POSTED" bash -c "tail -n +$from '$BOT_LOG' | grep -E 'CHAT [0-9a-f-]{36} [Tt]estville, [Hh]ome: POSTED' | grep -qv '$first_id'"
 
 bot quit
 wait "$BOT_PID" 2>/dev/null || true
