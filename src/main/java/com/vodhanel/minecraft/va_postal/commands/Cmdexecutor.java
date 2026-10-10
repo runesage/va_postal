@@ -171,6 +171,14 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         String sub = args[0].toLowerCase().trim();
+        if ("survey".equals(sub)) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(player, args);
+            return true;
+        }
         if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
                 || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
                 || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub)) {
@@ -335,7 +343,7 @@ public class Cmdexecutor implements CommandExecutor {
         if (args.length == 0) {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
-            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office>");
+            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/survey>");
             Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate/store/directory>");
             return true;
         }
@@ -346,6 +354,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("office".equals(args[0].toLowerCase().trim())) {
             P_Bank.office_command(sender, args, true);
+            return true;
+        }
+        if ("survey".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(sender, args);
             return true;
         }
         if ("track".equals(args[0].toLowerCase().trim())) {

@@ -247,6 +247,8 @@ public class VA_postal extends JavaPlugin {
 
     public static synchronized void SHUTDOWN() {
         VA_Dispatcher.dispatcher_running = false;
+        // Close every door and hatch a postman holds open before the postmen go.
+        com.vodhanel.minecraft.va_postal.navigation.Doorway.shutdown();
         release_chunk_tickets();
         if (Postal_Started) {
             Postal_Started = false;

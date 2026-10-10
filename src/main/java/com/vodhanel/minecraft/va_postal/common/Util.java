@@ -905,7 +905,10 @@ public class Util {
         //Util.dinform("valid_waypnt_block: " + AnsiColor.GREEN + "location " + AnsiColor.WHITE + "= [" + AnsiColor.YELLOW + location + AnsiColor.WHITE + "]");
         //Util.dinform("valid_waypnt_block: " + block + " " + block.getType() + " " + block.getType().isSolid() + " " + block.getType().isOccluding());
 
-        if (block.getType().isSolid())
+        // Solid and something you'd bump into: Bukkit counts signs, banners and pressure plates as solid, so the
+        // [Postal_Mail] sign hung in front of every mailbox put the postman's standing spot on top of it, a block
+        // up, where Citizens couldn't take him; he stopped wherever he was, off to one side.
+        if (block.getType().isSolid() && !block.isPassable())
             return block;
         else
             return null;

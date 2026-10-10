@@ -1,0 +1,166 @@
+package com.vodhanel.minecraft.va_postal.navigation.survey;
+
+/**
+ * What a block means to a walking postman, for the route survey. {@link SurveyGrid} maps each block to one of
+ * these; the {@link Surveyor} only ever sees cells.
+ * <ul>
+ * <li>{@code passable}: the postman's body can be in it (feet or head).</li>
+ * <li>{@code floor}: he can stand on top of it.</li>
+ * <li>{@code cost}: how much a step costs when he's standing on it (roads are cheaper than grass); or, for a
+ * passable cell he walks through, the extra cost of walking through it.</li>
+ * </ul>
+ */
+public enum Cell {
+    /** Air and anything a body walks through without noticing: flowers, torches, signs, carpets, grass. */
+    OPEN(true, false, 0.0D),
+    /** Ordinary ground: grass, dirt, stone, most full blocks. */
+    GROUND(false, true, 1.0D),
+    /** Roads and floors: paths, gravel, stone bricks, planks. Preferred. */
+    ROAD(false, true, 0.7D),
+    /** A bottom slab (or a stair whose facing isn't known): a road a postman steps up onto without jumping. */
+    STEP(false, true, 0.7D),
+    /** Stairs going up towards the north (their high side): stepped up from the south; from anywhere else it's a jump. */
+    STAIRS_NORTH(false, true, 0.7D),
+    STAIRS_SOUTH(false, true, 0.7D),
+    STAIRS_EAST(false, true, 0.7D),
+    STAIRS_WEST(false, true, 0.7D),
+    /** Ground that's slow or unpleasant: sand, soul sand, snow, farmland. */
+    ROUGH(false, true, 2.0D),
+    /** Can't be walked through or stood on: fences, walls, leaves, panes, iron bars. */
+    WALL(false, false, 0.0D),
+    /** A door: passable once opened. */
+    DOOR(true, false, 3.0D),
+    /** A fence gate: passable once opened. */
+    GATE(true, false, 3.0D),
+    /**
+     * A closed trapdoor: stood on like a floor and walked into like a wall, but a climb up or down a ladder passes
+     * through it (Postal opens it for the postman: a hatch over a ladder shaft).
+     */
+    HATCH(false, true, 0.7D),
+    /** A ladder or vine: passable, climbable, and its top can be stood on. */
+    LADDER(true, true, 2.0D),
+    /** Crops: passable, but a postman shouldn't walk through someone's field. */
+    CROP(true, false, 8.0D),
+    /** Water: avoided (a postman doesn't swim with the mail). */
+    WATER(false, false, 0.0D),
+    /** Lava, fire, cactus, magma, berry bushes, powder snow: never. */
+    DANGER(false, false, 0.0D),
+    /** Not loaded or outside the survey area: treated as a wall. */
+    UNKNOWN(false, false, 0.0D);
+
+    /** For stairs: the way up, as {dx, dz}; null for anything else. */
+    public int[] ascends() {
+        return switch (this) {
+            case STAIRS_NORTH -> new int[]{0, -1};
+            case STAIRS_SOUTH -> new int[]{0, 1};
+            case STAIRS_EAST -> new int[]{1, 0};
+            case STAIRS_WEST -> new int[]{-1, 0};
+            default -> null;
+        };
+    }
+
+    /** Stairs going up towards {@code facing} (NORTH, SOUTH, EAST or WEST). */
+    public static Cell stairs(String facing) {
+        return switch (facing) {
+            case "NORTH" -> STAIRS_NORTH;
+            case "SOUTH" -> STAIRS_SOUTH;
+            case "EAST" -> STAIRS_EAST;
+            case "WEST" -> STAIRS_WEST;
+            default -> STEP;
+        };
+    }
+
+    public final boolean passable;
+    public final boolean floor;
+    public final double cost;
+
+    Cell(boolean passable, boolean floor, double cost) {
+        this.passable = passable;
+        this.floor = floor;
+        this.cost = cost;
+    }
+
+    /**
+     * What a block is to a postman, by its name (and whether the server calls it solid). Names rather than
+     * block tags, so it's testable without a server.
+     */
+    public static Cell of(String n, boolean solid) {
+        switch (n) {
+            case "AIR", "CAVE_AIR", "VOID_AIR":
+                return OPEN;
+            case "NETHER_PORTAL", "END_PORTAL", "END_GATEWAY", "LAVA_CAULDRON", "POWDER_SNOW_CAULDRON":
+                return DANGER; // a portal would carry him off; the cauldrons hurt
+            case "SUGAR_CANE":
+                return CROP; // no collision, but someone's crop
+            case "IRON_TRAPDOOR", "TURTLE_EGG", "FROGSPAWN", "END_ROD", "CHORUS_PLANT", "CHORUS_FLOWER",
+                 "AMETHYST_CLUSTER", "SMALL_AMETHYST_BUD", "MEDIUM_AMETHYST_BUD", "LARGE_AMETHYST_BUD":
+                return WALL; // no hand opens an iron trapdoor; eggs aren't for trampling; posts and crystals are obstacles
+            case "LEVER", "TRIPWIRE", "TRIPWIRE_HOOK", "REDSTONE_WIRE", "REPEATER", "COMPARATOR", "COCOA":
+                return OPEN;
+            case "CLAY":
+                return GROUND;
+            case "SNOW", "LILY_PAD":
+                // A thin snow layer is stepped over (SurveyGrid makes deep ones ground); a lily pad is never a floor
+                // (the water under it isn't one either, so a route never crosses water on them).
+                return OPEN;
+            case "WATER", "BUBBLE_COLUMN", "KELP", "KELP_PLANT", "SEAGRASS", "TALL_SEAGRASS":
+                return WATER;
+            case "LAVA", "FIRE", "SOUL_FIRE", "MAGMA_BLOCK", "CACTUS", "SWEET_BERRY_BUSH", "POWDER_SNOW", "CAMPFIRE",
+                 "SOUL_CAMPFIRE", "WITHER_ROSE", "POINTED_DRIPSTONE":
+                return DANGER;
+            case "IRON_DOOR", "IRON_BARS", "COBWEB", "BAMBOO", "CHEST", "TRAPPED_CHEST", "ENDER_CHEST",
+                 "CHAIN":
+                return WALL; // chests: never route over a mailbox
+            case "LADDER", "VINE", "SCAFFOLDING", "WEEPING_VINES", "WEEPING_VINES_PLANT", "TWISTING_VINES",
+                 "TWISTING_VINES_PLANT", "CAVE_VINES", "CAVE_VINES_PLANT":
+                return LADDER;
+            case "WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "MELON_STEM", "PUMPKIN_STEM", "ATTACHED_MELON_STEM",
+                 "ATTACHED_PUMPKIN_STEM", "TORCHFLOWER_CROP", "PITCHER_CROP", "NETHER_WART":
+                return CROP;
+            case "DIRT_PATH", "GRAVEL":
+                return ROAD;
+            case "SAND", "RED_SAND", "SOUL_SAND", "SOUL_SOIL", "FARMLAND", "SNOW_BLOCK", "MUD", "HONEY_BLOCK",
+                 "SLIME_BLOCK":
+                return ROUGH;
+            default:
+                break;
+        }
+        // Thin things a postman walks over or through, whatever the server says about their collision box (a carpet
+        // is "solid", but he stands on top of it, not a block higher).
+        if (n.endsWith("_CARPET") || n.endsWith("_SIGN") || n.endsWith("_BANNER") || n.endsWith("TORCH")
+                || n.endsWith("CANDLE") || n.endsWith("_PRESSURE_PLATE") || n.endsWith("_BUTTON") || n.endsWith("RAIL")) {
+            return OPEN;
+        }
+        if (n.endsWith("_CHEST") || n.endsWith("LIGHTNING_ROD")) {
+            return WALL; // copper chests are mailboxes like any chest; rods are posts
+        }
+        if (n.endsWith("_DOOR")) {
+            return DOOR;
+        }
+        if (n.endsWith("_FENCE_GATE")) {
+            return GATE;
+        }
+        if (n.endsWith("_CHAIN") || n.endsWith("_BARS")) {
+            return WALL; // IRON_CHAIN and the copper chains and bars (Minecraft 1.21.9)
+        }
+        if (n.endsWith("_TRAPDOOR")) {
+            return HATCH; // SurveyGrid makes an open one open
+        }
+        if (n.endsWith("_FENCE") || n.endsWith("_LEAVES") || n.endsWith("SHULKER_BOX")
+                || n.endsWith("_PANE") || n.endsWith("_WALL") && !n.endsWith("_SIGN") || n.equals("COBBLESTONE_WALL")) {
+            return WALL;
+        }
+        if (!solid) {
+            return OPEN; // signs, torches, flowers, grass, rails, pressure plates, carpets
+        }
+        if (n.endsWith("_SLAB") || n.endsWith("_STAIRS")) {
+            return STEP;
+        }
+        if (n.endsWith("_PLANKS") || n.contains("BRICK") || n.contains("COBBLESTONE") || n.startsWith("POLISHED_")
+                || n.startsWith("SMOOTH_") || n.endsWith("_CONCRETE") || n.endsWith("_TILES") || n.startsWith("CUT_")
+                || n.startsWith("QUARTZ")) {
+            return ROAD;
+        }
+        return GROUND;
+    }
+}

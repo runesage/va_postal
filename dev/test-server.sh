@@ -16,6 +16,8 @@
 #      DEV_DIR (default: <repo>/dev-server), PAPER_VERSION,
 #      DEV_BALANCE (starting money for players on the test server; default 100000),
 #      SEED_SIZE (full: 3 towns x 5 addresses, the default; small: Testville + Home only),
+#      SEED_WORLD (flat: the street test network, the default; towns: three built-up towns with hills,
+#                  a river, bridges, doors and a forest, from dev/towns/build_towns.py),
 #      DEV_PACE (fast: quick postman cycles, the default; normal: Postal's live-server pacing)
 set -euo pipefail
 
@@ -286,10 +288,19 @@ cmd_start() {
         if [ -f "$SERVER/.seeded" ]; then
             info "Test network already seeded; skipping (dev/test-server.sh reset to start over)"
         else
-            info "Seeding the test network ($SEED_SIZE: Central + $(seed_towns | wc -w) town(s)) at the world origin"
-            seed_config "$POSTAL_CONFIG"
-            commands+=("${SEED_COMMANDS[@]}")
-            touch "$SERVER/.seeded"
+            if [ "${SEED_WORLD:-flat}" = towns ]; then
+                info "Seeding the test towns (Hillcrest, Riverside, Woodvale; see dev/towns/README.md)"
+                mkdir -p "$SERVER/world/datapacks"
+                python3 "$REPO/dev/towns/build_towns.py" --datapack "$SERVER/world/datapacks/postal_towns" \
+                    --config "$POSTAL_CONFIG"
+                commands+=("function postal_towns:build")
+                echo towns > "$SERVER/.seeded"
+            else
+                info "Seeding the test network ($SEED_SIZE: Central + $(seed_towns | wc -w) town(s)) at the world origin"
+                seed_config "$POSTAL_CONFIG"
+                commands+=("${SEED_COMMANDS[@]}")
+                touch "$SERVER/.seeded"
+            fi
         fi
     fi
     if [ -f "$SERVER/.seeded" ]; then
@@ -320,7 +331,11 @@ cmd_start() {
     local port
     port="$(get_property server-port)"
     info "Starting Paper $PAPER_VERSION. Join at localhost:${port:-25565}. Type 'stop' to shut down."
-    [ -f "$SERVER/.seeded" ] && echo "    Test network: Central (0,-60,0); streets at z=0 Testville, z=40 Riverside, z=80 Hilltop (post office x=20, addresses x=40-80)."
+    if grep -qs towns "$SERVER/.seeded"; then
+        echo "    Test towns: Central (0,-60,0); Hillcrest office (70,-60,0), Riverside (0,-60,85), Woodvale (-70,-60,0)."
+    elif [ -f "$SERVER/.seeded" ]; then
+        echo "    Test network: Central (0,-60,0); streets at z=0 Testville, z=40 Riverside, z=80 Hilltop (post office x=20, addresses x=40-80)."
+    fi
     echo "    Afterwards: dev/test-server.sh report"
     (cd "$SERVER" && "$JAVA" -Xms2G -Xmx4G -jar paper.jar nogui) || true
 }

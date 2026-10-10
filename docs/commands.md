@@ -23,6 +23,8 @@ Lists all chests and locations _(only works when running)_
 Shows a tracked letter's state, where it is, and its full history; `recent` lists the ten most recently changed letters.
 ##### `reconcile`
 Runs the mail reconciliation check now (normally every 5 minutes), for loaded chunks: finishes interrupted moves, marks letters missing from their chests as MISSING, removes stale copies and flags forged postal books.
+##### `survey <PostOffice> [address | missing | all]`
+Surveys routes: Postal finds a walking route from the post office to the address over the blocks as they are now, and saves it as an ordinary route (so `/showroute` shows it and `/setroute` can still adjust it). `missing` (the default) surveys the addresses that have no route, `all` replaces every route in the office. A new address is surveyed automatically when it's registered with `/setaddr`. The survey keeps to roads and stairs, walks through doors and gates, climbs ladders, and won't swim, cross crops or drop more than three blocks; if there's no such way, it says how close it got.
 ##### `testparcel <from PostOffice> <to PostOffice> <address> [cod] [retired]`
 Packs a test parcel (an enchanted, renamed diamond sword, oak logs, golden apples) in a chest beside the from-office, locks it and hands its label in at that office, as a player would after `/package`. Optional COD amount. With `retired`, the parcel also carries an item recorded under an id this Minecraft doesn't have, as if an upgrade had removed it: whoever opens the parcel gets everything else, plus a message naming what was left out.
 ##### `recover <mail id> [x y z]`

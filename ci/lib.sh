@@ -43,6 +43,27 @@ install_server() {
     mkdir -p "$2/plugins"
     cp "$1/paper-$PAPER_VERSION.jar" "$2/paper.jar"
     cp "$1/Citizens.jar" "$1/VaultUnlocked.jar" "$1/EssentialsX.jar" "$2/plugins/"
+    # Libraries the plugins downloaded on an earlier run (see keep_libraries): a flaky download then can't
+    # stop Citizens from loading.
+    if [ -d "$1/libraries" ]; then
+        cp -r "$1/libraries" "$2/"
+    fi
+    if [ -d "$1/citizens-lib" ]; then  # Citizens downloads some libraries itself, into plugins/Citizens/lib
+        mkdir -p "$2/plugins/Citizens"
+        cp -r "$1/citizens-lib" "$2/plugins/Citizens/lib"
+    fi
+}
+
+# keep_libraries <cache-dir> <server-dir>: keeps the libraries the plugins downloaded, for install_server.
+keep_libraries() {
+    if [ -d "$2/libraries" ]; then
+        mkdir -p "$1/libraries"
+        cp -rn "$2/libraries/." "$1/libraries/" 2>/dev/null || true
+    fi
+    if [ -d "$2/plugins/Citizens/lib" ]; then
+        mkdir -p "$1/citizens-lib"
+        cp -rn "$2/plugins/Citizens/lib/." "$1/citizens-lib/" 2>/dev/null || true
+    fi
 }
 
 # java_major <java-binary>: prints the major version, e.g. 25 (and 8 for Java 8's "1.8.0").
