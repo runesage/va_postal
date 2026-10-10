@@ -1811,7 +1811,11 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "");
             Util.pinform(player, "&7&oUsage: &f&r/gps <PostOffice> [Address] &7&oto set your compass");
             Util.pinform(player, "");
-            Util.pinform(player, "&7Dist Cmp  Post-Office--  Address------- Qwner--------");
+            if (g_list == null) { // nothing in this world (the list was dereferenced regardless: an internal error)
+                Util.pinform(player, "&7&oNo post offices or addresses in this world.");
+                return true;
+            }
+            Util.pinform(player, "&7Dist Cmp  Post-Office--  Address------- Owner--------");
             for (int i = 0; i < g_list.length; i++) {
                 String[] parts = g_list[i].split(",");
                 if (parts.length == 4) {
