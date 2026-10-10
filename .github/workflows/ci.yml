@@ -89,9 +89,48 @@ jobs:
             smoke/server/plugins/Postal/config.yml
           if-no-files-found: ignore
 
+  bot:
+    name: Bot player test on Paper 26.1.2
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A headless player (ci/bot, MCProtocolLib) checks what the console can't: compass targets and other
+    # player-only behaviour. Runs alongside the smoke tests, so it adds no wall time.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: actions/download-artifact@v4
+        with:
+          name: postal-jar
+          path: dist
+      - name: Cache bot dependencies and server downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            bot-work/cache
+          key: bot-${{ hashFiles('ci/bot/pom.xml', 'ci/lib.sh') }}
+      - name: Run bot test
+        env:
+          PAPER_VERSION: "26.1.2"
+          WORK_DIR: bot-work
+        run: ci/bot-test.sh dist/va_postal-*.jar
+      - name: Upload bot and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-logs
+          path: |
+            bot-work/*.log
+            bot-work/server/logs/
+          if-no-files-found: ignore
+
   report:
     name: Open issue on failure
-    needs: [build, smoke]
+    needs: [build, smoke, bot]
     # Only for master and the weekly run; PR failures show on the PR itself.
     if: failure() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
