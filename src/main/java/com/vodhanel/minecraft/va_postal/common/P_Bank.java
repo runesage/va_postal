@@ -247,7 +247,13 @@ public final class P_Bank {
             amount = parse_amount(args[3]);
         }
         if (amount <= 0.0D) {
-            send(sender, "&7Nothing to " + action + ("all".equalsIgnoreCase(args[3]) ? ": the office is at its reserve." : ". Use a positive amount."));
+            String why = ". Use a positive amount.";
+            if ("all".equalsIgnoreCase(args[3])) {
+                double arrears = office(office).arrears();
+                why = arrears > 0.0D ? ": " + Util.df(office) + " owes " + money(arrears) + " in upkeep, which must be paid first."
+                        : ": the office is at its reserve of " + money(office(office).reserve) + ".";
+            }
+            send(sender, "&7Nothing to " + action + why);
             return;
         }
         Result result = "withdraw".equals(action) ? withdraw(office, player, amount) : deposit(office, player, amount);
