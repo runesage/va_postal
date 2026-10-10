@@ -10,86 +10,53 @@ public class C_Economy {
     }
 
     public static synchronized double postage_price(boolean local) {
-        double result = 0.0D;
         String spath;
         if (local) {
             spath = GetConfig.path_format("economy.postage.letter.local");
         } else {
             spath = GetConfig.path_format("economy.postage.letter.out_town");
         }
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            result = Double.parseDouble(str);
-        } catch (Exception e) {
-            return 0.0D;
-        }
-        return result;
+        return price(spath);
     }
 
     public static synchronized double ship_price(boolean local) {
-        double result = 0.0D;
         String spath;
         if (local) {
             spath = GetConfig.path_format("economy.postage.shipment.local");
         } else {
             spath = GetConfig.path_format("economy.postage.shipment.out_town");
         }
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            result = Double.parseDouble(str);
-        } catch (Exception e) {
-            return 0.0D;
-        }
-        return result;
+        return price(spath);
     }
 
     public static synchronized double cod_surchg() {
-        double result = 0.0D;
-
         String spath = GetConfig.path_format("economy.postage.shipment.cod_surchg");
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            result = Double.parseDouble(str);
-        } catch (Exception e) {
-            return 0.0D;
-        }
-        return result;
+        return price(spath);
     }
 
     public static synchronized double distr_price() {
-        double result = 0.0D;
         String spath = GetConfig.path_format("economy.postage.distribution");
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            result = Double.parseDouble(str);
-        } catch (Exception e) {
-            return 0.0D;
-        }
-        return result;
+        return price(spath);
     }
 
     public static synchronized double po_purchase_price() {
-        double result = 0.0D;
         String spath = GetConfig.path_format("economy.postoffice.purchase_price");
-        try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            result = Double.parseDouble(str);
-        } catch (Exception e) {
-            return 0.0D;
-        }
-        return result;
+        return price(spath);
     }
 
     public static synchronized double addr_purchase_price() {
-        double result = 0.0D;
         String spath = GetConfig.path_format("economy.address.purchase_price");
+        return price(spath);
+    }
+
+    /** A price from the config: 0 if it's missing, not a number, or negative (a negative price would pay the buyer). */
+    private static double price(String spath) {
         try {
-            String str = VA_postal.plugin.getConfig().getString(spath);
-            result = Double.parseDouble(str);
+            double value = Double.parseDouble(VA_postal.plugin.getConfig().getString(spath).trim());
+            return Double.isFinite(value) && value > 0.0D ? value : 0.0D;
         } catch (Exception e) {
             return 0.0D;
         }
-        return result;
     }
 
     private static double config_double(String path, double fallback) {

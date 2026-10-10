@@ -191,7 +191,7 @@ text = open(p).read()
 head = text.split("\nPostoffice:\n", 1)[0]
 open(p, "w").write(head + "\nPostoffice:\n  Central:\n    Location: world,0.0,-60.0,2.0\n")
 PY
-run_server "$WORK_DIR/phase8.log" "postal start" "sleep:3" "postal stop" "sleep:2"
+run_server "$WORK_DIR/phase8.log" "postal start" "sleep:3" "postal stop" "sleep:2" "postal speed NaN" "postal speed"
 cp "$WORK_DIR/config.full.yml" "$CONFIG"
 
 # Phase 9 (#12): owners who are not online. The smoke server has no players, so any owner is offline. Home is owned
@@ -236,6 +236,20 @@ PY
 run_server "$WORK_DIR/phase10.log" "tlist testville" "alist Testville" "postal start" "sleep:15" \
     "data get block 20 -60 1 front_text.messages" "data get block 40 -60 1 front_text.messages" \
     "postal stop" "sleep:3"
+
+# Phase 11: a local office saved in a world that no longer exists must not crash `postal start`.
+echo "== Phase 11: an office whose Location names a missing world"
+python3 - "$CONFIG" <<'PY'
+import re, sys
+p = sys.argv[1]
+text = open(p).read()
+# Testville's Location line, wherever it sits in its block (phase 7 put an Owner section in front of it).
+new = re.sub(r"(\n    Testville:\n(?:      .*\n)*?      Location: '?)world,", r"\1gone_world,", text, count=1)
+assert new != text
+open(p, "w").write(new)
+PY
+run_server "$WORK_DIR/phase11.log" "postal start" "sleep:10" "postal stop" "sleep:3"
+cp "$WORK_DIR/config.full.yml" "$CONFIG"
 
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
@@ -367,12 +381,15 @@ check "phase8: no exception on postal start" no_match "NullPointerException|Comm
 check "phase8: postal start aborts cleanly" grep -q "could not compile town list" "$WORK_DIR/phase8.log"
 check "phase8: postal start says a local post office is needed" grep -q "cannot find a local post office to service" "$WORK_DIR/phase8.log"
 check "phase8: the dispatcher did not start" no_match "VA_Postal started" "$WORK_DIR/phase8.log"
+check "phase8: postal speed refuses NaN" grep -q "Speed factor must be 0.5 - 2.0" "$WORK_DIR/phase8.log"
+check "phase8: the speed factor is unchanged after NaN" no_match "Current speed factor: NaN" "$WORK_DIR/phase8.log"
 
 # Phase 9 (#12): offline owners show by account name; a player the server has never seen shows a placeholder.
 check "phase9: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase9.log"
 check "phase9: no exception or stack trace" no_match "NullPointerException|Command exception: /?(postal|tlist|alist)|at .*com\.vodhanel\." "$WORK_DIR/phase9.log"
 check "phase9: dispatcher started with offline owners" grep -q "VA_Postal started" "$WORK_DIR/phase9.log"
 check "phase9: /tlist names Home's offline owner" grep -qE "Home[.]+ +$KNOWN_NAME" <(plain phase9)
+check "phase9: console /tlist lists the first office too" grep -qE "TESTVILLE[.]+ +${OWNER_UUID}" <(plain phase9)
 check "phase9: /alist names Home's offline owner" grep -qE "^.*Home +$KNOWN_NAME" <(plain phase9)
 check "phase9: Testville's sign carries the placeholder for a never-seen owner" grep -qF "\"${OWNER_UUID:0:15}\"" <(plain phase9)
 
@@ -381,6 +398,8 @@ check "phase10: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase10.log
 check "phase10: no exception or stack trace" no_match "NullPointerException|Command exception: /?(postal|tlist|alist)|at .*com\.vodhanel\." "$WORK_DIR/phase10.log"
 check "phase10: dispatcher started" grep -q "VA_Postal started" "$WORK_DIR/phase10.log"
 check "phase10: /tlist lists the office and address as server-owned" grep -qE "Home[.]+ +server" <(plain phase10)
+check "phase11: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase11.log"
+check "phase11: no NullPointerException or Postal stack trace" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase11.log"
 
 echo
 echo "---- Postal output (phase 2) ----"

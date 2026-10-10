@@ -50,10 +50,15 @@ public class Util {
             for (int a = 0; a < 3; a++) {
                 parsed[a] = ((int) Double.parseDouble(arg[(a + 1)].trim()));
             }
-            location = new Location(Bukkit.getWorld(arg[0]), parsed[0], parsed[1], parsed[2], 0.0F, 0.0F);
-            // Util.dinform("str2location: LOC IS "+location);
-        } catch (NumberFormatException numberFormatException) {
-            Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: " + str + " " + numberFormatException);
+            World world = Bukkit.getWorld(arg[0].trim());
+            if (world == null) {
+                Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: world not loaded: " + str);
+                return null;
+            }
+            location = new Location(world, parsed[0], parsed[1], parsed[2], 0.0F, 0.0F);
+        } catch (RuntimeException e) {
+            // Malformed string (NumberFormatException, ArrayIndexOutOfBoundsException, ...)
+            Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: " + str + " " + e);
             return null;
         }
         return location;
@@ -322,14 +327,6 @@ public class Util {
         }
     }
 
-    public static void calibrate_compass(Player player) {
-        if (player == null) {
-            return;
-        }
-        Location loc_ref = player.getWorld().getBlockAt(0, 0, -12550820).getLocation();
-        player.setCompassTarget(loc_ref);
-    }
-
     public static double get_direction_to_target(Player player, Location loc_target) {
         if ((player == null) || (loc_target == null)) {
             return -1000.0D;
@@ -446,8 +443,8 @@ public class Util {
                         sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(poffice));
                         disp = fmt_po + fixed_len(poffice.toUpperCase(), 16, fmt_fill);
                         disp = disp + " " + fmt_ownr + owner + " " + fmt_wrld + Util.df(sworld);
-                        if ((player == null) && (i != 0)) {
-                            cinform(disp);
+                        if (player == null) {
+                            cinform(disp); // the console too gets the first office (it went to pinform(null), lost)
                         } else {
                             if ((detail) && (i != 0)) {
                                 pinform(player, "");
@@ -549,12 +546,15 @@ public class Util {
             for (int a = 0; a < 3; a++) {
                 parsed[a] = Double.parseDouble(arg[(a + 1)].trim());
             }
-            location = new Location(Bukkit.getWorld(arg[0]), parsed[0], parsed[1], parsed[2]);
-        } catch (NumberFormatException numberFormatException) {
-            return null;
+            World w = Bukkit.getWorld(arg[0].trim());
+            if (w == null) {
+                return null; // world removed/renamed/not loaded
+            }
+            location = new Location(w, parsed[0], parsed[1], parsed[2]);
+            return w.getBlockAt(location);
+        } catch (RuntimeException e) {
+            return null; // malformed string
         }
-        World w = location.getWorld();
-        return w.getBlockAt(location);
     }
 
     public static World str2world(String sworld) {
@@ -774,7 +774,7 @@ public class Util {
         try {
             String sadjusted_loc = put_point_on_ground(slocation, false);
             Location adjusted_loc = str2location(sadjusted_loc);
-            if (sadjusted_loc == null) {
+            if (adjusted_loc == null) {
                 cinform(error + " " + slocation);
                 return;
             }
@@ -805,6 +805,9 @@ public class Util {
     public static synchronized String put_point_on_ground(String slocation, boolean ground_block) {
         //Util.dinform("put_point_on_ground: "+slocation + " "+ground_block);
         Location base = simplified_copy(slocation);
+        if (base == null) {
+            return slocation; // unparseable, or its world isn't loaded: nothing to put on the ground
+        }
         Location test_loc = simplified_copy(base);
         Block block = valid_waypnt_block(test_loc);
         if (ground_block) {

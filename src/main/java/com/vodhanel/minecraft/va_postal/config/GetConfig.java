@@ -221,7 +221,7 @@ public class GetConfig {
         } catch (Exception e) {
             return 1.0F;
         }
-        if ((result.floatValue() < 0.5F) || (result.floatValue() > 2.0F)) {
+        if (!((result.floatValue() >= 0.5F) && (result.floatValue() <= 2.0F))) { // so NaN falls back too
             return 1.0F;
         }
         return result.floatValue();
