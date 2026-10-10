@@ -79,14 +79,24 @@ wait_log() { # file regex timeout-seconds [first-line]: waits for a line matchin
 }
 lines() { wc -l < "$1" | tr -d ' '; }
 
-start_server() { # log: starts Paper with a console fifo on fd 3
-    rm -f "$SERVER/logs/latest.log" "$CONSOLE"
-    mkfifo "$CONSOLE"
-    (cd "$SERVER" && exec "$JAVA" -Xms1G -Xmx2G -jar paper.jar nogui < "$CONSOLE") > "$1" 2>&1 &
-    SERVER_PID=$!
-    exec 3>"$CONSOLE"
-    wait_log "$1" 'Done \(' 300 || { echo "server did not start"; tail -30 "$1"; exit 1; }
-    sleep 3
+start_server() { # log: starts Paper with a console fifo on fd 3; retries when a plugin fails to enable
+    local attempt
+    for attempt in 1 2 3; do
+        rm -f "$SERVER/logs/latest.log" "$CONSOLE"
+        mkfifo "$CONSOLE"
+        (cd "$SERVER" && exec "$JAVA" -Xms1G -Xmx2G -jar paper.jar nogui < "$CONSOLE") > "$1" 2>&1 &
+        SERVER_PID=$!
+        exec 3>"$CONSOLE"
+        wait_log "$1" 'Done \(' 300 || { echo "server did not start"; tail -30 "$1"; exit 1; }
+        sleep 3
+        # Citizens downloads libraries on first start and that occasionally fails, which takes Postal down with it.
+        if ! grep -q 'Error occurred while enabling' "$1"; then return 0; fi
+        echo "a plugin failed to enable (attempt $attempt), restarting:"
+        grep -A1 'Error occurred while enabling' "$1" | head -4
+        stop_server
+    done
+    echo "plugins would not enable after 3 attempts"
+    exit 1
 }
 console() { echo "$*" >&3; }
 stop_server() {

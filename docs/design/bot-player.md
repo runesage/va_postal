@@ -64,7 +64,7 @@ Maven; the bot's dependencies land in `ci/bot/target/lib`). Output ends with the
 event log; the exit status is non-zero on any FAIL. Server log: `$WORK_DIR/server.log`, bot events:
 `$WORK_DIR/bot.log`.
 
-Local result (Paper 26.1.2 build 74, MCProtocolLib 26.1-1): all checks pass; the bot joins in about 1 s after the
+The script restarts the server (up to 3 tries) when a plugin fails to enable: Citizens downloads libraries on first start through the sandbox proxy and that sometimes fails, which also takes Postal down. Local result (Paper 26.1.2 build 74, MCProtocolLib 26.1-1): all checks pass, on two runs (one of them after such a retry); the bot joins in about 1 s after the
 server is up and the scenario takes a few seconds.
 
 ## Hooking into CI (not wired yet)

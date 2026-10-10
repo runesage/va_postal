@@ -131,3 +131,6 @@ fabric.properties
 target/
 smoke/
 dev-server/
+
+# CI bot test working directory
+bot-work/
