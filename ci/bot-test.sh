@@ -151,9 +151,10 @@ sleep 2
 # The compass target Postal will set: Testville's post office, as seeded by lib.sh (world,20.0,-60.0,2.0).
 EXPECTED="minecraft:overworld 20 -60 2"
 
+before_gps=$(compass_events)
 check "/gps asks for confirmation" bot_cmd "/gps testville" 'CHAT .*Ready to set your compass to'
-before_confirm=$(compass_events)
-check "the compass is not moved before confirming" test "$(compass_events)" = "$before_confirm"
+sleep 1
+check "the compass is not moved before confirming" test "$(compass_events)" = "$before_gps"
 check "confirming with / is accepted" bot_cmd "/" 'CHAT .*Your compass has been set to'
 sleep 1
 check "the compass target is Testville's post office ($EXPECTED)" test "$(last_compass)" = "$EXPECTED"

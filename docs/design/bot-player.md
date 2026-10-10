@@ -67,7 +67,15 @@ event log; the exit status is non-zero on any FAIL. Server log: `$WORK_DIR/serve
 The script restarts the server (up to 3 tries) when a plugin fails to enable: Citizens downloads libraries on first start through the sandbox proxy and that sometimes fails, which also takes Postal down. Local result (Paper 26.1.2 build 74, MCProtocolLib 26.1-1): all checks pass, on two runs (one of them after such a retry); the bot joins in about 1 s after the
 server is up and the scenario takes a few seconds.
 
-## Hooking into CI (not wired yet)
+## In CI
+
+The `bot` job in `.github/workflows/ci.yml` runs `ci/bot-test.sh` on Java 25 alongside the smoke tests, caching
+Maven's repository and the server downloads, and uploads `bot-logs` on every run.
+
+The test was checked against a build with PR #37 reverted: it fails on the two `/tlist` checks (the compass jumps to
+`0 0 -12550820`, the old reset point) and passes with the fix.
+
+### Original sketch
 
 Add a job (or a step in the `smoke` job, which already has Java 25 and the cached `smoke/cache`):
 
@@ -94,7 +102,6 @@ Add a job (or a step in the `smoke` job, which already has Java 25 and the cache
 
 ## Not done yet / next steps
 
-- Not wired into `.github/workflows/ci.yml`.
 - Signed chat messages (non-command chat) are not sent; only commands. Commands are sent unsigned, which is fine on
   an offline-mode server with `enforce-secure-profile=false`.
 - The bot does not track its position, inventory or the world. `/postal test` and route-walking checks need at least
