@@ -446,8 +446,8 @@ public class Util {
                         sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(poffice));
                         disp = fmt_po + fixed_len(poffice.toUpperCase(), 16, fmt_fill);
                         disp = disp + " " + fmt_ownr + owner + " " + fmt_wrld + Util.df(sworld);
-                        if ((player == null) && (i != 0)) {
-                            cinform(disp);
+                        if (player == null) {
+                            cinform(disp); // the console too gets the first office (it went to pinform(null), lost)
                         } else {
                             if ((detail) && (i != 0)) {
                                 pinform(player, "");
