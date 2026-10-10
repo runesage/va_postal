@@ -240,10 +240,11 @@ run_server "$WORK_DIR/phase10.log" "tlist testville" "alist Testville" "postal s
 # Phase 11: a local office saved in a world that no longer exists must not crash `postal start`.
 echo "== Phase 11: an office whose Location names a missing world"
 python3 - "$CONFIG" <<'PY'
-import sys
+import re, sys
 p = sys.argv[1]
 text = open(p).read()
-new = text.replace("    Testville:\n      Location: world,", "    Testville:\n      Location: gone_world,", 1)
+# Testville's Location line, wherever it sits in its block (phase 7 put an Owner section in front of it).
+new = re.sub(r"(\n    Testville:\n(?:      .*\n)*?      Location: '?)world,", r"\1gone_world,", text, count=1)
 assert new != text
 open(p, "w").write(new)
 PY
