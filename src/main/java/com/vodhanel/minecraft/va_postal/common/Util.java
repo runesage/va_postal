@@ -327,14 +327,6 @@ public class Util {
         }
     }
 
-    public static void calibrate_compass(Player player) {
-        if (player == null) {
-            return;
-        }
-        Location loc_ref = player.getWorld().getBlockAt(0, 0, -12550820).getLocation();
-        player.setCompassTarget(loc_ref);
-    }
-
     public static double get_direction_to_target(Player player, Location loc_target) {
         if ((player == null) || (loc_target == null)) {
             return -1000.0D;
