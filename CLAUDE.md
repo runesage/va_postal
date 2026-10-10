@@ -10,7 +10,7 @@ MySQL/MariaDB), money goes through Vault, and post offices can span servers.
 |---|---|
 | `src/main/java/com/vodhanel/minecraft/va_postal/` | plugin code: `commands/`, `common/` (Util, P_* integrations, dispatchers), `config/` (C_* config accessors), `economy/`, `listeners/`, `mail/`, `navigation/` (routes, Stuck_NPC, Climb, Doorway), `store/` (mail store, SQL dialects) |
 | `src/test/java/...` | JUnit 5 unit tests; store tests run on SQLite and (when configured) MariaDB |
-| `ci/` | `smoke-test.sh` (boots a real Paper server, 11 phases), `lib.sh` (pinned Paper/plugin builds), `start-mariadb.sh` |
+| `ci/` | `smoke-test.sh` (boots a real Paper server, 11 phases), `bot-test.sh` + `bot/` (headless player tests), `lib.sh` (pinned Paper/plugin builds), `start-mariadb.sh` |
 | `dev/` | `test-server.sh` (local server to join by hand), `rcon.py`; on `claude/routes-design` also `dev/towns/` (towns soak, SMP load test) |
 | `docs/` | `commands.md`, `economy.md`, `design/` (economy, persistent-state, routes), `testing/` (per-phase test plans), `plans/` |
 
@@ -62,16 +62,19 @@ the Maven cache. If Docker isn't up, run `nohup dockerd >/tmp/dockerd.log 2>&1 &
 
 ## CI
 
-`.github/workflows/ci.yml`: **Build and unit tests** (with MariaDB), then **Smoke test (sqlite)** and
-**Smoke test (mysql)**. That's about 16 minutes, mostly the smoke tests. Failures on `master` or the weekly
+`.github/workflows/ci.yml`: **Build and unit tests** (with MariaDB), then **Smoke test (sqlite)**,
+**Smoke test (mysql)** and **Bot player test** in parallel. That's about 16 minutes, mostly the smoke tests. Failures on `master` or the weekly
 run open a `ci-failure` issue.
 
 When a job fails, read its log before anything else. If it died before any build or test step (image pull,
 checkout, runner loss), it's infrastructure: re-run it once and say so on the PR. Otherwise it's real: fix it.
 Never skip or weaken a test to get green.
 
-The smoke test drives the server from the console only, so player-only behaviour isn't covered. A headless bot
-player is being built on `claude/bot-player` (`docs/design/bot-player.md`).
+The smoke test drives the server from the console only. Player-only behaviour (compass targets so far) is covered
+by the **Bot player test** job: `ci/bot-test.sh` boots a server and joins a headless player built with
+MCProtocolLib (`ci/bot/`, `docs/design/bot-player.md`). Run it locally with
+`JAVA=$JAVA25 PORT=25620 WORK_DIR=/tmp/bot-work ci/bot-test.sh target/va_postal-*.jar`. Add new player-only checks
+there as scenarios, and see a new check fail against the unfixed code before trusting it.
 
 ## Gotchas learned the hard way
 
