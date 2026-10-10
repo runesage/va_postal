@@ -813,6 +813,9 @@ public class Util {
     public static synchronized String put_point_on_ground(String slocation, boolean ground_block) {
         //Util.dinform("put_point_on_ground: "+slocation + " "+ground_block);
         Location base = simplified_copy(slocation);
+        if (base == null) {
+            return slocation; // unparseable, or its world isn't loaded: nothing to put on the ground
+        }
         Location test_loc = simplified_copy(base);
         Block block = valid_waypnt_block(test_loc);
         if (ground_block) {
