@@ -131,6 +131,26 @@ public class Cmdexecutor implements CommandExecutor {
         return false;
     }
 
+    /** An "x,y,z" point in the player's world, or null if it isn't three finite numbers. */
+    private static Location test_point(Player player, String sxyz) {
+        String[] xyz = sxyz.split(",");
+        if (xyz.length != 3) {
+            return null;
+        }
+        double[] d = new double[3];
+        try {
+            for (int i = 0; i < 3; i++) {
+                d[i] = Double.parseDouble(xyz[i].trim());
+                if (!Double.isFinite(d[i])) {
+                    return null;
+                }
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return new Location(player.getWorld(), d[0], d[1], d[2]);
+    }
+
     public static boolean postal(boolean console, CommandSender sender, String cmd, String[] args) {
         if (args.length == 0) {
             if (hasPermission(player, "postal.admin")) {
@@ -290,6 +310,7 @@ public class Cmdexecutor implements CommandExecutor {
             VA_postal.towny_opt_in = GetConfig.towny_opt_in();
             VA_postal.showroute_PE = GetConfig.showroute_PE();
             VA_postal.showroute_COL = GetConfig.showroute_COLOR();
+            VA_postal.wtr_speed = GetConfig.speed();
 
             Config.LoadConfiguration();
 
@@ -297,10 +318,12 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         if ("test".equals(args[0].toLowerCase().trim()) && hasPermission(player, "postal.admin") && args.length >= 3) {
-            String[] xyz1 = args[1].split(",");
-            String[] xyz2 = args[2].split(",");
-            Location one = new Location(player.getWorld(), Double.parseDouble(xyz1[0]), Double.parseDouble(xyz1[1]), Double.parseDouble(xyz1[2]));
-            Location two = new Location(player.getWorld(), Double.parseDouble(xyz2[0]), Double.parseDouble(xyz2[1]), Double.parseDouble(xyz2[2]));
+            Location one = test_point(player, args[1]);
+            Location two = test_point(player, args[2]);
+            if (one == null || two == null) {
+                Util.pinform(player, "&7&oUsage: &f&r/postal test <x,y,z> <x,y,z> &7&oDraws a line between two points.");
+                return true;
+            }
             Particles.displayLine(one, two, player, Particle.PORTAL);
             return true;
         }

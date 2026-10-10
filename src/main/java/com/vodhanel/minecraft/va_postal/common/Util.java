@@ -782,7 +782,7 @@ public class Util {
         try {
             String sadjusted_loc = put_point_on_ground(slocation, false);
             Location adjusted_loc = str2location(sadjusted_loc);
-            if (sadjusted_loc == null) {
+            if (adjusted_loc == null) {
                 cinform(error + " " + slocation);
                 return;
             }
