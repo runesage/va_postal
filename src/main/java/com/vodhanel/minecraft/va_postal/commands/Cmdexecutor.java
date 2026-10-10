@@ -132,6 +132,26 @@ public class Cmdexecutor implements CommandExecutor {
         return false;
     }
 
+    /** An "x,y,z" point in the player's world, or null if it isn't three finite numbers. */
+    private static Location test_point(Player player, String sxyz) {
+        String[] xyz = sxyz.split(",");
+        if (xyz.length != 3) {
+            return null;
+        }
+        double[] d = new double[3];
+        try {
+            for (int i = 0; i < 3; i++) {
+                d[i] = Double.parseDouble(xyz[i].trim());
+                if (!Double.isFinite(d[i])) {
+                    return null;
+                }
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return new Location(player.getWorld(), d[0], d[1], d[2]);
+    }
+
     public static boolean postal(boolean console, CommandSender sender, String cmd, String[] args) {
         if (args.length == 0) {
             if (hasPermission(player, "postal.admin")) {
@@ -201,7 +221,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.pinform(player, "&7&cProblem with the number you used.");
                 return true;
             }
-            if ((result < 0.5F) || (result > 2.0F)) {
+            if (!((result >= 0.5F) && (result <= 2.0F))) { // so NaN is refused too
                 Util.pinform(player, "&7&cSpeed must be 0.5 - 2.0");
                 return true;
             }
@@ -298,6 +318,7 @@ public class Cmdexecutor implements CommandExecutor {
             VA_postal.towny_opt_in = GetConfig.towny_opt_in();
             VA_postal.showroute_PE = GetConfig.showroute_PE();
             VA_postal.showroute_COL = GetConfig.showroute_COLOR();
+            VA_postal.wtr_speed = GetConfig.speed();
 
             Config.LoadConfiguration();
 
@@ -305,10 +326,12 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         if ("test".equals(args[0].toLowerCase().trim()) && hasPermission(player, "postal.admin") && args.length >= 3) {
-            String[] xyz1 = args[1].split(",");
-            String[] xyz2 = args[2].split(",");
-            Location one = new Location(player.getWorld(), Double.parseDouble(xyz1[0]), Double.parseDouble(xyz1[1]), Double.parseDouble(xyz1[2]));
-            Location two = new Location(player.getWorld(), Double.parseDouble(xyz2[0]), Double.parseDouble(xyz2[1]), Double.parseDouble(xyz2[2]));
+            Location one = test_point(player, args[1]);
+            Location two = test_point(player, args[2]);
+            if (one == null || two == null) {
+                Util.pinform(player, "&7&oUsage: &f&r/postal test <x,y,z> <x,y,z> &7&oDraws a line between two points.");
+                return true;
+            }
             Particles.displayLine(one, two, player, Particle.PORTAL);
             return true;
         }
@@ -429,7 +452,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.con_type("Must be a floating point number.");
                 return true;
             }
-            if ((result < 0.5F) || (result > 2.0F)) {
+            if (!((result >= 0.5F) && (result <= 2.0F))) { // so NaN is refused too
                 Util.con_type("Speed factor must be 0.5 - 2.0");
                 return true;
             }
@@ -806,7 +829,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for address. See list:");
             return true;
         }
-        if (!hasPermission_ext(player, "postal.closeaddr", stown, "null")) {
+        if (!hasPermission_ext(player, "postal.closeaddr", stown, saddress)) {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
@@ -884,7 +907,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for address. See list:");
             return true;
         }
-        if (!hasPermission_ext(player, "postal.openaddr", stown, "null")) {
+        if (!hasPermission_ext(player, "postal.openaddr", stown, saddress)) {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
@@ -1754,7 +1777,7 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         double cod_price = Util.str2double(args[0]);
-        if (cod_price <= 0.0D) {
+        if (!Double.isFinite(cod_price) || cod_price < 0.01D) { // NaN and Infinity parse, and a label shows cents
             Util.pinform(player, "&f&oProblem reading the price: " + args[0]);
             return true;
         }
@@ -1865,7 +1888,11 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "");
             Util.pinform(player, "&7&oUsage: &f&r/gps <PostOffice> [Address] &7&oto set your compass");
             Util.pinform(player, "");
-            Util.pinform(player, "&7Dist Cmp  Post-Office--  Address------- Qwner--------");
+            if (g_list == null) { // nothing in this world (the list was dereferenced regardless: an internal error)
+                Util.pinform(player, "&7&oNo post offices or addresses in this world.");
+                return true;
+            }
+            Util.pinform(player, "&7Dist Cmp  Post-Office--  Address------- Owner--------");
             for (int i = 0; i < g_list.length; i++) {
                 String[] parts = g_list[i].split(",");
                 if (parts.length == 4) {
@@ -1875,10 +1902,14 @@ public class Cmdexecutor implements CommandExecutor {
                     boolean is_po = false;
                     if (saddr.equalsIgnoreCase("post_office")) {
                         is_po = true;
-                        if (C_Owner.is_local_po_owner_defined(stown))
-                            sownr = Util.df(C_Owner.get_owner_local_po(stown).getDisplayName());
-                    } else if (C_Owner.is_address_owner_defined(stown, saddr))
-                        sownr = Util.df(C_Owner.get_owner_address(stown, saddr).getDisplayName());
+                        String po_owner_name = C_Owner.get_owner_local_po_name(stown);
+                        if (po_owner_name != null)
+                            sownr = Util.df(po_owner_name);
+                    } else {
+                        String addr_owner_name = C_Owner.get_owner_address_name(stown, saddr);
+                        if (addr_owner_name != null)
+                            sownr = Util.df(addr_owner_name);
+                    }
 
                     sownr = fixed_len(Util.df(sownr), 14, "-");
                     String hding = parts[3];
@@ -2530,20 +2561,19 @@ public class Cmdexecutor implements CommandExecutor {
 
         int a_hits = 0;
         int p_hits = 0;
-        Player srch_param = arg_player;
+        java.util.UUID srch_id = arg_player.getUniqueId();
         Util.pinform(player, "");
-        Util.pinform(player, "&f&l" + arg_player);
+        Util.pinform(player, "&f&l" + arg_player.getName()); // not the Player's toString, "CraftPlayer{name=...}"
         String[] town_list = C_Arrays.town_list();
         if (town_list == null) return true;
         for (String stown : town_list) {
             String sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(stown));
             String dstown = fixed_len(Util.df(stown), 15, "-");
             sworld = Util.df(sworld);
-            Player po_owner;
             String saddress = fixed_len("Post-Office", 15, "-");
             if (C_Owner.is_local_po_owner_defined(stown)) {
-                po_owner = C_Owner.get_owner_local_po(stown);
-                if (po_owner == srch_param) {
+                // By UUID: an offline owner is a fresh stand-in object every time, so == never matched.
+                if (srch_id.equals(C_Owner.get_owner_local_po_id(stown))) {
                     Util.pinform(player, "    &6&o" + dstown + "  &6&o" + saddress + "  &f&o" + sworld);
                     p_hits++;
                 }
@@ -2552,8 +2582,7 @@ public class Cmdexecutor implements CommandExecutor {
             if (addr_list != null) for (String anAddr_list : addr_list) {
                 saddress = anAddr_list;
                 if (C_Owner.is_address_owner_defined(stown, saddress)) {
-                    Player addr_owner = C_Owner.get_owner_address(stown, saddress);
-                    if (addr_owner == srch_param) {
+                    if (srch_id.equals(C_Owner.get_owner_address_id(stown, saddress))) {
                         saddress = fixed_len(Util.df(saddress), 15, "-");
                         Util.pinform(player, "    &a&o" + dstown + "  &a&o" + saddress + "  &f&o" + sworld);
                         a_hits++;
@@ -2561,7 +2590,9 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
-
+        if (p_hits + a_hits == 0) {
+            Util.pinform(player, "    &7&oOwns no post offices or addresses.");
+        }
         return true;
     }
 
@@ -2582,20 +2613,19 @@ public class Cmdexecutor implements CommandExecutor {
 
         int a_hits = 0;
         int p_hits = 0;
-        Player srch_param = arg_player;
+        java.util.UUID srch_id = arg_player.getUniqueId();
         Util.con_type("");
-        Util.con_type(arg_player.toString());
+        Util.con_type(arg_player.getName());
         String[] town_list = C_Arrays.town_list();
         if (town_list == null) return true;
         for (String stown : town_list) {
             String sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(stown));
             String dstown = fixed_len(Util.df(stown), 15, "-");
             sworld = Util.df(sworld);
-            Player po_owner;
             String saddress = fixed_len("Post-Office", 15, "-");
             if (C_Owner.is_local_po_owner_defined(stown)) {
-                po_owner = C_Owner.get_owner_local_po(stown);
-                if (po_owner == srch_param) {
+                // By UUID: an offline owner is a fresh stand-in object every time, so == never matched.
+                if (srch_id.equals(C_Owner.get_owner_local_po_id(stown))) {
                     Util.con_type("\033[0;33m    " + dstown + "  " + saddress + "  " + sworld);
                     p_hits++;
                 }
@@ -2604,8 +2634,7 @@ public class Cmdexecutor implements CommandExecutor {
             if (addr_list != null) for (String anAddr_list : addr_list) {
                 saddress = anAddr_list;
                 if (C_Owner.is_address_owner_defined(stown, saddress)) {
-                    Player addr_owner = C_Owner.get_owner_address(stown, saddress);
-                    if (addr_owner == srch_param) {
+                    if (srch_id.equals(C_Owner.get_owner_address_id(stown, saddress))) {
                         saddress = fixed_len(Util.df(saddress), 15, "-");
                         Util.con_type("\033[0;32m    " + dstown + "  " + saddress + "  " + sworld);
                         a_hits++;
@@ -2613,7 +2642,9 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
-
+        if (p_hits + a_hits == 0) {
+            Util.con_type("    Owns no post offices or addresses.");
+        }
         return true;
     }
 

@@ -19,7 +19,7 @@ jobs:
     # The store tests run on MariaDB as well as SQLite (MariaDbMailStoreTest), so both dialects stay identical.
     services:
       mariadb:
-        image: mariadb:11
+        image: public.ecr.aws/docker/library/mariadb:11
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: postal_test
@@ -55,7 +55,7 @@ jobs:
     # For the MySQL run (persistent-state phase P3); the SQLite run ignores it.
     services:
       mariadb:
-        image: mariadb:11
+        image: public.ecr.aws/docker/library/mariadb:11
         env:
           MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: postal

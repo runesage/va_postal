@@ -424,8 +424,10 @@ public class BukkitListener implements Listener {
             return;
         }
         Location location = Util.str2location(slocation);
-        Chunk chunk = location.getChunk();
-        append_temp_chunk_list(chunk);
+        if (location == null) {
+            return; // bad/unloaded-world entry: skip it, keep the rest of the route's chunks
+        }
+        append_temp_chunk_list(location.getChunk());
     }
 
     public static synchronized void add_new_route_to_chunklist(String stown, String saddress) {

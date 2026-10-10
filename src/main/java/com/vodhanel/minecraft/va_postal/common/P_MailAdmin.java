@@ -232,6 +232,8 @@ public final class P_MailAdmin {
             send(sender, "&7Recover letters in game: the book is given to you.");
             return;
         }
+        org.bukkit.entity.Player player = (org.bukkit.entity.Player) sender;
+        org.bukkit.inventory.ItemStack book = Letters.materialise(r); // build first: no item, no state change
         try {
             MailStores.active().transition(r, com.vodhanel.minecraft.va_postal.store.MailState.RECOVERED,
                     com.vodhanel.minecraft.va_postal.store.Custody.NONE, actor, "recovered by an admin");
@@ -239,8 +241,13 @@ public final class P_MailAdmin {
             send(sender, "&7Couldn't recover it: " + e.getMessage());
             return;
         }
-        ((org.bukkit.entity.Player) sender).getInventory().addItem(Letters.materialise(r));
-        send(sender, "&6Letter " + r.id + " recovered into your inventory.");
+        java.util.Map<Integer, org.bukkit.inventory.ItemStack> leftover = player.getInventory().addItem(book);
+        if (leftover.isEmpty()) {
+            send(sender, "&6Letter " + r.id + " recovered into your inventory.");
+        } else {
+            leftover.values().forEach(i -> player.getWorld().dropItemNaturally(player.getLocation(), i));
+            send(sender, "&6Letter " + r.id + " recovered; your inventory was full, so it was dropped at your feet.");
+        }
     }
 
     /** {@code /postal accept <id> [x y z]}: accepts a delivered parcel for its recipient (testing; no COD). */

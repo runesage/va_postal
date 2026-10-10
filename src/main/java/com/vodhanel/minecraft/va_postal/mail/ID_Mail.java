@@ -382,8 +382,11 @@ public class ID_Mail {
         String sowner = "Server";
         Player owner = VA_postal.SERVER;
         if (C_Owner.is_local_po_owner_defined(stown)) {
-            owner = C_Owner.get_owner_local_po(stown);
-            sowner = owner.getDisplayName();
+            Player po_owner = C_Owner.get_owner_local_po(stown);
+            if (po_owner != null) {
+                owner = po_owner;
+                sowner = owner.getDisplayName();
+            }
         }
         String[] pages = new String[]{Book.makeFirstLogPage(sworld, slocation_mod, "Postal_Local", sowner, owner)};
 
@@ -430,8 +433,11 @@ public class ID_Mail {
         String sowner = "Server";
         Player owner = VA_postal.SERVER;
         if (C_Owner.is_address_owner_defined(stown, saddr)) {
-            owner = C_Owner.get_owner_address(stown, saddr);
-            sowner = owner.getDisplayName();
+            Player addr_owner = C_Owner.get_owner_address(stown, saddr);
+            if (addr_owner != null) {
+                owner = addr_owner;
+                sowner = owner.getDisplayName();
+            }
         }
 
         ArrayList<String> input_lines = new ArrayList<>(Arrays.asList(log_book.getPage(1).split("\n")));
@@ -466,8 +472,11 @@ public class ID_Mail {
         String sowner = "Server";
         Player owner = VA_postal.SERVER;
         if (C_Owner.is_local_po_owner_defined(stown)) {
-            owner = C_Owner.get_owner_local_po(stown);
-            sowner = owner.getDisplayName();
+            Player po_owner = C_Owner.get_owner_local_po(stown);
+            if (po_owner != null) {
+                owner = po_owner;
+                sowner = owner.getDisplayName();
+            }
         }
         String[] pages = new String[1];
         pages[0] = Book.makeFirstLogPage(sworld, slocation_mod, saddress, sowner, owner);
@@ -1271,7 +1280,10 @@ public class ID_Mail {
         String stitle = "§a[Postal_Mail]";
         if (C_Owner.is_address_owner_defined(stown, saddress)) {
             // The account name, which is what the mailbox lookup matches (a display name can be a nickname).
-            sowner = C_Owner.get_owner_address(stown, saddress).getName();
+            String owner_name = C_Owner.get_owner_address_name(stown, saddress);
+            if (owner_name != null) {
+                sowner = owner_name;
+            }
             if (sowner.length() > SignManip.OWNER_LINE_MAX) {
                 sowner = sowner.substring(0, SignManip.OWNER_LINE_MAX);
             }
