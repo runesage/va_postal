@@ -237,6 +237,20 @@ run_server "$WORK_DIR/phase10.log" "tlist testville" "alist Testville" "postal s
     "data get block 20 -60 1 front_text.messages" "data get block 40 -60 1 front_text.messages" \
     "postal stop" "sleep:3"
 
+# Phase 11: a local office saved in a world that no longer exists must not crash `postal start`.
+echo "== Phase 11: an office whose Location names a missing world"
+python3 - "$CONFIG" <<'PY'
+import re, sys
+p = sys.argv[1]
+text = open(p).read()
+# Testville's Location line, wherever it sits in its block (phase 7 put an Owner section in front of it).
+new = re.sub(r"(\n    Testville:\n(?:      .*\n)*?      Location: '?)world,", r"\1gone_world,", text, count=1)
+assert new != text
+open(p, "w").write(new)
+PY
+run_server "$WORK_DIR/phase11.log" "postal start" "sleep:10" "postal stop" "sleep:3"
+cp "$WORK_DIR/config.full.yml" "$CONFIG"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -384,6 +398,8 @@ check "phase10: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase10.log
 check "phase10: no exception or stack trace" no_match "NullPointerException|Command exception: /?(postal|tlist|alist)|at .*com\.vodhanel\." "$WORK_DIR/phase10.log"
 check "phase10: dispatcher started" grep -q "VA_Postal started" "$WORK_DIR/phase10.log"
 check "phase10: /tlist lists the office and address as server-owned" grep -qE "Home[.]+ +server" <(plain phase10)
+check "phase11: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase11.log"
+check "phase11: no NullPointerException or Postal stack trace" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase11.log"
 
 echo
 echo "---- Postal output (phase 2) ----"

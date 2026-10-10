@@ -45,6 +45,9 @@ public class C_Arrays {
         }
 
 
+        if (result != null) {
+            result = Arrays.stream(result).filter(C_Arrays::office_world_loaded).toArray(String[]::new);
+        }
         if ((result != null) && (result.length > 0)) {
             try {
                 Arrays.sort(result);
@@ -56,6 +59,28 @@ public class C_Arrays {
         }
 
         return result;
+    }
+
+    /** Offices already warned about, so the warning shows once per office, not on every listing. */
+    private static final Set<String> warned_unloaded = new java.util.HashSet<>();
+
+    /**
+     * False for an office whose saved location names a world that isn't loaded (removed or renamed): it's left out,
+     * with a warning, rather than crashing the dispatcher and listings that look up its location.
+     */
+    static boolean office_world_loaded(String town) {
+        String loc = C_Postoffice.get_local_po_location_by_name(town);
+        if (loc == null || "null".equals(loc) || loc.indexOf(',') < 0) {
+            return true; // no location to judge by: leave it to the existing checks
+        }
+        String world = loc.substring(0, loc.indexOf(',')).trim();
+        if (world.isEmpty() || org.bukkit.Bukkit.getWorld(world) != null) {
+            return true;
+        }
+        if (warned_unloaded.add(town.toLowerCase())) {
+            Util.con_type("Skipping post office " + town + ": its world '" + world + "' isn't loaded.");
+        }
+        return false;
     }
 
     public static synchronized String[] towny_list_sorted() {

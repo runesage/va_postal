@@ -817,7 +817,7 @@ public class C_Dispatcher {
                         spo_index = "null";
                     }
                     String po_status = "false";
-                    if (is_poffice_open(spostoffice)) {
+                    if (is_poffice_open(spostoffice) && C_Arrays.office_world_loaded(spostoffice)) { // not in a missing world
                         po_status = "true";
                     }
                     VA_postal.plugin.getConfig().set(GetConfig.path_format("dispatcher.queue." + spo_index + ".open"), po_status);
