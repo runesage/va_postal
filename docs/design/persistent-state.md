@@ -237,7 +237,7 @@ follow-up, the v4-compatibility shims added during the port can be removed (done
 | **P1** | `MailStore`/SQLite, schema and migrations, `mail_id` PDC, ledger-first moves for **letters**, reconciliation, `route_run` resume, removal of the v4-compatibility shims | Restart-safe and crash-safe letters; the foundation for everything else |
 | **P2** | Parcels on full `ItemStack` payloads, COD and postage settled against records, `MISSING` → claim hooks | Fixes parcel item loss; the insurance fund can be built |
 | **P3** | `directory_*` tables, MySQL backend and parity CI, `server-id` (built: §16) | Network-ready storage while still running one server |
-| **P4** | `ProxyBus`, the Velocity relay plugin, `IN_NETWORK` claiming, a two-server CI | Cross-server letters |
+| **P4** | `IN_NETWORK` claiming, network players, cross-server addressing, a two-server test (built: §17; the proxy bus deferred) | Cross-server letters |
 
 P1–P3 change nothing for players on a single server beyond reliability. P4 is only switched on by config.
 
@@ -307,6 +307,107 @@ P1 follows this design, with these differences:
 - **Parity tests.** The store tests are one contract suite (`MailStoreContract`) run on SQLite and on
   MariaDB (`MariaDbMailStoreTest`, enabled by `POSTAL_TEST_MYSQL_URL`). CI's build job has a MariaDB service, and
   the smoke test runs twice: on SQLite and on MariaDB (`STORAGE=mysql`).
+
+## 17. P4 as built
+
+Cross-server letters, for servers behind a Velocity proxy that share one MySQL/MariaDB mail store. Decided with the
+owner: **only letters cross; parcels, COD and items never do**; a letter always goes to a mailbox but can be marked
+for any player's attention, whatever server they're on and whether or not they're online; the origin keeps the
+postage, at a higher network rate; offices are addressed by name, or `server:office` when the name is ambiguous;
+and there are **no duplicate or divergent records**.
+
+- **One row crosses.** A letter for another server has `dest_server` set when it's addressed. It travels this
+  server's normal route to Central (office pickup, `AT_CENTRAL`), then:
+  1. **Hand-off (origin), on the mail ship's schedule.** Every `Network.Poll_seconds` (default 10) each server
+     reads, off the main thread, which letters at its Central are bound elsewhere (`outbound`) and which are on
+     their way to it (`in_network`). Letters leave only at a **departure**: every `Network.Departure_minutes`
+     (default 10), counted on the clock from the epoch, so every server agrees when the ship sails without
+     talking to the others. At a departure the origin settles each letter's postage, then moves it to
+     `IN_NETWORK` with the usual two-phase move: begin (custody `NONE`), take the book out of the Central chest,
+     and `depart`, which commits with the letter's arrival time (`due_at` = the departure +
+     `Network.Transit_minutes`, default 5). Nothing of the letter stays on the origin but its record.
+  2. **Claim (destination), when the trip is over.** The destination claims a waiting letter once its `due_at` has
+     passed. It claims each
+     with one version-checked update that only matches `kind = 'LETTER' AND state = 'IN_NETWORK' AND
+     dest_server = <this server>`, so of two claimers only one wins. The claim makes the record this server's
+     (`custody_server`) with a move in flight to `AT_CENTRAL` in its Central chest. It then rebuilds the book
+     from the record's `LETTER_V1` text, titled with the local office's name so Central routes it as usual,
+     and commits. From there the destination's Central and postman deliver it like any other letter.
+  The mail id never changes, so `/postal track` on either server shows the whole history, with the server
+  that made each step. Reconciliation finishes an interrupted hand-off (the book is taken out of Central and the
+  move committed: the record carries the letter) and an interrupted claim (the book is rebuilt at the
+  destination, as for any move in flight).
+- **The mail ship (RP).** Decided with the owner: town routing stays as it was, and the network gets the
+  flavour. The vehicle has a name (`Network.Vehicle`, "the mail ship"). A departure is announced to the server
+  ("The mail ship departs for creative with 3 letters; it arrives in 5 min."), as is an arrival ("The mail ship
+  from survival has arrived with 2 letters."), unless `Network.Broadcast` is false, when only the log gets them.
+  Each is marked by a sound at the Central chest (`Network.Sound`, `block.bell.use`; empty for none).
+  `/postal network`, for everyone, shows the schedule, the next departure, the letters waiting at Central for it,
+  what's on its way here, and the other servers. A letter that reaches Central just after a departure waits
+  for the next one. That's deliberate: it's a schedule.
+- **The Central Dispatcher.** A character carries the mail between Central and the ship, so the transfer is something players
+  see. At a departure the Central Dispatcher appears a few dozen blocks from Central (`Network.Dispatcher.Distance`, 24), walks to
+  the Central chest, opens it, takes the outbound letters in a mailbag and says so to anyone nearby ("All aboard
+  for creative! 3 letters for the voyage."), closes the chest and walks off. The bell rings as the ship sails.
+  At an arrival they walk in carrying the bag, ring the bell, leave the letters in the chest ("Mail from survival!
+  2 letters off the ship.") and walk off empty-handed. There is no dock to build: they come from, and go to, a
+  free spot near Central. The name (`Network.Dispatcher.Name`, "&3Central Dispatcher"), the lines (`Network.Dispatcher.Lines.*`),
+  the skin (`Settings.Skin.Dispatcher`, the postmaster's bundled skin by default, or `custom`/a player name like the
+  others) and the uniform (`Settings.Uniform.Dispatcher.*`: a postal-green cap and coat with the navy trousers and black boots the
+  postman and postmaster wear, so they're plainly Post Office staff but neither of the other two; on unless
+  `Network.Dispatcher.Uniform` is false) are all configurable. The **transfer itself happens when the Central Dispatcher reaches the chest**: the letters'
+  records and books move then. The Central Dispatcher can only make it late, never stop it. With nobody within 48 blocks of
+  Central to see it, without Citizens, with `Network.Dispatcher.Enabled: false`, or if anything goes wrong (a walk
+  past 30 seconds ends in a teleport, an unloaded chunk, a shutdown), the transfer runs at once. One voyage runs at
+  a time; a departure that comes up while the Central Dispatcher is out keeps its slot and goes when they're back. Like the
+  parcel courier, the NPC is never saved by Citizens. (In code it's `CentralDispatcher`, apart from
+  `VA_Dispatcher`, the scheduler that sends postmen on their rounds.) `Network.Dispatcher.Always` brings them even with nobody
+  watching (the network test uses it).
+- **Letters only, at every layer** (§6): `/package` refuses another server's office, and `addr_worker` refuses
+  a parcel for one; the store refuses to move a non-letter into `IN_NETWORK` or to claim one; the claim query
+  matches only `LETTER`; the `CHECK` constraint rejects it in the database; and `LETTER_V1` has no item fields.
+  A letter for another server must be tracked: if the store can't record it, it isn't sent (and its postage is
+  refunded), since an untracked book could never leave Central.
+- **Addressing.** Each server keeps a copy of the directory (§16), refreshed every 30 seconds. A plain office name
+  resolves to one of this server's offices first (as before: an exact name or a unique part of one), then to
+  another server's office if exactly one server has it. `server:office` picks one explicitly, and when several
+  servers have the name, `/addr` lists the `server:office` choices. Addresses at another server's office complete
+  from its published addresses. The book's title is `server:office` until it reaches its server.
+- **Players across servers** (schema 5, `network_player`): one row per player UUID, with their name, the
+  server they were last on, whether they're online, and when last seen. Each server records joins and quits
+  (a quit only counts if the player is still recorded on that server, since switching servers can record
+  the join first), marks its players offline when it stops, and re-records who is online when it starts. `/addr`,
+  `/att` and `/package` find the player for `[player]` online here first, then in this table (most recently
+  seen first, so a name that changed hands finds the current owner), then among players who have been on this
+  server. An unknown name is now refused, instead of being silently replaced with `[Resident]`. The UUID is
+  written on the letter (page 1) and its record. `/postal whois <player>` shows what the network knows.
+- **Postage.** A letter to another server holds `Economy.Postage.Letter.Network` (default 10, against 6 out of
+  town) and is settled when it leaves the origin's Central, ½ Central and ½ the sending office, since no money
+  crosses servers. A letter rebuilt on the destination carries no hold, so its delivery settles nothing there.
+- **Fixes found on the way.** A postman delivered any book in his office chest whose address matched his run,
+  including another town's mail waiting there for Central if it had a same-named address (and now another
+  server's). He now also checks the book is for his office. `by_destination` also checks `dest_server`, so a
+  letter waiting to leave can't be marked out for delivery by a namesake office.
+- **Not built: the proxy bus.** Notifications through a Velocity relay plugin (§8) would only make delivery quicker,
+  and the mail ship's schedule makes the trip take minutes on purpose; polling makes it correct. It stays an option behind the same design, as does a "you have mail" ping to a player online on
+  another server.
+- **Undeliverable network mail** (an office removed from the destination after the letter was addressed) is claimed
+  and waits in the destination's Central chest, with a warning in its log, like a letter for a deleted local office.
+- **Tests.** The contract suite gains the cross-server cases on both backends: one row crossing with its
+  history, two claimers with one winner, only the addressed server claiming, a local letter never entering the
+  network, a parcel never outbound or claimable, local queries ignoring outbound letters, and one player row
+  across servers (switching, renaming, stopping). `ci/network-test.sh` runs two Paper servers on one MariaDB, each
+  with a Testville/Home, and sends a letter each way at the same time, with 1-minute departures, a 30-second trip
+  and the Central Dispatcher forced on. Each letter was delivered once, to the other server's Home and not the sender's
+  namesake; each record carries both servers' history (posted, Central and `IN_NETWORK` on the origin; claimed,
+  Central, postman and `DELIVERED` on the destination); both ships and both Central Dispatchers announced themselves; and
+  the trip took about 2.5 minutes from posting to the mailbox, most of it the schedule and the postman's round.
+- **Found by the network test.** Two servers starting together on an empty MySQL database raced to create the schema,
+  and one failed to open its store (MySQL commits DDL at once, so the migration transaction couldn't separate
+  them). Migrations now hold a named lock (`GET_LOCK('postal_migrate')`), and the contract suite opens three
+  stores at once on a fresh database. Also: a server that had just started couldn't address another server's
+  office for up to 30 seconds (its directory copy predated the other's publish); a name that isn't in the copy
+  now re-reads the directory on the spot, at most every 3 seconds.
 
 ## 15. P2 as built
 

@@ -275,4 +275,162 @@ abstract class MailStoreContract {
         store.sign_off(b);
         assertEquals(0L, store.servers().get(0).last_seen());
     }
+
+    // ---- P4: letters between servers --------------------------------------------------------
+
+    /** A letter posted on "main" for an office on "skyblock", waiting in main's Central chest. */
+    private MailRecord letter_for_skyblock() {
+        MailRecord r = store.create(MailRecord.new_letter(UUID.randomUUID(), "main", "skyblock", "Testville", "Isle", "Hut",
+                UUID.randomUUID(), UUID.randomUUID(), "{}".getBytes(StandardCharsets.UTF_8), 4440, 1L, null), Actor.system("test"), "posted");
+        return store.transition(r, MailState.AT_CENTRAL, Custody.chest("world,0,64,0"), Actor.central(), null);
+    }
+
+    @Test
+    void oneRowCrossesFromOriginToDestination() {
+        SqlMailStore skyblock = new SqlMailStore(ds, "skyblock", null, dialect());
+        MailRecord r = letter_for_skyblock();
+        assertTrue(r.networked());
+        assertEquals(List.of(r.id), store.outbound("world,0,64,0").stream().map(m -> m.id).toList());
+        assertTrue(skyblock.in_network().isEmpty());                 // still at main's Central
+
+        MailRecord sent = store.commit_move(store.begin_move(r, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null),
+                Actor.central(), null);
+        assertEquals(MailState.IN_NETWORK, sent.state);
+        assertTrue(store.outbound("world,0,64,0").isEmpty());
+        assertTrue(store.held_here().isEmpty());                      // main no longer holds it
+        assertTrue(store.in_network().isEmpty());                     // and it isn't main's to claim
+
+        List<MailRecord> waiting = skyblock.in_network();
+        assertEquals(1, waiting.size());
+        MailRecord claimed = skyblock.claim(waiting.get(0), Custody.chest("sky,5,70,5"), Actor.central());
+        assertEquals("skyblock", claimed.custody_server);
+        assertEquals(1, skyblock.held_here().size());                 // a move in flight: reconciliation sees it
+        MailRecord arrived = skyblock.commit_move(claimed, Actor.central(), null);
+        assertEquals(MailState.AT_CENTRAL, arrived.state);
+        assertEquals(Custody.chest("sky,5,70,5"), arrived.custody);
+        // The same row, with the sender and the whole history on it: no copy on either side.
+        assertEquals(r.sender, arrived.sender);
+        assertEquals(r.attention, arrived.attention);
+        assertEquals(r.id, arrived.id);
+        assertTrue(skyblock.in_network().isEmpty());
+        List<MailEvent> history = store.history(r.id);
+        assertTrue(history.stream().anyMatch(e -> "skyblock".equals(e.server_id)));
+        assertTrue(history.stream().anyMatch(e -> "main".equals(e.server_id)));
+    }
+
+    @Test
+    void ofTwoClaimersOnlyOneWins() {
+        SqlMailStore skyblock = new SqlMailStore(ds, "skyblock", null, dialect());
+        SqlMailStore other_instance = new SqlMailStore(ds, "skyblock", null, dialect());
+        MailRecord r = letter_for_skyblock();
+        store.commit_move(store.begin_move(r, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null), Actor.central(), null);
+        MailRecord seen_by_a = skyblock.in_network().get(0);
+        MailRecord seen_by_b = other_instance.in_network().get(0);
+        skyblock.claim(seen_by_a, Custody.chest("sky,5,70,5"), Actor.central());
+        assertThrows(ConflictException.class, () -> other_instance.claim(seen_by_b, Custody.chest("sky,9,70,9"), Actor.central()));
+    }
+
+    @Test
+    void onlyTheAddressedServerCanClaim() {
+        SqlMailStore survival = new SqlMailStore(ds, "survival", null, dialect());
+        MailRecord r = letter_for_skyblock();
+        MailRecord sent = store.commit_move(store.begin_move(r, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null),
+                Actor.central(), null);
+        assertTrue(survival.in_network().isEmpty());
+        assertThrows(ConflictException.class, () -> survival.claim(sent, Custody.chest("s,0,0,0"), Actor.central()));
+        assertThrows(ConflictException.class, () -> store.claim(sent, Custody.chest("s,0,0,0"), Actor.central()));
+    }
+
+    @Test
+    void aLetterForThisServerNeverEntersTheNetwork() {
+        MailRecord local = store.transition(letter(), MailState.AT_CENTRAL, Custody.chest("world,0,64,0"), Actor.central(), null);
+        assertFalse(local.networked());
+        assertTrue(store.outbound("world,0,64,0").isEmpty());
+        assertThrows(ConflictException.class,
+                () -> store.begin_move(local, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null));
+    }
+
+    @Test
+    void aParcelIsNeverOutboundOrClaimable() throws SQLException {
+        MailRecord parcel = store.create(new MailRecord(UUID.randomUUID(), MailKind.PARCEL, MailState.AT_CENTRAL, 0, "main",
+                "skyblock", "a", "b", "c", "main", Custody.chest("world,0,64,0"), null, null, null, null, 0, 0, "PARCEL_ITEMS_V1",
+                new byte[0], 4440, 1L, 1L), Actor.system("t"), null);
+        assertThrows(ConflictException.class,
+                () -> store.begin_move(parcel, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null));
+        SqlMailStore skyblock = new SqlMailStore(ds, "skyblock", null, dialect());
+        assertThrows(ConflictException.class, () -> skyblock.claim(parcel, Custody.chest("s,0,0,0"), Actor.central()));
+        assertTrue(skyblock.in_network().isEmpty());
+    }
+
+    @Test
+    void localQueriesIgnoreALetterBoundForAnotherServer() {
+        // A letter for skyblock's "Isle" must not look like mail for an office of ours with the same name.
+        letter_for_skyblock();
+        assertTrue(store.by_destination(MailState.AT_CENTRAL, "isle").isEmpty());
+        MailRecord ours = store.create(MailRecord.new_letter(UUID.randomUUID(), "main", "Testville", "Isle", "Hut",
+                UUID.randomUUID(), null, "{}".getBytes(StandardCharsets.UTF_8), 4440, 1L), Actor.system("test"), "posted");
+        store.transition(ours, MailState.AT_CENTRAL, Custody.chest("world,0,64,0"), Actor.central(), null);
+        assertEquals(List.of(ours.id), store.by_destination(MailState.AT_CENTRAL, "isle").stream().map(m -> m.id).toList());
+    }
+
+    @Test
+    void tracksEachPlayerOnceAcrossServers() {
+        SqlMailStore skyblock = new SqlMailStore(ds, "skyblock", null, dialect());
+        UUID alex = UUID.randomUUID();
+        store.player_seen(alex, "Alex", true, 10L);
+        // Switching servers: the join on skyblock can arrive before the quit on main.
+        skyblock.player_seen(alex, "Alex", true, 20L);
+        store.player_seen(alex, "Alex", false, 21L);
+        List<NetworkPlayer> found = store.players_named("alex");
+        assertEquals(1, found.size());
+        assertEquals("skyblock", found.get(0).server_id());
+        assertTrue(found.get(0).online());
+        // A name change keeps the same row.
+        skyblock.player_seen(alex, "Alexandra", true, 30L);
+        assertTrue(store.players_named("Alex").isEmpty());
+        assertEquals(alex, store.players_named("ALEXANDRA").get(0).id());
+        // Leaving skyblock, then skyblock stopping, both leave them offline (and still findable).
+        skyblock.player_seen(alex, "Alexandra", false, 40L);
+        assertFalse(store.player(alex).orElseThrow().online());
+        UUID sam = UUID.randomUUID();
+        skyblock.sync_players(List.of(new NetworkPlayer(sam, "Sam", "skyblock", true, 0L)), 50L);
+        assertTrue(store.player(sam).orElseThrow().online());
+        skyblock.sign_off(UUID.randomUUID());
+        assertFalse(store.player(sam).orElseThrow().online());
+        // Two players who once had the same name: the most recently seen comes first.
+        UUID other_sam = UUID.randomUUID();
+        store.player_seen(other_sam, "Sam", true, 60L);
+        assertEquals(other_sam, store.players_named("sam").get(0).id());
+    }
+
+    @Test
+    void aDepartingLetterCarriesItsArrivalTime() {
+        SqlMailStore skyblock = new SqlMailStore(ds, "skyblock", null, dialect());
+        MailRecord r = letter_for_skyblock();
+        MailRecord moving = store.begin_move(r, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null);
+        MailRecord sent = store.depart(moving, 123_456_789L, Actor.central(), "left on the mail ship");
+        assertEquals(MailState.IN_NETWORK, sent.state);
+        assertEquals(Custody.NONE, sent.custody);
+        assertEquals(123_456_789L, skyblock.in_network().get(0).due_at);
+        assertThrows(ConflictException.class, () -> store.depart(sent, 1L, Actor.central(), null));
+    }
+
+    @Test
+    void serversStartingTogetherOnAFreshDatabaseBothOpen() throws Exception {
+        store.close();
+        DataSource fresh = fresh_database();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(3);
+        try {
+            List<java.util.concurrent.Future<SqlMailStore>> opening = new java.util.ArrayList<>();
+            for (String id : new String[]{"alpha", "beta", "gamma"}) {
+                opening.add(pool.submit(() -> new SqlMailStore(fresh, id, null, dialect())));
+            }
+            for (java.util.concurrent.Future<SqlMailStore> f : opening) {
+                assertEquals(SqlMailStore.MIGRATIONS.length, f.get().schema_version());
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        store = new SqlMailStore(fresh, "main", null, dialect());
+    }
 }

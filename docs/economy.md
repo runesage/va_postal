@@ -39,6 +39,7 @@ when the pool holds less than Postal owes in refunds.
 |---|---|---|
 | Letter / parcel, same office | sender | ½ Central, ½ local office |
 | Letter / parcel, other office | sender | ⅓ Central, ⅓ sending office, ⅓ destination office |
+| Letter to another server (network) | sender | the network rate, kept by the origin server: ½ Central, ½ sending office |
 | COD surcharge | sender | ½ Central, ½ sending office |
 | COD amount | recipient | the parcel's sender (works while they're offline) |
 | `/distr` | sender | Central |
@@ -64,7 +65,11 @@ actually handled the mail:
    the local price is split ½ Central, ½ the office, and the difference goes back to the sender. Otherwise
    the out-of-town price is split in thirds. A COD surcharge goes ½ Central, ½ the sending office. Refunds
    reach senders who are offline.
-4. **Never posted:** postage held for mail no postman picks up within `Postage.Hold_expiry_days` Postal days
+4. **Another server:** a letter to another server's office holds the **network** price
+   (`Postage.Letter.Network`, default 10) instead, and it's settled when the letter leaves this server's Central,
+   ½ Central and ½ the sending office. No money crosses servers, so the destination is paid nothing and there's
+   no refund. Re-addressing a letter to another server tops its hold up to the network price.
+5. **Never posted:** postage held for mail no postman picks up within `Postage.Hold_expiry_days` Postal days
    (default 7) is refunded. That mail stays where it is until it's re-addressed (and paid for again).
 
 Held postage counts toward what **Central owes**, so it's never swept, paid out as a dividend or used to
