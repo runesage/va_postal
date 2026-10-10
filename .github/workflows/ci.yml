@@ -17,19 +17,6 @@ jobs:
     name: Build and unit tests
     runs-on: ubuntu-latest
     # The store tests run on MariaDB as well as SQLite (MariaDbMailStoreTest), so both dialects stay identical.
-    services:
-      mariadb:
-        image: public.ecr.aws/docker/library/mariadb:11
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: postal_test
-          MARIADB_USER: postal
-          MARIADB_PASSWORD: postal
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
-          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       POSTAL_TEST_MYSQL_URL: jdbc:mariadb://127.0.0.1:3306/postal_test?user=postal&password=postal
     steps:
@@ -39,6 +26,9 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      # Started by a script, not a service container, so a rate-limited image pull retries instead of failing the run.
+      - name: Start MariaDB
+        run: ci/start-mariadb.sh postal_test
       - name: mvn verify
         run: mvn -B -ntp verify
       - uses: actions/upload-artifact@v4
@@ -52,20 +42,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # For the MySQL run (persistent-state phase P3); the SQLite run ignores it.
-    services:
-      mariadb:
-        image: public.ecr.aws/docker/library/mariadb:11
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: postal
-          MARIADB_USER: postal
-          MARIADB_PASSWORD: postal
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
-          --health-interval 5s --health-timeout 5s --health-retries 20
     strategy:
       fail-fast: false
       matrix:
@@ -83,6 +59,10 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
+      # For the MySQL run (persistent-state phase P3) only.
+      - name: Start MariaDB
+        if: matrix.storage == 'mysql'
+        run: ci/start-mariadb.sh postal
       - uses: actions/download-artifact@v4
         with:
           name: postal-jar
