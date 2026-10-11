@@ -83,12 +83,12 @@ public final class CentralDispatcher {
     }
 
     static boolean enabled() {
-        return VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.dispatcher.enabled"), true);
+        return GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("network.dispatcher.enabled"), true);
     }
 
     /** {@code Network.Dispatcher.Always}: come even with nobody near Central to see it (for testing). */
     static boolean always() {
-        return VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.dispatcher.always"), false);
+        return GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("network.dispatcher.always"), false);
     }
 
     static String config(String path, String fallback) {
@@ -168,7 +168,7 @@ public final class CentralDispatcher {
             if (beside == null) {
                 throw new IllegalStateException("no room beside Central's chest");
             }
-            int distance = Math.max(4, VA_postal.plugin.getConfig().getInt(GetConfig.path_format("network.dispatcher.distance"), 24));
+            int distance = Math.max(4, GetConfig.int_value(VA_postal.plugin.getConfig(), GetConfig.path_format("network.dispatcher.distance"), 24));
             Location from = Courier.stand_near(chest.getLocation(), distance);
             this.stand = beside;
             this.start = from != null ? from : beside;
@@ -177,7 +177,7 @@ public final class CentralDispatcher {
             npc.data().set(NPC.Metadata.SHOULD_SAVE, false);
             NpcLook.skin(npc, "dispatcher");
             npc.spawn(start);
-            NpcLook.uniform(npc, "dispatcher", VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.dispatcher.uniform"), true));
+            NpcLook.uniform(npc, "dispatcher", GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("network.dispatcher.uniform"), true));
             NpcLook.hold(npc, voyage == Voyage.ARRIVAL ? mailbag() : null);
             npc.getNavigator().getDefaultParameters().speedModifier(1.0F).range(Math.max(32.0F, distance * 2.0F));
             npc.getNavigator().setTarget(stand);

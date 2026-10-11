@@ -82,7 +82,9 @@ there as scenarios, and see a new check fail against the unfixed code before tru
 - Citizens floors navigation targets to the block corner and applies `distanceMargin` per path node. Centring a
   target with +0.5 doesn't change where the pathfinder aims.
 - Citizens treats water as standable; Postal swaps in `navigation/DryGround` when `avoidWater` is on.
-- Bukkit's `getInt` parses numeric strings too ('1' works), so a quoted number in config.yml isn't a bug.
+- Bukkit's `getInt`/`getDouble`/`getBoolean` **ignore** a quoted value ('3307', 'true') and return the default.
+  Read numbers and booleans with `GetConfig.int_value`/`double_value`/`bool_value`, which take both; most of the
+  older settings are read as strings (`'true'`) on purpose.
 - Smoke phase 7 inserts an `Owner` block before `Location` in config.yml; YAML edits in later phases must
   allow for it.
 - Console senders aren't players: anything using `player.getWorld()` or compass targets needs a player path.
