@@ -75,6 +75,28 @@ public final class Letters {
         }
     }
 
+    /**
+     * {@code /att} rewrote the addressed {@code book}'s attention line: the book's record, if it is still
+     * POSTED (not collected or moving), gets the same attention player and book text, so the two agree.
+     */
+    public static void attention_changed(ItemStack book, UUID sender, UUID attention) {
+        MailStore store = store();
+        UUID id = MailIds.read(book);
+        if (store == null || id == null) {
+            return;
+        }
+        try {
+            store.get(id).ifPresent(r -> {
+                if (r.state == MailState.POSTED && !r.moving()) {
+                    store.set_attention(r, attention, r.kind == com.vodhanel.minecraft.va_postal.store.MailKind.LETTER ? payload(book) : null,
+                            sender == null ? Actor.system("console") : Actor.player(sender), "attention changed");
+                }
+            });
+        } catch (StoreException | ConflictException e) {
+            Util.cinform("[Postal] Could not update a letter's record after /att: " + e.getMessage());
+        }
+    }
+
     /** The post office nearest {@code player} (the letter's origin), or null if there is none. */
     public static String nearest_office(org.bukkit.entity.Player player) {
         String[] list = com.vodhanel.minecraft.va_postal.config.C_Arrays.geo_po_list_sorted(player);
