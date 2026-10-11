@@ -11,7 +11,6 @@ import com.vodhanel.minecraft.va_postal.store.MailEvent;
 import com.vodhanel.minecraft.va_postal.store.MailRecord;
 import com.vodhanel.minecraft.va_postal.store.MailStore;
 import com.vodhanel.minecraft.va_postal.store.MailStores;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
@@ -507,6 +506,6 @@ public final class P_MailAdmin {
     }
 
     private static void send(CommandSender sender, String message) {
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+        sender.sendMessage(Text.color(message));
     }
 }

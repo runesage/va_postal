@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
 import com.vodhanel.minecraft.va_postal.common.Util;
@@ -486,7 +487,7 @@ public final class Network {
     /** A broadcast ({@code Network.Broadcast}), or just the log. The bell is the dispatcher's (or {@link CentralDispatcher#voyage}'s). */
     private static void announce(String message) {
         if (VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.broadcast"), true)) {
-            Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&9[Postal] &7" + message));
+            Bukkit.broadcast(Text.component(Text.color("&9[Postal] &7" + message)));
         } else {
             Util.cinform("[Postal] " + message.replace("&f", "").replace("&7", ""));
         }
