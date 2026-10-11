@@ -233,8 +233,17 @@ public class Cmd_static {
     public static void validate_route(Player player, String stown, String saddress) {
         boolean waypoint_exist = C_Route.is_waypoint_defined(stown, saddress, 0);
         if (!waypoint_exist) {
+            // No route yet: the post office surveys one. The address stays closed until it has a route.
             C_Dispatcher.open_address(stown, saddress, false);
-            Util.cinform("There is no route " + stown + ", " + saddress + ", closing route.");
+            Util.pinform(player, "&7&oThe post office is surveying a route to your address...");
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.survey(stown, saddress, o -> {
+                com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.report(player, o);
+                if (o.saved()) {
+                    C_Dispatcher.open_address(stown, saddress, true);
+                } else {
+                    Util.pinform(player, "&7&oSet the route by hand with &f&r/setroute " + Util.df(stown) + " " + Util.df(saddress) + "&7&o.");
+                }
+            });
         }
     }
 

@@ -79,7 +79,10 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path2, "300");
         VA_postal.plugin.getConfig().addDefault(path3, "false");
         VA_postal.plugin.getConfig().addDefault(path4, "false");
-        VA_postal.plugin.getConfig().addDefault(path5, "1.0");
+        // How close Citizens gets him to each step of its path before turning for the next. At a whole block he
+        // turned early, still against one side of a one-wide alley or tunnel, and caught on its mouth; much under
+        // half a block and he can't settle on stairs.
+        VA_postal.plugin.getConfig().addDefault(path5, "0.5");
         VA_postal.plugin.getConfig().addDefault(path6, "true");
         VA_postal.plugin.getConfig().addDefault(path7, "20");
         VA_postal.plugin.getConfig().addDefault(path8, "100");
