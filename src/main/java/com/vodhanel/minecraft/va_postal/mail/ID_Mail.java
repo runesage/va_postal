@@ -53,9 +53,14 @@ public class ID_Mail {
         if (!C_Dispatcher.is_address_on_firstpass(stown, saddr)) {
             return;
         }
+        // The mailbox now: by the time this runs a dispatcher restart may have replaced the arrays.
+        final org.bukkit.inventory.Inventory inventory = VA_postal.wtr_inventory_address[id];
+        if (inventory == null) {
+            return;
+        }
         Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, new Runnable() {
             public void run() {
-                ListIterator<ItemStack> item_itr = VA_postal.wtr_inventory_address[id].iterator(1);
+                ListIterator<ItemStack> item_itr = inventory.iterator(1);
                 if (item_itr != null) {
                     int index = 0;
                     while (item_itr.hasNext()) {

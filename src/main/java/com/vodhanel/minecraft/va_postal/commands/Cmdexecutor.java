@@ -275,6 +275,10 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.pinform(player, "Required permission not present.");
                 return true;
             }
+            if (VA_Dispatcher.dispatcher_running) {
+                Util.pinform(player, "&7&oDispatcher is already running.");
+                return true;
+            }
             VA_Dispatcher.start_up(false);
             if (!VA_postal.needs_configuration) Util.pinform(player, "VA_postal Started");
             return true;

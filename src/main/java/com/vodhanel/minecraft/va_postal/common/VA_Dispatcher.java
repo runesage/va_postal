@@ -20,6 +20,9 @@ public class VA_Dispatcher {
     public static long restart_cool = 200L;
     public static boolean restarting = false;
     public static boolean postmen_initialized = false;
+    // The second half of a stop (NPCs deleted, arrays cleared), scheduled restart_cool ticks after it. A start
+    // before then runs it at once, so it can never fire later and tear down the run that start set up.
+    private static BukkitTask pending_stop = null;
 
     public VA_Dispatcher() {
     }
@@ -71,26 +74,40 @@ public class VA_Dispatcher {
         if (dispatcher_id >= 0) {
             restarting = true;
             dispatcher_running = false;
+            // Stop the heartbeat now: left for the clean-up, a start in between would run two of them.
+            if (dispatcher_task != null) dispatcher_task.cancel();
             if (VA_postal.dynmap_configured) P_Dynmap.dynmap_stop();
             if (!quiet) Util.cinform(AnsiColor.RED + "[Stopping VA_postal] \033[0;37mDispatcher stopped.");
-            VA_postal.plugin.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
-                if (VA_Dispatcher.dispatcher_id >= 0) {
-                    VA_Dispatcher.dispatcher_task.cancel();
-                    VA_postal.central_array_name = null;
-                    VA_postal.central_array_location = null;
-                    VA_postal.central_array_time = null;
-                    RouteMngr.npc_delete_all(true);
-                    VA_postal.central_route_pos = 0;
-                    VA_postal.route_watchdog_ping_time = -1L;
-                    VA_postal.route_watchdog_pos = 0;
-                    VA_Arrays.clear_nav_and_goals();
-                }
-                VA_Dispatcher.restarting = false;
-            }, restart_cool);
+            pending_stop = VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin,
+                    VA_Dispatcher::finish_stop, restart_cool);
         } else Util.dinform("DISPATCHER ID NOT OVER 0");
     }
 
+    /** Deletes the stopped run's NPCs and clears its state, if a stop is still waiting to do that. */
+    private static synchronized void finish_stop() {
+        if (pending_stop == null) return;
+        pending_stop.cancel();
+        pending_stop = null;
+        if (VA_Dispatcher.dispatcher_id >= 0) {
+            VA_postal.central_array_name = null;
+            VA_postal.central_array_location = null;
+            VA_postal.central_array_time = null;
+            RouteMngr.npc_delete_all(true);
+            VA_postal.central_route_pos = 0;
+            VA_postal.route_watchdog_ping_time = -1L;
+            VA_postal.route_watchdog_pos = 0;
+            VA_Arrays.clear_nav_and_goals();
+        }
+        VA_Dispatcher.restarting = false;
+    }
+
     public static synchronized void start_up(boolean quiet) {
+        if (dispatcher_running) {
+            // Setting up again would re-create every array under the running dispatcher.
+            Util.dinform("start_up: the dispatcher is already running");
+            return;
+        }
+        finish_stop(); // a stop still winding down finishes now, before this run sets up
         aux_slots = 10;
         String[] town_list = C_Arrays.town_list();
         if ((town_list == null) || (town_list.length <= 0)) {
