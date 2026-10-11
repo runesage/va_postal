@@ -272,6 +272,7 @@ for phase in phase1 phase2; do
     check "$phase: no enable failure" no_match "Error occurred while enabling Postal" "$log"
     check "$phase: no Postal stack traces" no_match "at .*com\.vodhanel\." "$log"
     check "$phase: no command exceptions" no_match "Command exception: /?(postal|tlist|alist|showroute)" "$log"
+    check "$phase: no watchdog dump" no_match "The server has not responded for" "$log"
 done
 check "phase1: unconfigured start refused cleanly" grep -q "could not compile town list" "$WORK_DIR/phase1.log"
 check "phase2: economy hooked" grep -q "for economy\." "$WORK_DIR/phase2.log"
@@ -374,6 +375,7 @@ check "phase4: its label is in Home exactly once" parcel_once
 check "phase6: a letter whose chest was destroyed is MISSING" grep -qE "testville, home: MISSING at CHEST@world,20,-60,0" <(plain phase6)
 for phase in phase3 phase4 phase5 phase6; do
     check "$phase: no Postal stack traces" no_match "at .*com\.vodhanel\." "$WORK_DIR/$phase.log"
+    check "$phase: no watchdog dump" no_match "The server has not responded for" "$WORK_DIR/$phase.log"
 done
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
 # Postal recreates its NPCs on every start; Citizens must not save them (saved copies came back as idle

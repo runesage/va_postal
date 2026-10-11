@@ -3,15 +3,19 @@
 # large map, with no routes. Postal surveys every route, then all the post offices run at once while the
 # server's TPS and tick times are sampled. Reports:
 #   - surveys: how many found a route, the failures, the slowest, the most positions searched;
-#   - the server: TPS (1 minute) and tick times through the run;
+#   - the server: TPS (1 minute) and tick times through the run, including the worst single tick (from the
+#     1-minute window of `mspt`, sampled every 30 s so that every tick falls in some window);
 #   - the postmen: how many addresses got a completed round trip, and the rescues (stuck postmen teleported on).
 #
 # Usage: dev/towns/load.sh [postal.jar]     (default: the newest target/va_postal-*.jar)
 # Env:   JAVA (Java 25+; default: java), WORK_DIR (default: ./smp-load),
 #        TOWNS (default 12), ADDRESSES (per town, default 20), LOAD_SECONDS (postmen running; default 900),
-#        MIN_TPS (fail below this 1-minute TPS; default 18)
+#        MIN_TPS (fail below this 1-minute TPS; default 18),
+#        MAX_TICK_MS (fail if any single tick took longer than this many ms; default 1000)
 #
-# Exits non-zero if a survey failed or the TPS dropped below MIN_TPS.
+# Exits non-zero if a survey failed, the TPS dropped below MIN_TPS, a single tick took longer than MAX_TICK_MS
+# (the 1-minute TPS average smooths a lone multi-second freeze away), or Paper's watchdog dumped threads
+# ("The server has not responded for").
 # Running this accepts the Minecraft EULA for a throwaway test server.
 set -euo pipefail
 
@@ -25,6 +29,7 @@ TOWNS="${TOWNS:-12}"
 ADDRESSES="${ADDRESSES:-20}"
 LOAD_SECONDS="${LOAD_SECONDS:-900}"
 MIN_TPS="${MIN_TPS:-18}"
+MAX_TICK_MS="${MAX_TICK_MS:-1000}"
 # shellcheck source=ci/lib.sh
 source "$REPO/ci/lib.sh"
 
@@ -108,11 +113,12 @@ echo "== Surveying $total routes, then running every post office for ${LOAD_SECO
 run_server "$WORK_DIR/load.log" "$((LOAD_SECONDS + total + 900))" "${RUN[@]}"
 
 echo "== Results"
-python3 - "$LIST" "$WORK_DIR/load.log" "$MIN_TPS" <<'PY'
+python3 - "$LIST" "$WORK_DIR/load.log" "$MIN_TPS" "$MAX_TICK_MS" <<'PY'
 import json, re, statistics, sys
 towns = json.load(open(sys.argv[1]))
 log = re.sub(r"\x1b\[[0-9;]*m|§.", "", open(sys.argv[2], errors="replace").read())
 min_tps = float(sys.argv[3])
+max_tick = float(sys.argv[4])
 total = sum(len(t["addresses"]) for t in towns.values())
 
 saved = re.findall(r"Route (\w+), (\w+): (\d+) waypoints over (\d+) blocks.*?\((\d+) positions searched, (\d+) ms\)", log)
@@ -130,13 +136,17 @@ for t, a, why in failed[:20]:
     print(f"  FAILED {t}, {a}: {why}")
 
 tps = [float(m) for m in re.findall(r"TPS from last 1m, 5m, 15m: \*?([\d.]+)", log)]
-mspt = [tuple(float(v) for v in m) for m in re.findall(r"([\d.]+)/([\d.]+)/([\d.]+), [\d.]+/[\d.]+/[\d.]+, [\d.]+/[\d.]+/[\d.]+", log)]
+# mspt: "avg/min/max" for the last 5s, 10s and 1m. Each sample is (5s avg, 5s max, 1m max). Sampled every 30 s,
+# the 1m windows overlap, so the largest 1m max is the worst tick of the whole run.
+mspt = [(float(m[0]), float(m[1]), float(m[2])) for m in re.findall(
+    r"([\d.]+)/[\d.]+/([\d.]+), [\d.]+/[\d.]+/[\d.]+, [\d.]+/[\d.]+/([\d.]+)", log)]
+worst_tick = max((m[2] for m in mspt), default=0.0)
 if tps:
     print(f"Server: TPS (1m) min {min(tps):.2f}, median {statistics.median(tps):.2f} over {len(tps)} samples")
 if mspt:
     avgs = [m[0] for m in mspt]
     print(f"  tick time (5s avg): median {statistics.median(avgs):.1f} ms, worst {max(avgs):.1f} ms; "
-          f"longest single tick {max(m[2] for m in mspt):.1f} ms")
+          f"longest single tick {worst_tick:.1f} ms (limit {max_tick:.0f})")
 
 # alist: each town's addresses with their last round trip in seconds (0: none yet).
 visited = {}
@@ -155,6 +165,10 @@ for (office, addr), n in sorted(by.items(), key=lambda kv: -kv[1])[:15]:
     print(f"  rescued {n}x: {office}, {addr}")
 errors = len(re.findall(r"Exception", log))
 print(f"Exceptions in the log: {errors}")
+watchdog = [i for i, line in enumerate(log.splitlines()) if "The server has not responded for" in line]
+if watchdog:
+    print("Watchdog dump in the log:")
+    print("\n".join("  " + line for line in log.splitlines()[watchdog[0]:watchdog[0] + 8]))
 
 bad = []
 if failed:
@@ -167,6 +181,12 @@ for t, (v, n) in visited.items():
         bad.append(f"{t}: no round trip at all")
 if tps and min(tps) < min_tps:
     bad.append(f"TPS fell to {min(tps):.2f} (< {min_tps})")
+if worst_tick > max_tick:
+    bad.append(f"a single tick took {worst_tick:.1f} ms (> {max_tick:.0f})")
+if not mspt:
+    bad.append("no mspt samples in the log")
+if watchdog:
+    bad.append("the server watchdog fired")
 print("OK" if not bad else "PROBLEMS: " + "; ".join(bad))
 sys.exit(1 if bad else 0)
 PY
