@@ -89,6 +89,42 @@ jobs:
             smoke/server/plugins/Postal/config.yml
           if-no-files-found: ignore
 
+  network:
+    name: Two servers, one MariaDB (cross-server letters)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Start MariaDB
+        run: ci/start-mariadb.sh postal
+      - uses: actions/download-artifact@v4
+        with:
+          name: postal-jar
+          path: dist
+      - name: Cache server, plugin and library downloads
+        uses: actions/cache@v4
+        with:
+          path: network/cache
+          key: network-26.1.2-${{ hashFiles('ci/network-test.sh', 'ci/lib.sh') }}
+      - name: Run network test
+        env:
+          WORK_DIR: network
+        run: ci/network-test.sh dist/va_postal-*.jar
+      - name: Upload server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-logs
+          path: |
+            network/*.log
+            network/*/plugins/Postal/config.yml
+          if-no-files-found: ignore
+
   bot:
     name: Bot player test on Paper 26.1.2 (${{ matrix.storage }})
     needs: build
@@ -140,7 +176,7 @@ jobs:
 
   report:
     name: Open issue on failure
-    needs: [build, smoke, bot]
+    needs: [build, smoke, network, bot]
     # Only for master and the weekly run; PR failures show on the PR itself.
     if: failure() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest

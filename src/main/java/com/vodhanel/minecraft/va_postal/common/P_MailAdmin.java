@@ -59,7 +59,8 @@ public final class P_MailAdmin {
         }
         UUID id = r.id;
         send(sender, "&6[Postal] " + r.kind + " " + r.id);
-        send(sender, "&7To &f" + r.dest_office + ", " + r.dest_address + "&7 from &f" + r.origin_office + "&7: &e"
+        send(sender, "&7To &f" + (r.networked() ? r.dest_server + ":" : "") + r.dest_office + ", " + r.dest_address
+                + "&7 from &f" + (r.networked() ? r.origin_server + ":" : "") + r.origin_office + "&7: &e"
                 + r.state + "&7 at " + r.custody + (r.moving() ? " &c(moving to " + r.pending_state + " at " + r.pending_custody + ")" : ""));
         if (r.kind == com.vodhanel.minecraft.va_postal.store.MailKind.PARCEL) {
             send(sender, "&7Contents: &f" + com.vodhanel.minecraft.va_postal.mail.Parcels.contents(r)
@@ -73,6 +74,7 @@ public final class P_MailAdmin {
         for (MailEvent e : history) {
             send(sender, "&7  v" + e.version + " " + fmt.format(new Date(e.at)) + " " + (e.from_state == null ? "" : e.from_state + " -> ")
                     + e.to_state + " by " + e.actor_kind + (e.actor_ref == null ? "" : " " + e.actor_ref)
+                    + (r.networked() ? " on " + e.server_id : "")
                     + (e.detail == null ? "" : " (" + e.detail + ")"));
         }
     }
@@ -93,19 +95,32 @@ public final class P_MailAdmin {
      */
     public static void testletter(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            send(sender, "&7Usage: /postal testletter <from office> <to office> <to address>");
+            send(sender, "&7Usage: /postal testletter <from office> <to office|server:office> <to address> [player]");
             return;
         }
         String from = C_Postoffice.town_complete(args[1]);
-        String to = C_Postoffice.town_complete(args[2]);
-        if ("null".equals(from) || "null".equals(to)) {
-            send(sender, "&7Unknown post office. See /tlist.");
+        com.vodhanel.minecraft.va_postal.mail.Network.Office dest = com.vodhanel.minecraft.va_postal.mail.Network.resolve_office(args[2]).office();
+        if ("null".equals(from) || dest == null) {
+            send(sender, "&7Unknown post office. See /tlist (and /postal directory for other servers').");
             return;
         }
-        String address = C_Address.addresses_complete(to, args[3]);
-        if ("null".equals(address)) {
-            send(sender, "&7Unknown address in " + to + ". See /alist " + to + ".");
+        String to = dest.office();
+        String address = dest.remote() ? com.vodhanel.minecraft.va_postal.mail.Network.remote_address(dest, args[3])
+                : C_Address.addresses_complete(to, args[3]);
+        if (address == null || "null".equals(address)) {
+            send(sender, "&7Unknown address in " + dest.label() + ".");
             return;
+        }
+        String attention = "[Resident]";
+        UUID attention_id = null;
+        if (args.length > 4) {
+            com.vodhanel.minecraft.va_postal.mail.Network.Recipient r = com.vodhanel.minecraft.va_postal.mail.Network.find_player(args[4]);
+            if (r == null) {
+                send(sender, "&7No player called " + args[4] + " is known on this network.");
+                return;
+            }
+            attention = r.name();
+            attention_id = r.id();
         }
         Block chest = office_chest(from);
         if (chest == null) {
@@ -113,11 +128,12 @@ public final class P_MailAdmin {
             return;
         }
         String date = new SimpleDateFormat("MM/dd/yy HH:mm").format(new Date());
+        String title = dest.remote() ? dest.server() + ":" + Util.df(to) : Util.df(to);
         String[] pages = {
-                Book.makeFirstMailPage(Util.df(to), Util.df(address), "[Resident]", null, null, "Server", "Test letter", date, null, null),
+                Book.makeFirstMailPageById(title, Util.df(address), attention, null, null, "Server", "Test letter", date, null, attention_id),
                 "A test letter from " + Util.df(from) + ", posted " + date + "."};
-        ItemStack letter = new Book(Util.df(to), Util.df(address), pages).generateItemStack();
-        letter = Letters.posted(letter, null, from, to, address, null);
+        ItemStack letter = new Book(title, Util.df(address), pages).generateItemStack();
+        letter = Letters.posted(letter, null, from, dest.server(), to, address, attention_id);
         if (!((Chest) chest.getState()).getInventory().addItem(letter).isEmpty()) {
             send(sender, "&7" + from + "'s post office chest is full.");
             return;
@@ -127,7 +143,7 @@ public final class P_MailAdmin {
                 com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH, com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()));
         UUID id = com.vodhanel.minecraft.va_postal.mail.MailIds.read(letter);
         send(sender, "&6Test letter " + (id == null ? "(untracked)" : id.toString()) + " handed in at " + Util.df(from)
-                + " for " + Util.df(to) + ", " + Util.df(address) + ".");
+                + " for " + (dest.remote() ? dest.server() + ":" : "") + Util.df(to) + ", " + Util.df(address) + ".");
     }
 
     /**
@@ -459,6 +475,34 @@ public final class P_MailAdmin {
             } else if (server != null) {
                 send(sender, "&7   " + e.address() + (e.open() ? "" : " &c(closed)"));
             }
+        }
+    }
+
+    /** {@code /postal whois <player>}: where the network last saw a player, for addressing mail to them. */
+    public static void whois(CommandSender sender, String[] args) {
+        com.vodhanel.minecraft.va_postal.store.MailStore store = MailStores.active();
+        if (args.length < 2) {
+            send(sender, "&7Usage: /postal whois <player>");
+            return;
+        }
+        if (store == null) {
+            send(sender, "&7The mail store isn't open.");
+            return;
+        }
+        java.util.List<com.vodhanel.minecraft.va_postal.store.NetworkPlayer> found;
+        try {
+            found = store.players_named(args[1]);
+        } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+            send(sender, "&cCan't read the network's players: " + e.getMessage());
+            return;
+        }
+        if (found.isEmpty()) {
+            send(sender, "&7No player called " + args[1] + " has been on a server of this network since it was set up.");
+            return;
+        }
+        for (com.vodhanel.minecraft.va_postal.store.NetworkPlayer p : found) {
+            send(sender, "&f" + p.name() + " &7(" + p.id() + "): " + (p.online() ? "&aonline" : "offline, last seen "
+                    + new Date(p.last_seen())) + " &7on &f" + p.server_id());
         }
     }
 

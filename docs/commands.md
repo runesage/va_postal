@@ -2,6 +2,10 @@
 Permissions: `none`
 Displays a menu with commands available to the player.
 <br>
+#### `/postal network`
+Permissions: `none`
+On a network of servers: when the mail ship (or whatever `Network.Vehicle` calls it) next leaves for the other servers, how many letters are waiting at Central for it, what's on its way here, and the other servers.
+<br>
 #### `/postal <start/stop/admin/chests/talk/quiet/speed>`
 Permissions: `postal.admin`
 Administrator commands for postal:
@@ -37,6 +41,10 @@ Forces a record into a state, keeping where it is. Testing only; recorded in its
 The mail store's health: SQLite or MySQL, the schema version, this server's id, how many calls it has made and how long they take (average and slowest, and the time spent on the main thread), failures, and the servers sharing the database. With MySQL, watch the main-thread time: every call waits for the database.
 ##### `directory [server]`
 The network directory: the offices each server has published, with their address counts, or one server's offices and addresses. Each server republishes its own every minute when they change.
+##### `whois <player>`
+Where the network last saw a player (server, online or when last seen), as `/addr` finds them.
+##### `testletter <from PostOffice> <to PostOffice|server:office> <address> [player]`
+Writes a tracked test letter and hands it in at the from-office, as a player would; the destination can be another server's office.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
 ##### `bank [newday | report [days] | policy [<setting> <value>]]`
@@ -60,18 +68,22 @@ Teleports the player to the given address, postoffice, or central office.
 <br>
 #### `/addr <PostOffice> <address> [player]`
 Permissions: `postal.addr`
-Address a signed book in your hand _(to `player`)_ at `PostOffice:Address`
+Address a signed book in your hand _(to `player`)_ at `PostOffice:Address`.
+
+On a network of servers sharing one mail store, `PostOffice` can be another server's office: its name, or `server:office` when several servers have an office by that name (your own server's offices always win a plain name). Only the letter's text travels; the postage is the network rate (`Economy.Postage.Letter.Network`).
+
+`player` can be any player the network knows, online or not, on any server: the letter still goes to the address's mailbox, marked for their attention.
 <br>
 #### `/att [player]`
 Permissions: `postal.att`
-Re-Addresses the unprocessed book in your hand to `player`
+Re-Addresses the unprocessed book in your hand to `player` (any player the network knows, as for `/addr`)
 No argument defaults the addressed to "`[resident]`"
 <br>
 #### `/package <PostOffice> <address> [player]`
 Permissions: `postal.package`
 Alias: `/pk`
 Package a chest full of goods, the player must stand near the chest, with it having no signs near or on.
-Otherwise, this command is used in the same was as `/addr`.
+Otherwise, this command is used in the same was as `/addr`, except that parcels can't go to another server: only letters cross servers, so no items ever leave the server they were packed on.
 The goods go into the post office's records straight away (with all their enchantments, names and data); the empty chest stays, locked by its `[Postal_Ship]` sign, until a courier collects it when the label is first picked up.
 
 `/package cancel`, holding the label before it's posted, unpacks the goods back into that chest and refunds the postage.

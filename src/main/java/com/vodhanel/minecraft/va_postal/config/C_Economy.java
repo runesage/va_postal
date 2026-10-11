@@ -19,6 +19,15 @@ public class C_Economy {
         return price(spath);
     }
 
+    /** Postage for a letter to another server on the network: held in full, kept by the origin server. */
+    public static synchronized double network_postage_price() {
+        try {
+            return Double.parseDouble(VA_postal.plugin.getConfig().getString(GetConfig.path_format("economy.postage.letter.network")));
+        } catch (Exception e) {
+            return postage_price(false);
+        }
+    }
+
     public static synchronized double ship_price(boolean local) {
         String spath;
         if (local) {
