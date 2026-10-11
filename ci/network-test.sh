@@ -10,6 +10,8 @@
 # Usage: ci/network-test.sh <path-to-postal.jar>
 # Env:   JAVA (default: java), WORK_DIR (default: ./network), MYSQL_HOST (127.0.0.1), MYSQL_PORT (3306),
 #        MYSQL_DATABASE (postal), MYSQL_USER (postal), MYSQL_PASSWORD (postal). The database must be empty.
+#        ALPHA_PORT (default 25617) and BETA_PORT (default 25618): the servers' game ports, in the single-route
+#        range of CLAUDE.md (25565 is reserved for dev/test-server.sh).
 #
 # Running this accepts the Minecraft EULA for throwaway test servers.
 set -euo pipefail
@@ -26,7 +28,7 @@ WORK_DIR="$(realpath "$WORK_DIR")"
 CACHE="$WORK_DIR/cache"
 download_server_jars "$CACHE"
 
-declare -A PORT=([alpha]=25565 [beta]=25566)
+declare -A PORT=([alpha]="${ALPHA_PORT:-25617}" [beta]="${BETA_PORT:-25618}")
 declare -A PID=()
 # However the script ends, its servers end with it (a leftover server holds its port for the next run).
 cleanup() { for pid in "${PID[@]}"; do kill -9 "$pid" 2>/dev/null || true; done; }
@@ -200,6 +202,7 @@ for s in alpha beta; do
     check "$s: mail store open on schema 5 as '$s'" grep -q "schema 5, server id '$s'" "$log"
     check "$s: no Postal stack traces" no_match "at .*com\.vodhanel\." "$log"
     check "$s: no command exceptions" no_match "Command exception: /?postal" "$log"
+    check "$s: no watchdog dump" no_match "The server has not responded for" "$log"
     check "$s: no duplicate server id" no_match "Another server is using Network.Server_id" "$log"
 done
 check "alpha: letter recorded for beta" test -n "$A_ID"
