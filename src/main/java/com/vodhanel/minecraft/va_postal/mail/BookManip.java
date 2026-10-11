@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
@@ -492,10 +493,10 @@ public class BookManip {
         }
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
-            sign.setLine(0, line_1);
-            sign.setLine(1, line_2);
-            sign.setLine(2, line_3);
-            sign.setLine(3, line_4);
+            Text.line(sign, 0, line_1);
+            Text.line(sign, 1, line_2);
+            Text.line(sign, 2, line_3);
+            Text.line(sign, 3, line_4);
             sign.update();
         }
     }

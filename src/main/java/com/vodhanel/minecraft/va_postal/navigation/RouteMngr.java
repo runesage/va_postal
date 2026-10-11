@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.navigation;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
@@ -151,12 +152,12 @@ public class RouteMngr {
         if (postman.equals(raw) || pmaster.equals(raw)) {
             return true;
         }
-        String name = org.bukkit.ChatColor.stripColor(npc.getName());
+        String name = Text.strip(npc.getName());
         return name != null && (name.equals(strip(postman)) || name.equals(strip(pmaster)));
     }
 
     private static String strip(String name) {
-        return org.bukkit.ChatColor.stripColor(org.bukkit.ChatColor.translateAlternateColorCodes('&', name));
+        return Text.strip(Text.color(name));
     }
 
     /**

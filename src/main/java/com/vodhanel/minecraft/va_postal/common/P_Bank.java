@@ -9,7 +9,6 @@ import com.vodhanel.minecraft.va_postal.economy.EconomyState;
 import com.vodhanel.minecraft.va_postal.economy.PostalDay;
 import com.vodhanel.minecraft.va_postal.economy.Reserves;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
@@ -555,6 +554,6 @@ public final class P_Bank {
     }
 
     private static void send(CommandSender sender, String message) {
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+        sender.sendMessage(Text.color(message));
     }
 }

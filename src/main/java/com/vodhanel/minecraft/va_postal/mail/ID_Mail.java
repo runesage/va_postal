@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
@@ -390,7 +391,7 @@ public class ID_Mail {
             Player po_owner = C_Owner.get_owner_local_po(stown);
             if (po_owner != null) {
                 owner = po_owner;
-                sowner = owner.getDisplayName();
+                sowner = Text.legacy(owner.displayName());
             }
         }
         String[] pages = new String[]{Book.makeFirstLogPage(sworld, slocation_mod, "Postal_Local", sowner, owner)};
@@ -441,7 +442,7 @@ public class ID_Mail {
             Player addr_owner = C_Owner.get_owner_address(stown, saddr);
             if (addr_owner != null) {
                 owner = addr_owner;
-                sowner = owner.getDisplayName();
+                sowner = Text.legacy(owner.displayName());
             }
         }
 
@@ -480,7 +481,7 @@ public class ID_Mail {
             Player po_owner = C_Owner.get_owner_local_po(stown);
             if (po_owner != null) {
                 owner = po_owner;
-                sowner = owner.getDisplayName();
+                sowner = Text.legacy(owner.displayName());
             }
         }
         String[] pages = new String[1];
