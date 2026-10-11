@@ -733,12 +733,26 @@ public class C_Dispatcher {
         }
     }
 
+    // Bumped whenever the route chunks are (re)requested or released, so a load that finishes late can tell
+    // it belongs to an earlier run and mustn't put a ticket back.
+    private static int region_generation = 0;
+    private static int regions_pending = 0;
+    private static long regions_started = 0L;
+    // Chunks already requested in this run: neighbouring routes overlap, and each chunk only needs asking for once.
+    private static final java.util.Set<String> regions_requested = new java.util.HashSet<String>();
+
     public static synchronized void load_static_regions() {
         String sworld = "";
         int xmin = -1;
         int xmax = -1;
         int zmin = -1;
         int zmax = -1;
+        region_generation++;
+        regions_pending = 0;
+        regions_requested.clear();
+        regions_started = System.currentTimeMillis();
+        VA_postal.chunks_loaded = 0;
+        VA_postal.chunks_requested = 0;
         int len = BukkitListener.st_count;
         for (int i = 0; i < len; i++) {
             sworld = BukkitListener.st_world[i];
@@ -748,24 +762,62 @@ public class C_Dispatcher {
             zmax = BukkitListener.st_zmax[i];
             npc_load_chunk_region(sworld, xmin, xmax, zmin, zmax);
         }
+        Util.dinform("\033[0;32mRoute chunks requested: " + VA_postal.chunks_requested + ", already loaded: " + VA_postal.chunks_loaded);
     }
 
+    /** Forgets loads still in flight: they finish without adding a ticket (see release_chunk_tickets). */
+    public static synchronized void cancel_region_loads() {
+        region_generation++;
+        regions_pending = 0;
+        regions_requested.clear();
+    }
+
+    /**
+     * Keeps a route's chunks loaded with a plugin ticket. Chunks already in memory get their ticket now; the
+     * rest are loaded asynchronously and ticketed when they arrive. Loading them all here on the main thread
+     * froze a large server at dispatcher start (2,100 chunks for 240 addresses: a 4.4 s tick, and once the watchdog).
+     */
     public static synchronized void npc_load_chunk_region(String sworld, int min_x, int max_x, int min_z, int max_z) {
         World world = Util.str2world(sworld);
-        VA_postal.chunks_loaded = 0;
-        VA_postal.chunks_requested = 0;
+        if (world == null) {
+            Util.dinform(AnsiColor.RED + "Route chunks: no world called " + sworld);
+            return;
+        }
+        final int generation = region_generation;
         for (int x = min_x; x <= max_x; x++) {
             for (int z = min_z; z <= max_z; z++) {
-                // A plugin ticket loads the chunk and keeps it loaded (chunk unloads can't be cancelled any more).
-                if (world.addPluginChunkTicket(x, z, VA_postal.plugin) || world.isChunkLoaded(x, z)) {
-                    VA_postal.chunks_loaded += 1;
+                if (!regions_requested.add(world.getName() + ":" + x + ":" + z)) {
+                    continue;
                 }
                 VA_postal.chunks_requested += 1;
+                if (world.isChunkLoaded(x, z)) {
+                    world.addPluginChunkTicket(x, z, VA_postal.plugin);
+                    VA_postal.chunks_loaded += 1;
+                    continue;
+                }
+                regions_pending += 1;
+                // Paper completes the future on the main thread.
+                world.getChunkAtAsync(x, z).whenComplete((chunk, error) -> region_chunk_arrived(generation, chunk, error));
             }
         }
         Util.dinform("\033[1;34mChunk range: " + sworld + ", minX=" + min_x + " maxX=" + max_x + " minZ=" + min_z + " maxZ=" + max_z);
-        Util.dinform("\033[0;32mChunk loads requested: " + VA_postal.chunks_requested);
-        Util.dinform("\033[1;34mChunk loads completed: " + VA_postal.chunks_loaded);
+    }
+
+    private static synchronized void region_chunk_arrived(int generation, Chunk chunk, Throwable error) {
+        if (generation != region_generation || !VA_Dispatcher.dispatcher_running) {
+            return; // the dispatcher stopped or restarted meanwhile: its tickets were released
+        }
+        if (error == null && chunk != null) {
+            chunk.addPluginChunkTicket(VA_postal.plugin);
+            VA_postal.chunks_loaded += 1;
+        } else {
+            Util.dinform(AnsiColor.RED + "Route chunk failed to load: " + (error == null ? "no chunk" : error.getMessage()));
+        }
+        regions_pending -= 1;
+        if (regions_pending == 0) {
+            Util.dinform("\033[1;34mRoute chunks loaded: " + VA_postal.chunks_loaded + " of " + VA_postal.chunks_requested
+                    + " in " + (System.currentTimeMillis() - regions_started) + " ms");
+        }
     }
 
     public static synchronized void load_central_route_array(String[] town_list) {
