@@ -33,6 +33,8 @@ public final class StoreStats {
     /** Set while the database can't be reached: calls fail at once instead of each waiting for a connection. */
     public volatile String unavailable;
     public volatile long unavailable_since;
+    /** Main-thread calls by method: {calls, nanos}, to see which calls a slow database would stall the server on. */
+    public final java.util.concurrent.ConcurrentHashMap<String, long[]> main_thread_by_method = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Methods that never touch the database, so they work while it's unavailable. */
     private static final Set<String> LOCAL = Set.of("server_id", "dialect", "close");
@@ -128,6 +130,11 @@ public final class StoreStats {
         if (main) {
             main_thread_calls.incrementAndGet();
             main_thread_nanos.addAndGet(nanos);
+            long[] m_stats = main_thread_by_method.computeIfAbsent(m.getName(), k -> new long[2]);
+            synchronized (m_stats) {
+                m_stats[0]++;
+                m_stats[1] += nanos;
+            }
         }
         long max = max_nanos.get();
         while (nanos > max) {
@@ -137,6 +144,15 @@ public final class StoreStats {
             }
             max = max_nanos.get();
         }
+    }
+
+    /** The methods that spent the most time on the main thread, most first: "name: calls, ms". */
+    public java.util.List<String> top_main_thread(int limit) {
+        return main_thread_by_method.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1]))
+                .limit(limit)
+                .map(e -> String.format("%s: %d calls, %.1f ms", e.getKey(), e.getValue()[0], e.getValue()[1] / 1e6D))
+                .toList();
     }
 
     public double average_ms() {

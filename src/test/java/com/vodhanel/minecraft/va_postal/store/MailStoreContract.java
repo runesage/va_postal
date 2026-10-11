@@ -43,6 +43,35 @@ abstract class MailStoreContract {
                 UUID.randomUUID(), null, "{}".getBytes(StandardCharsets.UTF_8), 4440, 1L), Actor.system("test"), "posted");
     }
 
+    /** Writes return the record without reading it back: what they return must be exactly what a read gives. */
+    @Test
+    void writesReturnExactlyWhatIsStored() throws Exception {
+        MailRecord r = letter();
+        MailRecord t = store.transition(r, MailState.AT_ORIGIN_BRANCH, Custody.chest("world,1,2,3"), Actor.system("t"), "in");
+        assertSame(t);
+        MailRecord b = store.begin_move(t, MailState.AT_CENTRAL, Custody.chest("world,0,0,0"), Actor.system("t"), null);
+        assertSame(b);
+        MailRecord c = store.commit_move(b, Actor.system("t"), null);
+        assertSame(c);
+        MailRecord b2 = store.begin_move(c, MailState.AT_DEST_BRANCH, Custody.chest("world,9,9,9"), Actor.system("t"), null);
+        assertSame(store.cancel_move(b2, Actor.system("t"), "didn't go"));
+    }
+
+    private void assertSame(MailRecord returned) throws Exception {
+        MailRecord stored = store.get(returned.id).orElseThrow();
+        for (java.lang.reflect.Field f : MailRecord.class.getFields()) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                continue;
+            }
+            Object a = f.get(returned), b = f.get(stored);
+            if (a instanceof byte[] ba && b instanceof byte[] bb) {
+                assertArrayEquals(bb, ba, f.getName());
+            } else {
+                assertEquals(String.valueOf(b), String.valueOf(a), f.getName());
+            }
+        }
+    }
+
     @Test
     void createsAndReadsBack() {
         MailRecord r = letter();
