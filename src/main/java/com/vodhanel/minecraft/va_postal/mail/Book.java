@@ -92,6 +92,19 @@ public class Book {
         }
     }
 
+    /**
+     * Whether mail titled {@code title} (its destination office) and authored {@code author} (its destination
+     * address) is for the mailbox at {@code office}'s {@code address}. Both must match: a letter for another town's
+     * Home, posted in this town's Home mailbox, is outgoing mail, not mail for here.
+     */
+    public static boolean addressed_to(String title, String author, String office, String address) {
+        return plain(author).equals(plain(address)) && plain(title).equals(plain(office));
+    }
+
+    private static String plain(String s) {
+        return s == null ? "" : s.replaceAll("\u00a7.", "").toLowerCase().trim();
+    }
+
     public String getTitle() {
         if (title == null) {
             return "null";
