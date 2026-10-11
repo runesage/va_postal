@@ -9,6 +9,8 @@ REQUIRED_JAVA=25
 CITIZENS_URL="https://ci.citizensnpcs.co/job/Citizens2/4256/artifact/dist/target/Citizens-2.0.44-b4256.jar"
 VAULT_URL="https://cdn.modrinth.com/data/ayRaM8J7/versions/qZgRzoYs/VaultUnlocked-2.20.3.jar"
 ESSENTIALS_URL="https://cdn.modrinth.com/data/hXiIvTyT/versions/nY6VN1XH/EssentialsX-2.22.0.jar"
+# The proxy for dev/network (three servers behind Velocity). Velocity 4.2.0 needs Java 25.
+VELOCITY_URL="https://fill-data.papermc.io/v1/objects/35a5596a5468a035d8a32c8de5ebb0dc6b8d8f0cc3ff5169d514aca762af8aa8/velocity-4.2.0-30.jar"
 
 # Office account UUIDs Postal derives (see OfficeAccounts / OfficeAccountsTest).
 CENTRAL_ACCOUNT="2ca1fae9-c175-239e-9eb2-df89430f098b"

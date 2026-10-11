@@ -131,6 +131,14 @@ It fails if any survey failed or TPS dropped below `MIN_TPS` (default 18). Like 
 CI. `SurveyorLoadTest` is the fast version that does run in CI: 60 surveys across a 600 x 600 block random
 town, plus an unreachable address, each held to the search's work bound.
 
+## Three dimensions
+
+`build_dims.py` builds one network across the Overworld, the Nether and the End: Central and Brookfield on the
+superflat Overworld, Cinderholm in a sealed blackstone cavern in the Nether (with a lava channel and one bridge
+across it), and Voidreach on a platform floating in the End's void, with one house on an islet reached by a
+one-wide bridge. Central's postman carries mail between the dimensions. Nothing has a route, so every route is
+surveyed. It's the **dims** server of the three-server network (`dev/network/README.md`), which builds it for you.
+
 ## Changing the towns
 
 The buildings come from `World.building` (walls, windows, door, gabled roof, chimney) and

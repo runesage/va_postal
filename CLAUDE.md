@@ -11,7 +11,7 @@ MySQL/MariaDB), money goes through Vault, and post offices can span servers.
 | `src/main/java/com/vodhanel/minecraft/va_postal/` | plugin code: `commands/`, `common/` (Util, P_* integrations, dispatchers), `config/` (C_* config accessors), `economy/`, `listeners/`, `mail/`, `navigation/` (routes, Stuck_NPC, Climb, Doorway), `store/` (mail store, SQL dialects) |
 | `src/test/java/...` | JUnit 5 unit tests; store tests run on SQLite and (when configured) MariaDB |
 | `ci/` | `smoke-test.sh` (boots a real Paper server, 11 phases), `bot-test.sh` + `bot/` (headless player tests), `lib.sh` (pinned Paper/plugin builds), `start-mariadb.sh` |
-| `dev/` | `test-server.sh` (local server to join by hand), `rcon.py`; on `claude/routes-design` also `dev/towns/` (towns soak, SMP load test) |
+| `dev/` | `test-server.sh` (local server to join by hand), `rcon.py`, `towns/` (test worlds: towns soak, SMP load test, cross-dimension world), `network/` (three servers behind Velocity) |
 | `docs/` | `commands.md`, `economy.md`, `design/` (economy, persistent-state, routes), `testing/` (per-phase test plans), `plans/` |
 
 Most code is inherited from the original plugin: static methods, `snake_case` names, `Util.cinform`/`pinform`
@@ -43,7 +43,8 @@ the Maven cache. If Docker isn't up, run `nohup dockerd >/tmp/dockerd.log 2>&1 &
 
 - **Give every server you start its own port** (`server-port` in server.properties). Other sessions and agents
   may be running servers on this machine at the same time. Ranges: 25611-25619 single-route tests,
-  25620-25629 bot-player tests, 25565 only for `dev/test-server.sh`.
+  25620-25629 bot-player tests, 25630-25639 the three-server network (`dev/network`), 25565 only for
+  `dev/test-server.sh`.
 - **Kill only the PIDs you started.** Never `pkill java` or `kill` every Paper server: that ends other people's
   soaks.
 - Keep servers, worlds and downloads under the scratchpad or a git-ignored dir, not in the repo.

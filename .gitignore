@@ -131,6 +131,7 @@ fabric.properties
 target/
 smoke/
 dev-server/
+dev-network/
 __pycache__/
 
 # CI bot test working directory
