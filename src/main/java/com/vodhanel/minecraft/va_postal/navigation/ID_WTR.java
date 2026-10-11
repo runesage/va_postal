@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.navigation;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.P_Towny;
@@ -209,7 +210,7 @@ public class ID_WTR {
         }
         if (!VA_postal.wtr_npc_player[id].isValid()) {
             Util.dinform(AnsiColor.RED + "SNR: NPC PLAYER IS INVALID " + id);
-            Util.dinform(AnsiColor.RED + "SNR: " + VA_postal.wtr_npc_player[id].getLocation() + " " + VA_postal.wtr_npc_player[id].getDisplayName());
+            Util.dinform(AnsiColor.RED + "SNR: " + VA_postal.wtr_npc_player[id].getLocation() + " " + Text.legacy(VA_postal.wtr_npc_player[id].displayName()));
             //return false;
         }
         if (VA_postal.wtr_nav[id] == null) {

@@ -254,7 +254,7 @@ public class P_Towny {
                         if (owner == null || owner == VA_postal.SERVER) {
                             sowner = "&7&oServer";
                         } else {
-                            sowner = "&f&r" + owner.getDisplayName();
+                            sowner = "&f&r" + Text.legacy(owner.displayName());
                         }
                         sowner = fixed_len(sowner + "&7&o", 28, "-");
                         sworld = "&7&o" + get_world(C_Postoffice.get_local_po_location_by_name(stown));
@@ -304,7 +304,7 @@ public class P_Towny {
                         if (owner == null || owner == VA_postal.SERVER) {
                             sowner = "&7&oServer";
                         } else {
-                            sowner = "&f&r" + owner.getDisplayName();
+                            sowner = "&f&r" + Text.legacy(owner.displayName());
                         }
                         sowner = fixed_len(sowner + "&7&o", 28, "-");
                         display = saddress + sowner + sinterval;
@@ -396,7 +396,7 @@ public class P_Towny {
                         if (!Objects.equals(m_entry.getKey(), "OK")) {
                             smayor = "";
                         } else {
-                            smayor = m_entry.getValue().getDisplayName();
+                            smayor = Text.legacy(m_entry.getValue().displayName());
                         }
                         disp = fmt_tny + fixed_len(dtown.toUpperCase(), 19, fmt_fill);
                         disp = disp + " " + fmt_myr + smayor.toUpperCase();

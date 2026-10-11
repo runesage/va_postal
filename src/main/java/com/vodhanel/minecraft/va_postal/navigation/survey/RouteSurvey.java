@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.navigation.survey;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.config.C_Address;
@@ -10,7 +11,6 @@ import com.vodhanel.minecraft.va_postal.navigation.survey.Surveyor.Move;
 import com.vodhanel.minecraft.va_postal.navigation.survey.Surveyor.Point;
 import com.vodhanel.minecraft.va_postal.navigation.survey.Surveyor.Result;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Location;
@@ -248,6 +248,6 @@ public final class RouteSurvey {
     }
 
     private static void send(CommandSender sender, String message) {
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+        sender.sendMessage(Text.color(message));
     }
 }

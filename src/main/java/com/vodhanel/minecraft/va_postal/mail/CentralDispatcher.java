@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.Util;
@@ -7,7 +8,6 @@ import com.vodhanel.minecraft.va_postal.config.GetConfig;
 import com.vodhanel.minecraft.va_postal.navigation.NpcLook;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.npc.NPC;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -134,7 +134,9 @@ public final class CentralDispatcher {
         ItemStack bag = new ItemStack(Material.BUNDLE);
         org.bukkit.inventory.meta.ItemMeta meta = bag.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(ChatColor.GOLD + "Mailbag");
+            // Not italic, like the names setDisplayName gave items.
+            meta.displayName(net.kyori.adventure.text.Component.text("Mailbag", net.kyori.adventure.text.format.NamedTextColor.GOLD)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             bag.setItemMeta(meta);
         }
         return bag;
@@ -171,7 +173,7 @@ public final class CentralDispatcher {
             this.stand = beside;
             this.start = from != null ? from : beside;
             this.npc = CitizensAPI.getNPCRegistry().createNPC(EntityType.PLAYER,
-                    ChatColor.translateAlternateColorCodes('&', config("network.dispatcher.name", "&3Central Dispatcher")));
+                    Text.color(config("network.dispatcher.name", "&3Central Dispatcher")));
             npc.data().set(NPC.Metadata.SHOULD_SAVE, false);
             NpcLook.skin(npc, "dispatcher");
             npc.spawn(start);
@@ -269,9 +271,8 @@ public final class CentralDispatcher {
         }
 
         private void say(String line) {
-            Util.cinform("[Postal] " + ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&',
-                    config("network.dispatcher.name", "&3Central Dispatcher"))) + " at Central: " + line);
-            String message = ChatColor.translateAlternateColorCodes('&', "&7<" + config("network.dispatcher.name", "&3Central Dispatcher")
+            Util.cinform("[Postal] " + Text.strip(Text.color(config("network.dispatcher.name", "&3Central Dispatcher"))) + " at Central: " + line);
+            String message = Text.color("&7<" + config("network.dispatcher.name", "&3Central Dispatcher")
                     + "&7> &f" + line);
             for (Player p : chest.getWorld().getPlayers()) {
                 if (p.getLocation().distanceSquared(chest_center) <= EARSHOT * EARSHOT) {
