@@ -11,7 +11,6 @@ import com.vodhanel.minecraft.va_postal.store.MailEvent;
 import com.vodhanel.minecraft.va_postal.store.MailRecord;
 import com.vodhanel.minecraft.va_postal.store.MailStore;
 import com.vodhanel.minecraft.va_postal.store.MailStores;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
@@ -412,6 +411,9 @@ public final class P_MailAdmin {
                     st.calls.get(), st.calls.get() / (double) minutes, st.average_ms(), st.max_ms(), st.slowest_call));
             send(sender, String.format("&7On the main thread: &f%d&7 calls, &f%.1f ms&7 in all",
                     st.main_thread_calls.get(), st.main_thread_nanos.get() / 1e6D));
+            for (String line : st.top_main_thread(5)) {
+                send(sender, "&7  " + line);
+            }
             send(sender, "&7Failures: &f" + st.failures.get() + (st.failures.get() > 0 ? "&7 (last: " + st.last_failure + ")" : ""));
             if (st.unavailable != null) {
                 send(sender, "&cUnavailable for " + (System.currentTimeMillis() - st.unavailable_since) / 1000L
@@ -507,6 +509,6 @@ public final class P_MailAdmin {
     }
 
     private static void send(CommandSender sender, String message) {
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+        sender.sendMessage(Text.color(message));
     }
 }

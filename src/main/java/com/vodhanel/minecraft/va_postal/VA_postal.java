@@ -273,6 +273,7 @@ public class VA_postal extends JavaPlugin {
         if (plugin == null) {
             return;
         }
+        com.vodhanel.minecraft.va_postal.config.C_Dispatcher.cancel_region_loads();
         for (org.bukkit.World world : Bukkit.getWorlds()) {
             world.removePluginChunkTickets(plugin);
         }
@@ -333,11 +334,11 @@ public class VA_postal extends JavaPlugin {
                 getConfig().getString(GetConfig.path_format("storage.type"), "sqlite"),
                 getConfig().getString(GetConfig.path_format("network.server_id"), "main"),
                 getConfig().getString(GetConfig.path_format("storage.mysql.host"), "localhost"),
-                getConfig().getInt(GetConfig.path_format("storage.mysql.port"), 3306),
+                GetConfig.int_value(getConfig(), GetConfig.path_format("storage.mysql.port"), 3306),
                 getConfig().getString(GetConfig.path_format("storage.mysql.database"), "postal"),
                 getConfig().getString(GetConfig.path_format("storage.mysql.user"), "postal"),
                 getConfig().getString(GetConfig.path_format("storage.mysql.password"), ""),
-                getConfig().getInt(GetConfig.path_format("storage.mysql.pool_size"), 6),
+                GetConfig.int_value(getConfig(), GetConfig.path_format("storage.mysql.pool_size"), 6),
                 getConfig().getString(GetConfig.path_format("storage.mysql.properties"), "")),
                 org.bukkit.Bukkit::isPrimaryThread, getLogger());
         com.vodhanel.minecraft.va_postal.mail.Directory.start();

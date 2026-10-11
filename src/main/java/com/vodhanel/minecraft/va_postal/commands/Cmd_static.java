@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.mail.CodLabel;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
@@ -701,6 +702,7 @@ public class Cmd_static {
             Book new_book = new Book(town, address, existing_pages);
             ItemStack new_stack = HoldTag.carry(stack, MailIds.carry(stack, new_book.generateItemStack()));
             player.getInventory().setItemInMainHand(new_stack);
+            Letters.attention_changed(new_stack, player.getUniqueId(), original);
             Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
             Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(address) + " &7&otown of &9&o" + Util.df(town));
             Util.pinform(player, "&7&oAttention: &9&o" + attention);
@@ -731,11 +733,11 @@ public class Cmd_static {
 
             cost = P_Economy.charge_po_purchase(player, subject, stown);
             if (cost > 0.0D) if (player == null) Util.con_type(subject + " charged " + ef(cost));
-            else Util.pinform(player, subject.getDisplayName() + " charged " + ef(cost));
+            else Util.pinform(player, Text.legacy(subject.displayName()) + " charged " + ef(cost));
         } else if (subject != null) {
             C_Owner.set_owner_local_po(stown, subject);
-            if (player == null) Util.con_type(Util.df(stown) + " is now owned by " + subject.getDisplayName());
-            else Util.pinform(player, Util.df(stown) + " is now owned by " + subject.getDisplayName());
+            if (player == null) Util.con_type(Util.df(stown) + " is now owned by " + Text.legacy(subject.displayName()));
+            else Util.pinform(player, Util.df(stown) + " is now owned by " + Text.legacy(subject.displayName()));
         } else {
             if (C_Owner.is_local_po_owner_defined(stown)) C_Owner.del_owner_local_po(stown);
             if (player == null) Util.con_type("Owner removed from: " + Util.df(stown));

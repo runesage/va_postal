@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.navigation;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.P_Towny;
@@ -209,7 +210,7 @@ public class ID_WTR {
         }
         if (!VA_postal.wtr_npc_player[id].isValid()) {
             Util.dinform(AnsiColor.RED + "SNR: NPC PLAYER IS INVALID " + id);
-            Util.dinform(AnsiColor.RED + "SNR: " + VA_postal.wtr_npc_player[id].getLocation() + " " + VA_postal.wtr_npc_player[id].getDisplayName());
+            Util.dinform(AnsiColor.RED + "SNR: " + VA_postal.wtr_npc_player[id].getLocation() + " " + Text.legacy(VA_postal.wtr_npc_player[id].displayName()));
             //return false;
         }
         if (VA_postal.wtr_nav[id] == null) {
@@ -321,6 +322,12 @@ public class ID_WTR {
             //else
             VA_postal.wtr_nav[id].setTarget(VA_postal.wtr_waypoint[id]);
         }
+    }
+
+    /** True while slot id still holds this spawned NPC (a restart replaces the arrays and the NPCs). */
+    static boolean same_postman(int id, net.citizensnpcs.api.npc.NPC npc) {
+        return npc != null && VA_postal.wtr_npc != null && id >= 0 && id < VA_postal.wtr_npc.length
+                && VA_postal.wtr_npc[id] == npc && npc.isSpawned();
     }
 
     public static void safe_stop(int id) {
@@ -654,12 +661,18 @@ public class ID_WTR {
                 walk_to(id, f_door_loc, 0.5F);
             }
         } else {
+            // Each step checks it's still the same postman: a dispatcher restart in between replaces them.
+            final net.citizensnpcs.api.npc.NPC npc = VA_postal.wtr_npc[id];
             VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
+                if (!same_postman(id, npc)) return;
                 ID_WTR.walk_to(id, f_door_loc, 0.5F);
                 VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
-                    faceLocation(VA_postal.wtr_npc[id].getEntity(), f_target);
+                    if (!same_postman(id, npc)) return;
+                    faceLocation(npc.getEntity(), f_target);
                     if (VA_postal.lookclose_on_route) {
-                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true), 40L);
+                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
+                            if (same_postman(id, npc)) npc.getOrAddTrait(LookClose.class).lookClose(true);
+                        }, 40L);
                     }
                 }, 20L);
             }, 60L);

@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
 import com.vodhanel.minecraft.va_postal.common.Util;
@@ -574,7 +575,7 @@ public final class Parcels {
         String count = lost.size() == 1 ? "1 item" : lost.size() + " items";
         String list = String.join(", ", lost);
         if (who != null) {
-            who.sendMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&e&o" + count + " in this parcel ("
+            who.sendMessage(Text.color("&e&o" + count + " in this parcel ("
                     + list + ") no longer exist" + (lost.size() == 1 ? "s" : "") + " in this version of Minecraft, so "
                     + (lost.size() == 1 ? "it" : "they") + " couldn't be delivered. Everything else is here; the post"
                     + " office has kept a record of " + (lost.size() == 1 ? "it." : "them.")));
@@ -603,7 +604,7 @@ public final class Parcels {
         // Someone else's chest built on the same spot isn't the parcel's.
         Block front = BlockFacing.front(block);
         return front.getState() instanceof org.bukkit.block.Sign
-                && ((org.bukkit.block.Sign) front.getState()).getLine(0).contains("[Postal_Ship]") ? block : null;
+                && Text.line((org.bukkit.block.Sign) front.getState(), 0).contains("[Postal_Ship]") ? block : null;
     }
 
     static Location location(String key) {

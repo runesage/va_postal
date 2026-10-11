@@ -30,6 +30,13 @@ public interface MailStore extends AutoCloseable {
      */
     MailRecord set_terms(MailRecord current, double cod_amount, String hold_id, Actor actor, String detail);
 
+    /**
+     * Changes who a record is addressed to (the attention player; null for "[Resident]") without moving it.
+     * {@code payload} replaces the stored book text so a book rebuilt from the record says the same; null keeps it.
+     * Version-checked and recorded in its history like a transition.
+     */
+    MailRecord set_attention(MailRecord current, java.util.UUID attention, byte[] payload, Actor actor, String detail);
+
     /** Phase 1 of a move: records the destination. The record keeps its current custody until committed. */
     MailRecord begin_move(MailRecord current, MailState to, Custody to_custody, Actor actor, String detail);
 

@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
 import com.vodhanel.minecraft.va_postal.common.Util;
@@ -70,7 +71,7 @@ public final class Network {
     }
 
     static int poll_seconds() {
-        return VA_postal.plugin.getConfig().getInt(GetConfig.path_format("network.poll_seconds"), 10);
+        return GetConfig.int_value(VA_postal.plugin.getConfig(), GetConfig.path_format("network.poll_seconds"), 10);
     }
 
     // ---- Players ----------------------------------------------------------------------------
@@ -331,7 +332,7 @@ public final class Network {
     }
 
     private static long minutes(String path, double fallback) {
-        double m = VA_postal.plugin.getConfig().getDouble(GetConfig.path_format(path), fallback);
+        double m = GetConfig.double_value(VA_postal.plugin.getConfig(), GetConfig.path_format(path), fallback);
         return Math.max(0L, Math.round(m * 60_000D));
     }
 
@@ -485,8 +486,8 @@ public final class Network {
 
     /** A broadcast ({@code Network.Broadcast}), or just the log. The bell is the dispatcher's (or {@link CentralDispatcher#voyage}'s). */
     private static void announce(String message) {
-        if (VA_postal.plugin.getConfig().getBoolean(GetConfig.path_format("network.broadcast"), true)) {
-            Bukkit.broadcastMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', "&9[Postal] &7" + message));
+        if (GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("network.broadcast"), true)) {
+            Bukkit.broadcast(Text.component(Text.color("&9[Postal] &7" + message)));
         } else {
             Util.cinform("[Postal] " + message.replace("&f", "").replace("&7", ""));
         }

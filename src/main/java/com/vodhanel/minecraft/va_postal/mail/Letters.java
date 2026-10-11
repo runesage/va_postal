@@ -11,10 +11,12 @@ import com.vodhanel.minecraft.va_postal.store.MailState;
 import com.vodhanel.minecraft.va_postal.store.MailStore;
 import com.vodhanel.minecraft.va_postal.store.MailStores;
 import com.vodhanel.minecraft.va_postal.store.StoreException;
+import com.vodhanel.minecraft.va_postal.store.StoreQueue;
 import org.bukkit.Bukkit;
 import org.bukkit.inventory.ItemStack;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,6 +74,28 @@ public final class Letters {
         } catch (StoreException | ConflictException e) {
             Util.cinform("[Postal] Could not record a letter; it will travel untracked: " + e.getMessage());
             return book;
+        }
+    }
+
+    /**
+     * {@code /att} rewrote the addressed {@code book}'s attention line: the book's record, if it is still
+     * POSTED (not collected or moving), gets the same attention player and book text, so the two agree.
+     */
+    public static void attention_changed(ItemStack book, UUID sender, UUID attention) {
+        MailStore store = store();
+        UUID id = MailIds.read(book);
+        if (store == null || id == null) {
+            return;
+        }
+        try {
+            store.get(id).ifPresent(r -> {
+                if (r.state == MailState.POSTED && !r.moving()) {
+                    store.set_attention(r, attention, r.kind == com.vodhanel.minecraft.va_postal.store.MailKind.LETTER ? payload(book) : null,
+                            sender == null ? Actor.system("console") : Actor.player(sender), "attention changed");
+                }
+            });
+        } catch (StoreException | ConflictException e) {
+            Util.cinform("[Postal] Could not update a letter's record after /att: " + e.getMessage());
         }
     }
 
@@ -133,26 +157,24 @@ public final class Letters {
             return result == Result.BEGUN || result == Result.UNTRACKED;
         }
 
+        /** The book is in place: record it, in the background (nothing waits on it). */
         public void commit() {
             if (result != Result.BEGUN) {
                 return;
             }
-            try {
-                record = store().commit_move(record, Actor.system("world"), null);
-            } catch (StoreException | ConflictException e) {
-                Util.cinform("[Postal] Could not commit the move of letter " + record.id + " (reconciliation will): " + e.getMessage());
-            }
+            MailRecord begun = record;
+            StoreQueue.later("Committing the move of letter " + begun.id + " (reconciliation will)",
+                    () -> store().commit_move(begun, Actor.system("world"), null));
         }
 
+        /** The book didn't go: record it, in the background. */
         public void cancel(String why) {
             if (result != Result.BEGUN) {
                 return;
             }
-            try {
-                record = store().cancel_move(record, Actor.system("world"), why);
-            } catch (StoreException | ConflictException e) {
-                Util.cinform("[Postal] Could not cancel the move of letter " + record.id + ": " + e.getMessage());
-            }
+            MailRecord begun = record;
+            StoreQueue.later("Cancelling the move of letter " + begun.id,
+                    () -> store().cancel_move(begun, Actor.system("world"), why));
         }
     }
 
@@ -197,20 +219,21 @@ public final class Letters {
      * (e.g. a player dropped it straight into a post office). Only applies to a letter still with its sender.
      */
     public static void arrived(ItemStack book, String chest, MailState state, Actor actor) {
-        MailStore store = store();
         UUID id = MailIds.read(book);
-        if (store == null || id == null) {
+        if (store() == null || id == null) {
             return;
         }
-        try {
+        StoreQueue.later("Recording letter " + id + " at its post office", () -> {
+            MailStore store = store();
+            if (store == null) {
+                return;
+            }
             store.get(id).ifPresent(r -> {
                 if (r.state == MailState.POSTED && !r.moving()) {
                     store.transition(r, state, com.vodhanel.minecraft.va_postal.store.Custody.chest(block_key(chest)), actor, "handed in at the post office");
                 }
             });
-        } catch (StoreException | ConflictException e) {
-            Util.cinform("[Postal] Could not record letter " + id + " at its post office: " + e.getMessage());
-        }
+        });
     }
 
     // ---- Route runs ------------------------------------------------------------------------
@@ -222,15 +245,24 @@ public final class Letters {
      * letters waiting at the office for that address as out for delivery.
      */
     public static synchronized void route_started(int npc, String office, String address, String office_chest) {
-        MailStore store = store();
-        if (store == null || office == null || address == null) {
+        if (store() == null || office == null || address == null) {
             return;
         }
-        try {
-            route_finished(npc);
-            String run = UUID.randomUUID().toString();
-            store.start_run(run, office, address, Integer.toString(npc), System.currentTimeMillis());
-            runs.put(npc, new String[]{run, office, address});
+        if (runs.containsKey(npc)) {
+            // The last run never ended: settle it first, now, so its letters can go out on this one.
+            close_run(runs.remove(npc), true);
+        }
+        String run = UUID.randomUUID().toString();
+        runs.put(npc, new String[]{run, office, address});
+        long now = System.currentTimeMillis();
+        // In the background: the postman's pickups from the office chest queue behind it, so they see these
+        // letters out for delivery.
+        StoreQueue.later("Recording the route run to " + office + ", " + address, () -> {
+            MailStore store = store();
+            if (store == null) {
+                return;
+            }
+            store.start_run(run, office, address, Integer.toString(npc), now);
             for (MailState waiting : new MailState[]{MailState.AT_DEST_BRANCH, MailState.AT_ORIGIN_BRANCH}) {
                 for (MailRecord r : store.by_destination(waiting, office)) {
                     // Only letters in this office's chest: a cross-town letter still at its origin office is also
@@ -241,36 +273,89 @@ public final class Letters {
                     }
                 }
             }
-        } catch (StoreException | ConflictException e) {
-            Util.cinform("[Postal] Could not record the route run to " + office + ", " + address + ": " + e.getMessage());
-        }
+        });
     }
 
     /** The run is over: anything still out for delivery (e.g. a full mailbox) goes back to waiting at the office. */
     public static synchronized void route_finished(int npc) {
-        MailStore store = store();
         String[] run = runs.remove(npc);
-        if (store == null || run == null) {
+        if (store() == null || run == null) {
             return;
         }
-        try {
-            for (MailRecord r : store.by_destination(MailState.OUT_FOR_DELIVERY, run[1])) {
-                if (run[2].equalsIgnoreCase(r.dest_address) && !r.moving()) {
-                    // The book waits in the office chest while it's out for delivery: if it isn't there now,
-                    // someone took it.
-                    org.bukkit.inventory.Inventory chest = Reconciler.chest(r.custody, false);
-                    if (chest != null && !Reconciler.holds(chest, r.id)) {
-                        store.transition(r, MailState.MISSING, r.custody, Actor.postman(run[1]),
-                                "not in the office chest when its route ended");
-                        Reconciler.missing(r, "not in the office chest when its route ended");
-                    } else {
-                        store.transition(r, MailState.AT_DEST_BRANCH, r.custody, Actor.postman(run[1]), "run ended without delivering it");
-                    }
-                }
+        close_run(run, false);
+    }
+
+    /**
+     * Closes {@code run}: its letters still out for delivery go back to waiting at the office, or MISSING if they're
+     * no longer in the office chest (where a book waits while it's out for delivery). {@code now}: all of it here,
+     * on the main thread; otherwise the store work runs in the background and only the look in the chest is here.
+     */
+    private static void close_run(String[] run, boolean now) {
+        if (now) {
+            try {
+                List<MailRecord> out = still_out(run);
+                settle(run, out, taken(out));
+            } catch (StoreException | ConflictException e) {
+                Util.cinform("[Postal] Could not close the route run " + run[0] + ": " + e.getMessage());
             }
-            store.end_run(run[0]);
-        } catch (StoreException | ConflictException e) {
-            Util.cinform("[Postal] Could not close the route run " + run[0] + ": " + e.getMessage());
+            return;
+        }
+        StoreQueue.later("Closing the route run " + run[0], () -> {
+            List<MailRecord> out = still_out(run);
+            if (out.isEmpty()) {
+                settle(run, out, List.of());
+                return;
+            }
+            // Whether each book is still in the office chest is a question for the world, on the main thread.
+            org.bukkit.Bukkit.getScheduler().runTask(com.vodhanel.minecraft.va_postal.VA_postal.plugin, () -> {
+                List<Boolean> taken = taken(out);
+                StoreQueue.later("Closing the route run " + run[0], () -> settle(run, out, taken));
+            });
+        });
+    }
+
+    private static List<MailRecord> still_out(String[] run) {
+        return store().by_destination(MailState.OUT_FOR_DELIVERY, run[1]).stream()
+                .filter(r -> run[2].equalsIgnoreCase(r.dest_address) && !r.moving())
+                .toList();
+    }
+
+    /** For each letter: true if it's no longer in the office chest. Main thread. */
+    private static List<Boolean> taken(List<MailRecord> out) {
+        List<Boolean> taken = new java.util.ArrayList<>();
+        for (MailRecord r : out) {
+            org.bukkit.inventory.Inventory chest = Reconciler.chest(r.custody, false);
+            taken.add(chest != null && !Reconciler.holds(chest, r.id));
+        }
+        return taken;
+    }
+
+    private static void settle(String[] run, List<MailRecord> out, List<Boolean> taken) {
+        MailStore store = store();
+        for (int i = 0; i < out.size(); i++) {
+            MailRecord r = out.get(i);
+            try {
+                if (taken.get(i)) {
+                    MailRecord gone = store.transition(r, MailState.MISSING, r.custody, Actor.postman(run[1]),
+                            "not in the office chest when its route ended");
+                    announce_missing(gone);
+                } else {
+                    store.transition(r, MailState.AT_DEST_BRANCH, r.custody, Actor.postman(run[1]), "run ended without delivering it");
+                }
+            } catch (ConflictException moved) {
+                // It moved on since we looked (a postman picked it up): its new state stands.
+            }
+        }
+        store.end_run(run[0]);
+    }
+
+    /** MailMissingEvent is a Bukkit event: fired on the main thread. */
+    private static void announce_missing(MailRecord r) {
+        if (org.bukkit.Bukkit.isPrimaryThread()) {
+            Reconciler.missing(r, "not in the office chest when its route ended");
+        } else {
+            org.bukkit.Bukkit.getScheduler().runTask(com.vodhanel.minecraft.va_postal.VA_postal.plugin,
+                    () -> Reconciler.missing(r, "not in the office chest when its route ended"));
         }
     }
 

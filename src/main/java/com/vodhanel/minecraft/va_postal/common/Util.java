@@ -638,7 +638,7 @@ public class Util {
     public static void spinform(Player player, String message) {
         if (player != null) {
             try {
-                player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+                player.sendMessage(Text.color(message));
             } catch (Exception ignored) {
             }
         }
@@ -650,7 +650,7 @@ public class Util {
 
     public static void binform(String message) {
         try {
-            VA_postal.plugin.getServer().broadcastMessage(ChatColor.translateAlternateColorCodes("&".charAt(0), message));
+            VA_postal.plugin.getServer().broadcast(Text.component(Text.color(message)));
         } catch (Exception ignored) {
         }
     }
@@ -1089,10 +1089,10 @@ public class Util {
                     } catch (Exception e) {
                         continue;
                     }
-                    if (kplyr.getDisplayName().length() >= splyr.length()) {
-                        if (kplyr.getDisplayName().toLowerCase().trim().contains(splyr)) {
+                    if (Text.legacy(kplyr.displayName()).length() >= splyr.length()) {
+                        if (Text.legacy(kplyr.displayName()).toLowerCase().trim().contains(splyr)) {
                             result = aPlayer;
-                            if (Objects.equals(kplyr.getDisplayName().toLowerCase(), splayer)) {
+                            if (Objects.equals(Text.legacy(kplyr.displayName()).toLowerCase(), splayer)) {
                                 return result;
                             }
 
@@ -1120,8 +1120,8 @@ public class Util {
                 if (hit > 1) {
                     for (int i = 0; i < hit; i++) {
 
-                        test = collection[i].getDisplayName().toLowerCase().trim();
-                        if (!test.equals(collection[i].getDisplayName().trim())) {
+                        test = Text.legacy(collection[i].displayName()).toLowerCase().trim();
+                        if (!test.equals(Text.legacy(collection[i].displayName()).trim())) {
                             case_save = collection[i];
                         }
                         if (!test.equals(last_match)) {
@@ -1189,7 +1189,7 @@ public class Util {
         int hit = 0;
 
         for (Player aPlayer_list : player_list) {
-            kplyr = aPlayer_list.getDisplayName().toLowerCase().trim();
+            kplyr = Text.legacy(aPlayer_list.displayName()).toLowerCase().trim();
             if ((kplyr.contains(splyr)) || (all)) {
                 result = aPlayer_list;
 
@@ -1216,7 +1216,7 @@ public class Util {
         Map<Player, String> player_list = new HashMap<>();
         try {
             for (Player a_player : onlineplayers) {
-                player_list.put(a_player, a_player.getDisplayName());
+                player_list.put(a_player, Text.legacy(a_player.displayName()));
             }
 
             for (OfflinePlayer a_player : offlineplayers) {

@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import org.bukkit.Material;
@@ -31,7 +32,7 @@ public class Book {
         try {
             author = bookData.getAuthor();
             title = bookData.getTitle();
-            lpages = bookData.getPages();
+            lpages = bookData.pages().stream().map(Text::legacy).toList();
         } catch (Exception e) {
             valid_book = false;
         }
@@ -211,12 +212,12 @@ public class Book {
                 if (i < pages.length) {
                     sPages[i] = pages[i];
                     if (!new_itemstack) {
-                        bookData.setPage(i, pages[i]);
+                        bookData.page(i, Text.component(pages[i]));
                     }
                 } else {
                     sPages[i] = " ";
                     if (!new_itemstack) {
-                        bookData.addPage(" ");
+                        bookData.addPages(Text.component(" "));
                     }
                 }
             }
@@ -226,7 +227,7 @@ public class Book {
         } else {
             pages[index] = text;
             if (!new_itemstack) {
-                bookData.setPage(index, text);
+                bookData.page(index, Text.component(text));
             }
         }
         return true;
@@ -242,7 +243,7 @@ public class Book {
         newBookData.setAuthor(author);
         newBookData.setTitle(title);
         for (int i = 0; i < pages.length; i++) {
-            newBookData.addPage(pages[i]);
+            newBookData.addPages(Text.component(pages[i]));
         }
         newbook.setItemMeta(newBookData);
         return newbook;

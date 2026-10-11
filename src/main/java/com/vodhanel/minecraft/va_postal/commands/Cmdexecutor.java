@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import org.bukkit.Particle;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.*;
@@ -275,6 +276,10 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.pinform(player, "Required permission not present.");
                 return true;
             }
+            if (VA_Dispatcher.dispatcher_running) {
+                Util.pinform(player, "&7&oDispatcher is already running.");
+                return true;
+            }
             VA_Dispatcher.start_up(false);
             if (!VA_postal.needs_configuration) Util.pinform(player, "VA_postal Started");
             return true;
@@ -386,7 +391,7 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("network".equals(args[0].toLowerCase().trim())) {
             for (String line : Network.schedule()) {
-                sender.sendMessage(org.bukkit.ChatColor.translateAlternateColorCodes('&', line));
+                sender.sendMessage(Text.color(line));
             }
             return true;
         }
@@ -2029,7 +2034,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.player_list_match(player, args[2]);
                 return true;
             }
-            subject = psubject.getDisplayName();
+            subject = Text.legacy(psubject.displayName());
         }
 
 
@@ -2201,12 +2206,12 @@ public class Cmdexecutor implements CommandExecutor {
             Cmd_static.ownerlocal_worker(player, stown, subject);
             deregister_player_comfirmation(player);
         } else {
-            Util.pinform(player, "Ready to make " + (subject != null ? subject.getDisplayName() : "the Server") + " the post office owner of " + Util.df(stown));
+            Util.pinform(player, "Ready to make " + (subject != null ? Text.legacy(subject.displayName()) : "the Server") + " the post office owner of " + Util.df(stown));
             if ((subject != null) &&
                     (price > 0.0D)) Util.pinform(player, "&f&o" + subject + "&7&o will be charged &f&o" + ef(price));
 
 
-            String scommand = "/ownerlocal " + stown + " " + (subject != null ? subject.getDisplayName() : "server");
+            String scommand = "/ownerlocal " + stown + " " + (subject != null ? Text.legacy(subject.displayName()) : "server");
             register_player_comfirmation(player, scommand);
         }
         return true;

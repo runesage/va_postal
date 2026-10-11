@@ -303,7 +303,13 @@ P1 follows this design, with these differences:
 - **Still synchronous.** Store calls stay on the calling thread, as in P1, rather than the async pipeline of §4.
   Measured on the SMP load test (12 towns, 240 addresses, 15 minutes) with MariaDB on the same machine: 909
   calls averaging 1.04 ms, 0.9 seconds of main-thread time in all, TPS at least 18.9, the same as on SQLite. A remote database adds its round trip to every call; `/postal store` shows what that costs. The
-  async pipeline remains the plan if real networks need it.
+  async pipeline remains the plan if real networks need it. Since then (#21) the writes nothing in the world
+  waits on go to one background thread (`StoreQueue`): committing or cancelling a move once the book is in place,
+  a letter handed in at its office, and the start and end of a route run. Main-thread calls that need an answer
+  (starting a move, posting, commands) still wait, but run on that thread behind the queued writes, so they never
+  read a record a queued write hasn't reached. `SqlMailStore` writes also skip re-reading the row they just wrote
+  (one round trip fewer). With MySQL 20 ms away, the smoke test's routes phase spent 2.9 s of main-thread time in
+  the store before and 1.7 s after; most of what's left is the test's own console commands.
 - **Parity tests.** The store tests are one contract suite (`MailStoreContract`) run on SQLite and on
   MariaDB (`MariaDbMailStoreTest`, enabled by `POSTAL_TEST_MYSQL_URL`). CI's build job has a MariaDB service, and
   the smoke test runs twice: on SQLite and on MariaDB (`STORAGE=mysql`).

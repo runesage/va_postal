@@ -265,6 +265,43 @@ public final class SqlMailStore implements MailStore {
     }
 
     @Override
+    public MailRecord set_attention(MailRecord current, UUID attention, byte[] payload, Actor actor, String detail) {
+        long now = System.currentTimeMillis();
+        String sql = "UPDATE mail SET attention_uuid = ?, " + (payload == null ? "" : "payload = ?, ")
+                + "version = ?, updated_at = ? WHERE mail_id = ? AND version = ?";
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                int rows;
+                try (PreparedStatement ps = c.prepareStatement(sql)) {
+                    int i = 1;
+                    ps.setString(i++, str(attention));
+                    if (payload != null) {
+                        ps.setBytes(i++, payload);
+                    }
+                    ps.setInt(i++, current.version + 1);
+                    ps.setLong(i++, now);
+                    ps.setString(i++, current.id.toString());
+                    ps.setInt(i, current.version);
+                    rows = ps.executeUpdate();
+                }
+                if (rows != 1) {
+                    c.rollback();
+                    throw new ConflictException(current.id + " changed since version " + current.version);
+                }
+                event(c, current.id, current.version + 1, current.state, current.state, current.custody, actor, detail);
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not update mail " + current.id, e);
+        }
+        return get(current.id).orElseThrow();
+    }
+
+    @Override
     public MailRecord begin_move(MailRecord current, MailState to, Custody to_custody, Actor actor, String detail) {
         if (current.moving()) {
             throw new ConflictException(current.id + " already has a move in flight");
@@ -354,7 +391,13 @@ public final class SqlMailStore implements MailStore {
         } catch (SQLException e) {
             throw new StoreException("Could not update mail " + current.id, e);
         }
-        return get(current.id).orElseThrow();
+        // The row is now exactly this: what the UPDATE set, the rest unchanged. Building it here saves reading it
+        // back, a round trip on every move (a database on another machine pays it each time).
+        return new MailRecord(current.id, current.kind, state, current.version + 1, current.origin_server,
+                current.dest_server, current.origin_office, current.dest_office, current.dest_address, server_id, custody,
+                pending_state, pending_custody, current.sender, current.attention, current.cod_amount,
+                current.postage_paid, current.payload_format, current.payload, current.mc_data_version,
+                current.created_at, now, current.hold_id, due_at == null ? current.due_at : due_at);
     }
 
     private void event(Connection c, UUID id, int version, MailState from, MailState to, Custody custody, Actor actor,

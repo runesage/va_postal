@@ -124,10 +124,12 @@ TOWNS=24 ADDRESSES=30 LOAD_SECONDS=1800 dev/towns/load.sh
 It surveys every route, then runs every post office at once (`Concurrent_Postmen`) while sampling `tps` and
 `mspt` every 30 seconds. It reports:
 - surveys: how many found a route, the failures and why, the median and slowest times, positions searched;
-- the server: the lowest and median TPS, and tick times;
+- the server: the lowest and median TPS, tick times, and the longest single tick (the 1-minute `mspt` maximum,
+  which sees a one-off freeze that the TPS average hides);
 - the postmen: round trips recorded, and the addresses that needed the most rescues.
 
-It fails if any survey failed or TPS dropped below `MIN_TPS` (default 18). Like the soak, it isn't part of
+It fails if any survey failed, TPS dropped below `MIN_TPS` (default 18), any single tick took longer than
+`MAX_TICK_MS` (default 1000), or Paper's watchdog dumped threads ("The server has not responded for"). Like the soak, it isn't part of
 CI. `SurveyorLoadTest` is the fast version that does run in CI: 60 surveys across a 600 x 600 block random
 town, plus an unreachable address, each held to the search's work bound.
 

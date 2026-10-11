@@ -9,6 +9,52 @@ import org.bukkit.configuration.ConfigurationSection;
 import java.util.Set;
 
 public class GetConfig {
+    // Bukkit's getInt, getDouble and getBoolean ignore a quoted value ('3307', 'true') and return the default, so
+    // a setting written with quotes in config.yml would be silently ignored. These accept both forms.
+
+    /** The int at {@code path}, written plain or quoted; {@code def} if it's missing or not a number. */
+    public static int int_value(ConfigurationSection c, String path, int def) {
+        Object v = c.get(path);
+        if (v instanceof Number n) {
+            return n.intValue();
+        }
+        try {
+            return v instanceof String str ? Integer.parseInt(str.trim()) : def;
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    /** The number at {@code path}, written plain or quoted; {@code def} if it's missing or not a number. */
+    public static double double_value(ConfigurationSection c, String path, double def) {
+        Object v = c.get(path);
+        if (v instanceof Number n) {
+            return n.doubleValue();
+        }
+        try {
+            return v instanceof String str ? Double.parseDouble(str.trim()) : def;
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    /** The true/false at {@code path}, written plain or quoted; {@code def} if it's missing or neither. */
+    public static boolean bool_value(ConfigurationSection c, String path, boolean def) {
+        Object v = c.get(path);
+        if (v instanceof Boolean b) {
+            return b;
+        }
+        if (v instanceof String str) {
+            if ("true".equalsIgnoreCase(str.trim())) {
+                return true;
+            }
+            if ("false".equalsIgnoreCase(str.trim())) {
+                return false;
+            }
+        }
+        return def;
+    }
+
     VA_postal plugin;
 
     public GetConfig(VA_postal instance) {
@@ -107,7 +153,7 @@ public class GetConfig {
         String spath = path_format("settings.allow_lossy_pathfinding");
         boolean result;
         try {
-            result = VA_postal.plugin.getConfig().getBoolean(spath);
+            result = bool_value(VA_postal.plugin.getConfig(), spath, false);
         } catch (Exception e) {
             return false;
         }
@@ -401,7 +447,7 @@ public class GetConfig {
     public static synchronized int showroute_PE() {
         String spath = path_format("settings.showroute_pe");
         try {
-            return VA_postal.plugin.getConfig().getInt(spath);
+            return int_value(VA_postal.plugin.getConfig(), spath, 0);
         } catch (Exception e) {
             e.printStackTrace();
         }

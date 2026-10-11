@@ -251,6 +251,13 @@ PY
 run_server "$WORK_DIR/phase11.log" "postal start" "sleep:10" "postal stop" "sleep:3"
 cp "$WORK_DIR/config.full.yml" "$CONFIG"
 
+# Phase 12: stop and start the dispatcher again within its 10 s stop clean-up. The old clean-up used to fire
+# into the new run, deleting its postmen and nulling their array ("Exception creating NPC ... wtr_npc is null").
+echo "== Phase 12: quick stop/start cycles, and a start while running"
+run_server "$WORK_DIR/phase12.log" "postal start" "sleep:15" \
+    "postal stop" "sleep:1" "postal start" "sleep:1" "postal stop" "sleep:1" "postal start" "sleep:1" \
+    "postal start" "sleep:25" "postal stop" "sleep:12"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -265,6 +272,7 @@ for phase in phase1 phase2; do
     check "$phase: no enable failure" no_match "Error occurred while enabling Postal" "$log"
     check "$phase: no Postal stack traces" no_match "at .*com\.vodhanel\." "$log"
     check "$phase: no command exceptions" no_match "Command exception: /?(postal|tlist|alist|showroute)" "$log"
+    check "$phase: no watchdog dump" no_match "The server has not responded for" "$log"
 done
 check "phase1: unconfigured start refused cleanly" grep -q "could not compile town list" "$WORK_DIR/phase1.log"
 check "phase2: economy hooked" grep -q "for economy\." "$WORK_DIR/phase2.log"
@@ -367,6 +375,7 @@ check "phase4: its label is in Home exactly once" parcel_once
 check "phase6: a letter whose chest was destroyed is MISSING" grep -qE "testville, home: MISSING at CHEST@world,20,-60,0" <(plain phase6)
 for phase in phase3 phase4 phase5 phase6; do
     check "$phase: no Postal stack traces" no_match "at .*com\.vodhanel\." "$WORK_DIR/$phase.log"
+    check "$phase: no watchdog dump" no_match "The server has not responded for" "$WORK_DIR/$phase.log"
 done
 check "phase2: no dispatcher watchdog restart" no_match "Activity timeout for job queue" "$WORK_DIR/phase2.log"
 # Postal recreates its NPCs on every start; Citizens must not save them (saved copies came back as idle
@@ -400,6 +409,9 @@ check "phase10: dispatcher started" grep -q "VA_Postal started" "$WORK_DIR/phase
 check "phase10: /tlist lists the office and address as server-owned" grep -qE "Home[.]+ +server" <(plain phase10)
 check "phase11: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase11.log"
 check "phase11: no NullPointerException or Postal stack trace" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase11.log"
+check "phase12: no NPC errors or Postal stack traces after quick restarts" \
+    no_match "Exception creating NPC|NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase12.log"
+check "phase12: a start while running is refused" grep -q "Dispatcher is already running" "$WORK_DIR/phase12.log"
 
 echo
 echo "---- Postal output (phase 2) ----"

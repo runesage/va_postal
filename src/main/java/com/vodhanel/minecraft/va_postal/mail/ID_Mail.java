@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
@@ -53,9 +54,14 @@ public class ID_Mail {
         if (!C_Dispatcher.is_address_on_firstpass(stown, saddr)) {
             return;
         }
+        // The mailbox now: by the time this runs a dispatcher restart may have replaced the arrays.
+        final org.bukkit.inventory.Inventory inventory = VA_postal.wtr_inventory_address[id];
+        if (inventory == null) {
+            return;
+        }
         Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, new Runnable() {
             public void run() {
-                ListIterator<ItemStack> item_itr = VA_postal.wtr_inventory_address[id].iterator(1);
+                ListIterator<ItemStack> item_itr = inventory.iterator(1);
                 if (item_itr != null) {
                     int index = 0;
                     while (item_itr.hasNext()) {
@@ -385,7 +391,7 @@ public class ID_Mail {
             Player po_owner = C_Owner.get_owner_local_po(stown);
             if (po_owner != null) {
                 owner = po_owner;
-                sowner = owner.getDisplayName();
+                sowner = Text.legacy(owner.displayName());
             }
         }
         String[] pages = new String[]{Book.makeFirstLogPage(sworld, slocation_mod, "Postal_Local", sowner, owner)};
@@ -436,7 +442,7 @@ public class ID_Mail {
             Player addr_owner = C_Owner.get_owner_address(stown, saddr);
             if (addr_owner != null) {
                 owner = addr_owner;
-                sowner = owner.getDisplayName();
+                sowner = Text.legacy(owner.displayName());
             }
         }
 
@@ -475,7 +481,7 @@ public class ID_Mail {
             Player po_owner = C_Owner.get_owner_local_po(stown);
             if (po_owner != null) {
                 owner = po_owner;
-                sowner = owner.getDisplayName();
+                sowner = Text.legacy(owner.displayName());
             }
         }
         String[] pages = new String[1];
