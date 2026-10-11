@@ -44,7 +44,7 @@ proxy then only listens on this machine (127.0.0.1). The servers' own ports and 
 
 | Command | Does |
 |---|---|
-| `setup [--offline] [--op NAME] [--no-build]` | builds Postal, downloads Paper, the plugins and Velocity, starts a fresh MariaDB, builds the three worlds and surveys their routes |
+| `setup [--offline] [--op NAME] [--no-build] [--accept-eula]` | asks you to accept the Minecraft EULA (`--accept-eula` skips the question, for scripts), then builds Postal, downloads Paper, the plugins and Velocity, starts a fresh MariaDB, builds the three worlds and surveys their routes |
 | `start` | starts everything in the background and starts each server's dispatcher |
 | `stop` | stops the proxy, the servers and MariaDB (only the processes `start` recorded; data is kept) |
 | `status` | what's running, and on which ports |
