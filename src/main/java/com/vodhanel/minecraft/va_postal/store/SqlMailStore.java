@@ -572,9 +572,50 @@ public final class SqlMailStore implements MailStore {
         return out;
     }
 
+    /**
+     * Two servers publishing at once (typically starting together) can deadlock on MySQL/MariaDB: under REPEATABLE
+     * READ, each {@code DELETE ... WHERE server_id = ?} takes gap locks the other's inserts need. READ COMMITTED
+     * takes no gap locks here, which avoids most of it (safe: the directory is rebuilt whole each time), and a
+     * deadlock that still happens is retried, so only a publish that keeps failing counts as a failure.
+     */
     @Override
     public void publish_directory(List<DirectoryEntry> entries, long now) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                publish_directory_once(entries, now);
+                return;
+            } catch (StoreException e) {
+                if (attempt >= DEADLOCK_RETRIES || !is_deadlock(e.getCause())) {
+                    throw e;
+                }
+                try {
+                    Thread.sleep(20L + java.util.concurrent.ThreadLocalRandom.current().nextLong(80L));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+    }
+
+    private static final int DEADLOCK_RETRIES = 3;
+
+    /** A deadlock (MySQL/MariaDB error 1213, SQL state 40001): the transaction was rolled back and may be retried. */
+    static boolean is_deadlock(Throwable t) {
+        for (; t != null; t = t.getCause()) {
+            if (t instanceof SQLException sql && ("40001".equals(sql.getSQLState()) || sql.getErrorCode() == 1213)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void publish_directory_once(List<DirectoryEntry> entries, long now) {
         try (Connection c = source.getConnection()) {
+            int isolation = c.getTransactionIsolation();
+            if (dialect == Dialect.MYSQL) {
+                c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            }
             c.setAutoCommit(false);
             try {
                 try (PreparedStatement ps = c.prepareStatement("DELETE FROM directory_address WHERE server_id = ?")) {
@@ -619,6 +660,9 @@ public final class SqlMailStore implements MailStore {
                 throw e;
             } finally {
                 c.setAutoCommit(true);
+                if (dialect == Dialect.MYSQL) {
+                    c.setTransactionIsolation(isolation); // pooled connections go back as they came
+                }
             }
         } catch (SQLException e) {
             throw new StoreException("Could not publish the directory", e);
