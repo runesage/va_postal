@@ -701,6 +701,7 @@ public class Cmd_static {
             Book new_book = new Book(town, address, existing_pages);
             ItemStack new_stack = HoldTag.carry(stack, MailIds.carry(stack, new_book.generateItemStack()));
             player.getInventory().setItemInMainHand(new_stack);
+            Letters.attention_changed(new_stack, player.getUniqueId(), original);
             Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
             Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(address) + " &7&otown of &9&o" + Util.df(town));
             Util.pinform(player, "&7&oAttention: &9&o" + attention);

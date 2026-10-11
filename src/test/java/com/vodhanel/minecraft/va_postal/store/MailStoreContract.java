@@ -200,6 +200,26 @@ abstract class MailStoreContract {
     }
 
     @Test
+    void setAttentionRewritesTheRecordAndIsVersionChecked() {
+        MailRecord l = letter();
+        UUID who = UUID.randomUUID();
+        byte[] text = "new page one".getBytes(StandardCharsets.UTF_8);
+        MailRecord changed = store.set_attention(l, who, text, Actor.player(l.sender), "attention changed");
+        assertEquals(who, changed.attention);
+        assertArrayEquals(text, changed.payload);
+        assertEquals(MailState.POSTED, changed.state);
+        assertEquals(l.version + 1, changed.version);
+        assertEquals(2, store.history(l.id).size());
+        assertThrows(ConflictException.class, () -> store.set_attention(l, null, null, Actor.system("test"), "stale"));
+
+        // Back to "[Resident]" (null) with the text kept.
+        MailRecord reset = store.set_attention(changed, null, null, Actor.system("test"), "reset");
+        assertNull(reset.attention);
+        assertArrayEquals(text, reset.payload);
+        assertEquals(changed.version + 1, reset.version);
+    }
+
+    @Test
     void acceptingADeliveredParcelHappensOnce() {
         MailRecord p = store.create(MailRecord.new_parcel(UUID.randomUUID(), "main", "Testville", "Testville", "Home",
                 UUID.randomUUID(), null, new byte[0], 4440, 1L, null), Actor.system("test"), "packaged");
