@@ -509,11 +509,9 @@ public class ID_Mail {
                 }
                 if (book.is_valid()) {
                     try {
-                        String mail_address = book.getAuthor().toLowerCase().trim();
-                        String this_address = VA_postal.wtr_address[id].toLowerCase().trim();
                         String[] spage = book.getPages();
-                        if ((spage[0].contains("[not-processed]")) &&
-                                (!mail_address.equals(this_address))) {
+                        if ((spage[0].contains("[not-processed]")) && !Book.addressed_to(book.getTitle(),
+                                book.getAuthor(), VA_postal.wtr_poffice[id], VA_postal.wtr_address[id])) {
                             Util.dinform("Found outgoing mail");
                             return true;
                         }
@@ -546,7 +544,6 @@ public class ID_Mail {
                 Book book = new Book(ind_item);
                 if (book.is_valid()) {
                     try {
-                        String mail_address = book.getAuthor().toLowerCase().trim();
                         String mail_title = book.getTitle().toLowerCase().trim();
 
                         if (mail_title.contains("[distribution]")) {
@@ -558,11 +555,11 @@ public class ID_Mail {
                             }
                         }
 
-                        String this_address = VA_postal.wtr_address[id].toLowerCase().trim();
                         String page1 = book.getPages()[0].toLowerCase();
                         if (page1.contains("[not-processed]")) {
                             mail_found = true;
-                            if (!mail_address.equals(this_address)) {
+                            if (!Book.addressed_to(book.getTitle(), book.getAuthor(), VA_postal.wtr_poffice[id],
+                                    VA_postal.wtr_address[id])) {
                                 // The first office to pick mail up is its sending office (postage escrow).
                                 if (!P_Economy.postage_collected(ind_item, VA_postal.wtr_poffice[id])) {
                                     continue;
