@@ -251,6 +251,13 @@ PY
 run_server "$WORK_DIR/phase11.log" "postal start" "sleep:10" "postal stop" "sleep:3"
 cp "$WORK_DIR/config.full.yml" "$CONFIG"
 
+# Phase 12: stop and start the dispatcher again within its 10 s stop clean-up. The old clean-up used to fire
+# into the new run, deleting its postmen and nulling their array ("Exception creating NPC ... wtr_npc is null").
+echo "== Phase 12: quick stop/start cycles, and a start while running"
+run_server "$WORK_DIR/phase12.log" "postal start" "sleep:15" \
+    "postal stop" "sleep:1" "postal start" "sleep:1" "postal stop" "sleep:1" "postal start" "sleep:1" \
+    "postal start" "sleep:25" "postal stop" "sleep:12"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -400,6 +407,9 @@ check "phase10: dispatcher started" grep -q "VA_Postal started" "$WORK_DIR/phase
 check "phase10: /tlist lists the office and address as server-owned" grep -qE "Home[.]+ +server" <(plain phase10)
 check "phase11: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase11.log"
 check "phase11: no NullPointerException or Postal stack trace" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase11.log"
+check "phase12: no NPC errors or Postal stack traces after quick restarts" \
+    no_match "Exception creating NPC|NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase12.log"
+check "phase12: a start while running is refused" grep -q "Dispatcher is already running" "$WORK_DIR/phase12.log"
 
 echo
 echo "---- Postal output (phase 2) ----"

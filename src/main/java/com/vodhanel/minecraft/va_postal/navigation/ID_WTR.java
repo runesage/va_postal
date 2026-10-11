@@ -323,6 +323,12 @@ public class ID_WTR {
         }
     }
 
+    /** True while slot id still holds this spawned NPC (a restart replaces the arrays and the NPCs). */
+    static boolean same_postman(int id, net.citizensnpcs.api.npc.NPC npc) {
+        return npc != null && VA_postal.wtr_npc != null && id >= 0 && id < VA_postal.wtr_npc.length
+                && VA_postal.wtr_npc[id] == npc && npc.isSpawned();
+    }
+
     public static void safe_stop(int id) {
         if ((VA_postal.wtr_controller[id] != null) &&
                 (!VA_postal.wtr_controller[id].isPaused())) {
@@ -654,12 +660,18 @@ public class ID_WTR {
                 walk_to(id, f_door_loc, 0.5F);
             }
         } else {
+            // Each step checks it's still the same postman: a dispatcher restart in between replaces them.
+            final net.citizensnpcs.api.npc.NPC npc = VA_postal.wtr_npc[id];
             VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
+                if (!same_postman(id, npc)) return;
                 ID_WTR.walk_to(id, f_door_loc, 0.5F);
                 VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
-                    faceLocation(VA_postal.wtr_npc[id].getEntity(), f_target);
+                    if (!same_postman(id, npc)) return;
+                    faceLocation(npc.getEntity(), f_target);
                     if (VA_postal.lookclose_on_route) {
-                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true), 40L);
+                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
+                            if (same_postman(id, npc)) npc.getOrAddTrait(LookClose.class).lookClose(true);
+                        }, 40L);
                     }
                 }, 20L);
             }, 60L);
