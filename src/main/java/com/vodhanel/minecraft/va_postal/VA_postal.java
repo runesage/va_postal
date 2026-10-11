@@ -273,6 +273,7 @@ public class VA_postal extends JavaPlugin {
         if (plugin == null) {
             return;
         }
+        com.vodhanel.minecraft.va_postal.config.C_Dispatcher.cancel_region_loads();
         for (org.bukkit.World world : Bukkit.getWorlds()) {
             world.removePluginChunkTickets(plugin);
         }
