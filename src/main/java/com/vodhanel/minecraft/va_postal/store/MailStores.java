@@ -91,7 +91,9 @@ public final class MailStores {
             }
             MailStore store = new SqlMailStore(ds, server_id, ds, dialect);
             stats = new StoreStats();
-            active = StoreStats.timed(store, stats, main_thread, log::warning);
+            // The stats wrap the ordering, so a main-thread call's time includes any wait behind queued writes.
+            StoreQueue.start(log::warning);
+            active = StoreStats.timed(StoreQueue.ordered(store, main_thread), stats, main_thread, log::warning);
             log.info("Mail store: " + description + ", schema " + active.schema_version() + ", server id '"
                     + active.server_id() + "'.");
         } catch (RuntimeException | LinkageError | java.sql.SQLException e) {
@@ -103,6 +105,7 @@ public final class MailStores {
     }
 
     public static synchronized void close() {
+        StoreQueue.stop(); // queued writes first
         if (active != null) {
             active.close();
             active = null;
