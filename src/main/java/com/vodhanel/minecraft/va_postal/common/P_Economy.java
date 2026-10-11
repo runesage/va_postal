@@ -280,8 +280,20 @@ public class P_Economy {
      * held for it (re-addressing is free) or there's no economy.
      */
     public static double postage_to_hold(ItemStack item, boolean parcel) {
+        return postage_to_hold(item, parcel, false);
+    }
+
+    /** {@code network}: a letter for another server, which holds the network rate. */
+    public static double postage_to_hold(ItemStack item, boolean parcel, boolean network) {
         if (!VA_postal.economy_configured || active_hold(item) != null) {
             return 0.0D;
+        }
+        return held_price(parcel, network);
+    }
+
+    private static double held_price(boolean parcel, boolean network) {
+        if (network && !parcel) {
+            return C_Economy.network_postage_price();
         }
         return parcel ? C_Economy.ship_price(false) : C_Economy.postage_price(false);
     }
@@ -299,15 +311,37 @@ public class P_Economy {
      * @return {@code new_item} tagged with its hold, or null if the sender couldn't pay
      */
     public static ItemStack hold_postage(Player player, ItemStack old_item, ItemStack new_item, boolean parcel) {
+        return hold_postage(player, old_item, new_item, parcel, false);
+    }
+
+    /**
+     * {@code network}: a letter for another server holds the network rate. Re-addressing keeps an existing hold
+     * unless it's too small for the network rate, when the difference is taken too.
+     */
+    public static ItemStack hold_postage(Player player, ItemStack old_item, ItemStack new_item, boolean parcel, boolean network) {
         if (!VA_postal.economy_configured) {
             return new_item;
         }
         Hold existing = active_hold(old_item);
         if (existing != null) {
+            double short_by = network ? held_price(false, true) - existing.base : 0.0D;
+            if (short_by > 0.005D) {
+                if (!withdraw_from_player(player, short_by)) {
+                    Util.pinform(player, "&f&oYou don't have enough money to cover postage to another server ("
+                            + ef(short_by) + " more).");
+                    return null;
+                }
+                deposit_to_central(short_by);
+                EconomyState.record(EconomyState.Flow.POSTAGE, short_by);
+                existing.base += short_by;
+                EconomyState.touch_hold();
+                Util.pinform(player, "&6Postage to another server costs " + ef(short_by) + " more; thank you for your payment.");
+                return HoldTag.write(new_item, existing.id);
+            }
             Util.pinform(player, "&6There is no charge for re-addressing.");
             return HoldTag.write(new_item, existing.id);
         }
-        double price = parcel ? C_Economy.ship_price(false) : C_Economy.postage_price(false);
+        double price = held_price(parcel, network);
         if (price <= 0.0D) {
             return HoldTag.write(new_item, null);
         }
@@ -319,7 +353,8 @@ public class P_Economy {
         EconomyState.record(parcel ? EconomyState.Flow.SHIPPING : EconomyState.Flow.POSTAGE, price);
         Hold hold = new Hold(UUID.randomUUID().toString(), player.getUniqueId(), parcel, price, 0.0D, now(), null);
         EconomyState.put_hold(hold);
-        Util.pinform(player, "&6Thank you for your payment. &7&o(Held until delivery; local mail gets the difference back.)");
+        Util.pinform(player, network ? "&6Thank you for your payment."
+                : "&6Thank you for your payment. &7&o(Held until delivery; local mail gets the difference back.)");
         return HoldTag.write(new_item, hold.id);
     }
 
@@ -408,14 +443,38 @@ public class P_Economy {
         }
     }
 
+    /**
+     * A letter is leaving this server for another one: its postage is settled now, here, because no money crosses
+     * servers. The origin keeps all of it, split between Central and the sending office as for local mail.
+     */
+    public static void settle_network_postage(String hold_id, String origin_office) {
+        if (!VA_postal.economy_configured || hold_id == null) {
+            return;
+        }
+        Hold hold = EconomyState.remove_hold(hold_id);
+        if (hold == null) {
+            return;
+        }
+        String origin = hold.origin != null ? hold.origin : origin_office;
+        Postage.Split split = Postage.settle(hold.base, hold.cod, hold.base, true);
+        if (origin != null) {
+            pay_office_from_central(origin, split.origin);
+        }
+    }
+
     /** Refunds a hold in full and closes it: a parcel cancelled by its sender before it was posted. */
     public static void cancel_hold(String hold_id) {
+        cancel_hold(hold_id, null);
+    }
+
+    /** {@code message}: what the payer is told (null: a cancelled parcel). */
+    public static void cancel_hold(String hold_id, String message) {
         if (!VA_postal.economy_configured || hold_id == null) {
             return;
         }
         Hold hold = EconomyState.remove_hold(hold_id);
         if (hold != null) {
-            refund_postage(hold.payer, hold.total(), "&6Postal refunded " + ef(hold.total())
+            refund_postage(hold.payer, hold.total(), message != null ? message : "&6Postal refunded " + ef(hold.total())
                     + " of postage for the parcel you cancelled.");
         }
     }

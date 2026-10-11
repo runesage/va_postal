@@ -40,6 +40,15 @@ public final class Letters {
      */
     public static ItemStack posted(ItemStack book, UUID sender, String origin_office, String dest_office,
                                    String dest_address, UUID attention) {
+        return posted(book, sender, origin_office, null, dest_office, dest_address, attention);
+    }
+
+    /**
+     * {@code dest_server}: the server the destination office is on (null: this one). A letter for another server
+     * must be tracked to travel; the caller checks the returned book carries a mail id.
+     */
+    public static ItemStack posted(ItemStack book, UUID sender, String origin_office, String dest_server, String dest_office,
+                                   String dest_address, UUID attention) {
         MailStore store = store();
         if (store == null || book == null) {
             return book;
@@ -54,10 +63,11 @@ public final class Letters {
                 });
             }
             UUID id = UUID.randomUUID();
-            store.create(MailRecord.new_letter(id, store.server_id(), origin_office, dest_office, dest_address,
+            store.create(MailRecord.new_letter(id, store.server_id(), dest_server == null ? store.server_id() : dest_server,
+                    origin_office, dest_office, dest_address,
                     sender, attention, payload(book), data_version(), System.currentTimeMillis(), HoldTag.read(book)),
                     sender == null ? Actor.system("console") : Actor.player(sender),
-                    "addressed to " + dest_office + ", " + dest_address);
+                    "addressed to " + (dest_server == null ? "" : dest_server + ":") + dest_office + ", " + dest_address);
             return MailIds.write(book, id);
         } catch (StoreException | ConflictException e) {
             Util.cinform("[Postal] Could not record a letter; it will travel untracked: " + e.getMessage());
@@ -315,7 +325,10 @@ public final class Letters {
     public static ItemStack materialise(MailRecord record) {
         ItemStack item = record.kind == com.vodhanel.minecraft.va_postal.store.MailKind.PARCEL
                 ? Parcels.label(record) : letter_book(record);
-        return HoldTag.write(MailIds.write(item, record.id), record.hold_id);
+        // A letter from another server carries no hold here: its postage was settled where it was posted.
+        MailStore store = store();
+        boolean arrived = record.networked() && store != null && store.server_id().equals(record.dest_server);
+        return HoldTag.write(MailIds.write(item, record.id), arrived ? null : record.hold_id);
     }
 
     /** The postage hold recorded for this book's mail, or null (for books whose hold tag was lost). */
@@ -339,7 +352,13 @@ public final class Letters {
         for (int i = 0; i < pages.length; i++) {
             pages[i] = arr.get(i).getAsString();
         }
-        return new Book(o.get("title").getAsString(), o.get("author").getAsString(), pages).generateItemStack();
+        String title = o.get("title").getAsString();
+        MailStore store = store();
+        if (record.networked() && store != null && store.server_id().equals(record.dest_server)) {
+            // Its title routes it: "server:office" on the way out, the office's own name once it has arrived.
+            title = Util.df(record.dest_office);
+        }
+        return new Book(title, o.get("author").getAsString(), pages).generateItemStack();
     }
 
     @SuppressWarnings("deprecation")

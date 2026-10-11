@@ -53,6 +53,12 @@ public class Book {
     }
 
     public static String makeFirstMailPage(String town, String address, String attention, String mf1, String mf2, String author, String title, String fdate, Player Author, Player Attention) {
+        return makeFirstMailPageById(town, address, attention, mf1, mf2, author, title, fdate,
+                Author != null ? Author.getUniqueId() : null, Attention != null ? Attention.getUniqueId() : null);
+    }
+
+    /** By UUID, so mail can be addressed to a player who is offline or on another server. */
+    public static String makeFirstMailPageById(String town, String address, String attention, String mf1, String mf2, String author, String title, String fdate, java.util.UUID Author, java.util.UUID Attention) {
         String spage = "";
         spage += "§7§oTo:\n";
         spage += "§c  " + town + "\n";
@@ -67,8 +73,8 @@ public class Book {
         spage += "§8  " + title + "\n";
         spage += "\n";
         spage += "§7" + fdate + "\n";
-        spage += (Author != null ? Author.getUniqueId() : "") + "\n";
-        spage += (Attention != null ? Attention.getUniqueId() : "") + "\n";
+        spage += (Author != null ? Author.toString() : "") + "\n";
+        spage += (Attention != null ? Attention.toString() : "") + "\n";
         return spage;
     }
 
