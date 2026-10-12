@@ -258,6 +258,13 @@ run_server "$WORK_DIR/phase12.log" "postal start" "sleep:15" \
     "postal stop" "sleep:1" "postal start" "sleep:1" "postal stop" "sleep:1" "postal start" "sleep:1" \
     "postal start" "sleep:25" "postal stop" "sleep:12"
 
+# Phase 13: a mailbox chest that's gone (broken by a player, blown up, replaced) when the postman comes. Postal
+# used to cast the block to a chest before looking at it, so instead of "does not have a mail chest" the route
+# threw ClassCastException. Home's chest goes, a route runs, and the chest comes back for later runs.
+echo "== Phase 13: a mailbox chest that's been removed"
+run_server "$WORK_DIR/phase13.log" "setblock 40 -60 0 minecraft:air" "postal start" "sleep:150" "postal stop" "sleep:5" \
+    "setblock 40 -60 0 minecraft:chest[facing=south]" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -412,6 +419,10 @@ check "phase11: no NullPointerException or Postal stack trace" no_match "NullPoi
 check "phase12: no NPC errors or Postal stack traces after quick restarts" \
     no_match "Exception creating NPC|NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase12.log"
 check "phase12: a start while running is refused" grep -q "Dispatcher is already running" "$WORK_DIR/phase12.log"
+check "phase13: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase13.log"
+check "phase13: no exception or stack trace for a missing mailbox chest" \
+    no_match "ClassCastException|NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase13.log"
+check "phase13: Postal says Home has no mail chest" grep -qi "home does not have a mail chest" <(plain phase13)
 
 echo
 echo "---- Postal output (phase 2) ----"
