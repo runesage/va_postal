@@ -11,6 +11,11 @@ VAULT_URL="https://cdn.modrinth.com/data/ayRaM8J7/versions/qZgRzoYs/VaultUnlocke
 ESSENTIALS_URL="https://cdn.modrinth.com/data/hXiIvTyT/versions/nY6VN1XH/EssentialsX-2.22.0.jar"
 # The proxy for dev/network (three servers behind Velocity). Velocity 4.2.0 needs Java 25.
 VELOCITY_URL="https://fill-data.papermc.io/v1/objects/35a5596a5468a035d8a32c8de5ebb0dc6b8d8f0cc3ff5169d514aca762af8aa8/velocity-4.2.0-30.jar"
+# The Gate (Stargate travel between servers; dev/network setup --with-gate). Closed source, so pinned by checksum:
+# Spiget only serves the latest upload, and a new one fails the check instead of running unseen code.
+THEGATE_URL="https://api.spiget.org/v2/resources/70247/download"
+THEGATE_VERSION="0.2.8mc1.21.1"
+THEGATE_SHA256="ead0654d579b2d656d7fc6bae5fe8e3c6ee1eb1e67d091837981d4d7e7484dc6"
 
 # Office account UUIDs Postal derives (see OfficeAccounts / OfficeAccountsTest).
 CENTRAL_ACCOUNT="2ca1fae9-c175-239e-9eb2-df89430f098b"

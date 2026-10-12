@@ -7,8 +7,9 @@
 #   dims   one network over three dimensions (dev/towns/build_dims.py): Central and Brookfield in the
 #          Overworld, Cinderholm in the Nether, Voidreach in the End; every route surveyed
 #
-#   dev/network/network.sh setup [--offline] [--op NAME] [--no-build] [--accept-eula]
+#   dev/network/network.sh setup [--offline] [--op NAME] [--no-build] [--accept-eula] [--with-gate]
 #                                         download everything, build the three worlds, survey their routes
+#                                         (--with-gate: also The Gate, a Stargate on each server; see README)
 #   dev/network/network.sh start          start MariaDB, the three servers and the proxy (in the background)
 #   dev/network/network.sh stop           stop them (only the processes this script started)
 #   dev/network/network.sh status         what's running, and where to join
@@ -19,6 +20,8 @@
 #                                         dimensions, wait for them, and report what was delivered
 #   dev/network/network.sh player         a headless player moves between the servers through the proxy with a
 #                                         letter it posted (needs setup --offline)
+#   dev/network/network.sh gate           checks The Gate on each server: Bungee mode, the shared database, the
+#                                         three gates (needs setup --with-gate)
 #   dev/network/network.sh reset          stop everything and delete the servers and the MariaDB container
 #                                         (downloads and settings such as --op are kept)
 #
@@ -53,6 +56,11 @@ DB_PORT_LOCAL=3307
 DEV_BALANCE="${DEV_BALANCE:-100000}"
 BIG_TOWNS="${BIG_TOWNS:-12}"
 BIG_ADDRESSES="${BIG_ADDRESSES:-20}"
+GATE_FLAG="$NET_DIR/with-gate"      # setup --with-gate was given
+# One gate per server, south-west of Central (clear of the towns and of small's hand-made routes); addresses are
+# 7 of The Gate's 16 symbols (0-9, a-f), easy to dial. It keeps its tables in Postal's database, prefixed thegate_.
+declare -A GATE_ADDRESS=([big]=1111111 [small]=2222222 [dims]=3333333)
+GATE_AT="-30 -60 30"
 
 die() { echo "error: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
@@ -223,6 +231,7 @@ install_backend() { # server
     rm -rf "${d:?}"
     install_server "$CACHE" "$d"
     cp "$POSTAL_JAR" "$d/plugins/Postal.jar"
+    if with_gate; then cp "$CACHE/TheGate.jar" "$d/plugins/TheGate.jar"; fi
     echo "eula=true" > "$d/eula.txt"
     set_props "$d/server.properties" "server-port=${PORT[$s]}" "online-mode=false" "motd=Postal network: $s" \
         'level-type=minecraft\:flat' generate-structures=false gamemode=creative difficulty=peaceful \
@@ -273,6 +282,40 @@ configure_backend() { # server online-mode(true|false)
     if [ -f "$d/plugins/Essentials/config.yml" ]; then
         sed -i.bak "s/^starting-balance: .*/starting-balance: $DEV_BALANCE/" "$d/plugins/Essentials/config.yml"
     fi
+    if with_gate; then
+        local gate="$d/plugins/The_Gate/config.yml"
+        [ -f "$gate" ] || die "$s didn't write The Gate's config; see $NET_DIR/$s-build.log"
+        # Bungee mode: every server shares the gates through MySQL, and sends players on through the proxy's
+        # BungeeCord channel (Velocity answers it: bungee-plugin-message-channel). ServerName is Velocity's name.
+        set_yaml "$gate" \
+            PluginSettings.Savefile=MYSQL "PluginSettings.Username=${MYSQL_USER:-postal}" \
+            "PluginSettings.Password=${MYSQL_PASSWORD:-postal}" \
+            "PluginSettings.Path=//$(db_host):$(db_port)/${MYSQL_DATABASE:-postal_net}" \
+            PluginSettings.TableGates=thegate_gates PluginSettings.TableCoOwner=thegate_coowner \
+            PluginSettings.TablePlayer=thegate_player PluginSettings.GateCommands=thegate_commands \
+            PluginSettings.AutoSyncDatabase=200 \
+            BungeeSettings.UseBungee=true "BungeeSettings.ServerName=$s"
+    fi
+}
+
+with_gate() { [ -f "$GATE_FLAG" ]; }
+
+fetch_gate() { # The Gate into the cache, checked against its pinned checksum
+    fetch "$THEGATE_URL" "$CACHE/TheGate.jar"
+    local sum; sum="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$CACHE/TheGate.jar")"
+    if [ "$sum" != "$THEGATE_SHA256" ]; then
+        rm -f "$CACHE/TheGate.jar"
+        die "The Gate's download isn't the pinned $THEGATE_VERSION (sha256 $sum); a new upload needs checking before THEGATE_SHA256 in ci/lib.sh is updated"
+    fi
+}
+
+create_gate() { # server: builds its gate from the console, before the routes are surveyed so they go round it
+    local s="$1"
+    boot "$s" "$NET_DIR/$s-gate.log" 600 "thegate create ${GATE_ADDRESS[$s]} world $GATE_AT 0" "sleep:5" \
+        "thegate syncdb" "sleep:5"
+    grep -aq "Gate: ${GATE_ADDRESS[$s]} created" "$NET_DIR/$s-gate.log" \
+        || die "$s: The Gate didn't create gate ${GATE_ADDRESS[$s]}; see $NET_DIR/$s-gate.log"
+    info "$s: gate ${GATE_ADDRESS[$s]} built at $GATE_AT"
 }
 
 write_proxy() { # online-mode(true|false) bind-address
@@ -359,13 +402,14 @@ survey_and_wait() { # server: surveys every route on its second boot
 }
 
 cmd_setup() {
-    local offline=0 op="" build=1 accept_eula=0
+    local offline=0 op="" build=1 accept_eula=0 gate=0
     while [ $# -gt 0 ]; do
         case "$1" in
             --offline) offline=1 ;;
             --op) shift; op="${1:?--op needs a player name}" ;;
             --no-build) build=0 ;;
             --accept-eula) accept_eula=1 ;;
+            --with-gate) gate=1 ;;
             *) die "unknown option for setup: $1" ;;
         esac
         shift
@@ -395,6 +439,11 @@ cmd_setup() {
     info "Downloading Paper $PAPER_VERSION, the plugins and Velocity (cached in $CACHE)"
     download_server_jars "$CACHE"
     fetch "$VELOCITY_URL" "$CACHE/velocity.jar"
+    rm -f "$GATE_FLAG"
+    if [ "$gate" -eq 1 ]; then
+        fetch_gate
+        touch "$GATE_FLAG"
+    fi
     [ -s "$NET_DIR/rcon-password" ] || python3 -c 'import secrets; print(secrets.token_urlsafe(24), end="")' > "$NET_DIR/rcon-password"
     echo "${op}" > "$NET_DIR/op-player"
     local online=true
@@ -426,6 +475,9 @@ cmd_setup() {
     done
     wait
     for s in "${SERVERS[@]}"; do configure_backend "$s" "$online"; done
+    if with_gate; then
+        for s in "${SERVERS[@]}"; do create_gate "$s"; done
+    fi
     survey_and_wait big &
     survey_and_wait dims &
     wait
@@ -547,6 +599,7 @@ case "${1:-}" in
     log) shift; cmd_log "$@" ;;
     check) shift; exec "$REPO/dev/network/check.sh" "$@" ;;
     player) shift; exec "$REPO/dev/network/player.sh" "$@" ;;
+    gate) shift; exec "$REPO/dev/network/gate.sh" "$@" ;;
     reset) shift; cmd_reset "$@" ;;
     -h|--help|help|"") usage 0 ;;
     *) echo "unknown command: $1" >&2; usage 1 ;;
