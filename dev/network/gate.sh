@@ -31,8 +31,9 @@ since() { tail -n +"$2" "$(log_of "$1")" | sed "s/${ESC}\[[0-9;]*m//g"; }   # se
 
 fail=0
 check() { local desc="$1"; shift; if "$@"; then echo "PASS: $desc"; else echo "FAIL: $desc"; fail=1; fi; }
-logged() { since "$1" 1 | grep -aqE "$2"; }       # server regex: anywhere in this run's log
-said() { echo "$3" | grep -aqE "$2"; }            # server regex output
+# grep -c, not -q: -q stops reading at the first match, and with pipefail the writer's SIGPIPE would fail the check.
+logged() { [ "$(since "$1" 1 | grep -acE "$2")" -gt 0 ]; }    # server regex: anywhere in this run's log
+said() { [ "$(echo "$3" | grep -acE "$2")" -gt 0 ]; }         # server regex output
 
 for s in big small dims; do
     echo "== $s"
@@ -48,9 +49,11 @@ for s in big small dims; do
     check "server name $s" said "$s" "Server name: $s\b" "$out"
     check "saving to MySQL" said "$s" "Used save format: MYSQL" "$out"
     count="$(echo "$out" | sed -nE 's/.*Gate count: ([0-9]+\/[0-9]+).*/\1/p' | tail -1)"
-    check "all three gates known (gate count $count)" said "$s" "Gate count: 3/3" "$out"
-    traces="$(since "$s" 1 | grep -acE "at thegate\." || true)"
-    check "no The Gate stack traces ($traces lines)" test "$traces" -eq 0
+    # "Gate count: here/network": its own gate, out of the three.
+    check "its gate, and all three on the network (gate count $count)" said "$s" "Gate count: 1/3" "$out"
+    # Paper prints its frames as "at TheGate.jar//thegate.main...", and an event it threw on as "Could not pass event".
+    traces="$(since "$s" 1 | grep -acE "TheGate\.jar//|Could not pass event .* to The_Gate|Error occurred while enabling The_Gate" || true)"
+    check "no The Gate errors ($traces lines; players joining included)" test "$traces" -eq 0
 done
 
 echo

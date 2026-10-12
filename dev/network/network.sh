@@ -198,7 +198,8 @@ PY
 }
 
 # boot <server> <log> <timeout> <command>...: runs a server in the foreground, feeds it console commands
-# once it's up ("sleep:N" waits, "until:REGEX:COUNT" waits until the log has COUNT matching lines), then stops it.
+# once it's up ("sleep:N" waits, "until:REGEX:COUNT" waits until the log has COUNT matching lines, "sh:CMD" runs a
+# shell command here instead), then stops it.
 boot() {
     local s="$1" log="$2" limit="$3"; shift 3
     local d; d="$(server_dir "$s")"
@@ -219,6 +220,7 @@ boot() {
                         [ "$(grep -acE "$regex" "$d/logs/latest.log" 2>/dev/null || true)" -ge "$count" ] && break
                         sleep 2
                     done ;;
+                sh:*) eval "${cmd#sh:}" >&2 ;;
                 *) echo "$cmd"; sleep 1 ;;
             esac
         done
@@ -309,12 +311,31 @@ fetch_gate() { # The Gate into the cache, checked against its pinned checksum
     fi
 }
 
+db_sql() { # statement: runs it on the network's database
+    local db="${MYSQL_DATABASE:-postal_net}" user="${MYSQL_USER:-postal}" pass="${MYSQL_PASSWORD:-postal}"
+    if [ -z "${MYSQL_HOST:-}" ]; then
+        docker exec "$DB_CONTAINER" mariadb "-u$user" "-p$pass" "$db" -e "$1"
+    elif command -v mariadb >/dev/null; then
+        mariadb -h "$MYSQL_HOST" -P "$(db_port)" "-u$user" "-p$pass" "$db" -e "$1"
+    elif command -v mysql >/dev/null; then
+        mysql -h "$MYSQL_HOST" -P "$(db_port)" "-u$user" "-p$pass" "$db" -e "$1"
+    else
+        die "--with-gate with MYSQL_HOST needs the mariadb or mysql client"
+    fi
+}
+
 create_gate() { # server: builds its gate from the console, before the routes are surveyed so they go round it
     local s="$1"
-    boot "$s" "$NET_DIR/$s-gate.log" 600 "thegate create ${GATE_ADDRESS[$s]} world $GATE_AT 0" "sleep:5" \
-        "thegate syncdb" "sleep:5"
+    # The Gate only INSERTs a gate made in its GUI; one made by /thegate create is only ever UPDATEd, which
+    # changes nothing, so it's gone at the next restart. A placeholder row (once its tables exist: it makes
+    # them when it enables) gives the UPDATE a row to fill in.
+    boot "$s" "$NET_DIR/$s-gate.log" 600 \
+        "sh:db_sql \"INSERT IGNORE INTO thegate_gates(address, server_name) VALUES ('${GATE_ADDRESS[$s]}', '$s')\"" \
+        "thegate create ${GATE_ADDRESS[$s]} world $GATE_AT 0" "sleep:5" "thegate syncdb" "sleep:5"
     grep -aq "Gate: ${GATE_ADDRESS[$s]} created" "$NET_DIR/$s-gate.log" \
         || die "$s: The Gate didn't create gate ${GATE_ADDRESS[$s]}; see $NET_DIR/$s-gate.log"
+    [ "$(db_sql "SELECT COUNT(*) FROM thegate_gates WHERE address = '${GATE_ADDRESS[$s]}' AND world IS NOT NULL" | tail -1)" = 1 ] \
+        || die "$s: gate ${GATE_ADDRESS[$s]} didn't reach the database; see $NET_DIR/$s-gate.log"
     info "$s: gate ${GATE_ADDRESS[$s]} built at $GATE_AT"
 }
 

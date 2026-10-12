@@ -123,9 +123,23 @@ it; leave out `--with-gate` and nothing of it is installed.
 `network.sh gate` checks each server: The Gate enabled, its database connected, Bungee mode under the server's
 Velocity name, saving to MySQL, all three gates known, no stack traces. It ends with the dialing steps.
 
-On Paper 26.1.2 The Gate warns at startup that it supports only 1.21.1, then runs. It reaches into Minecraft's
-internals, which change between versions, so the animations or the teleport itself may misbehave on this
-version even though everything above passes: dialing and stepping through are the parts to try in game.
+**Status on Paper 26.1.2: broken where players are involved.** Tested with The Gate 0.2.8 (1.21.1):
+- works: it enables, connects to MySQL in Bungee mode, builds gates from the console and shares them (each
+  server reports `Gate count: 1/3`);
+- fails: every player join throws `NoClassDefFoundError: net/minecraft/world/level/World` in
+  `TheGateMain.onPlayerJoin`. Its packet helper (EasyPackage_API, ~400 lines) builds 1.21-era packets from
+  Minecraft's internal classes, which 26.1 renamed. Gates are drawn only with those packets, so they're invisible,
+  and the rest of the join handler, including placing a player at the gate they arrived through from another
+  server, never runs.
+
+`network.sh gate` reports this (its "no The Gate errors" check fails once a player has joined). The source is now
+public ([EndMy5uffering/TheGate](https://github.com/EndMy5uffering/TheGate), targeting 1.21.4) but has no license
+yet. Porting the packet helper to the Bukkit API would fix it for good, but publishing a modified build needs a
+license from the authors.
+
+Setup also works around a bug in The Gate: in MySQL mode it only INSERTs gates made in its GUI, so a gate made with
+`/thegate create` is only ever UPDATEd and is lost at the next restart. Setup gives each gate a placeholder row
+first.
 
 Dialing (only a player can: The Gate dials from a GUI and has no dial command):
 1. Go to the gate: `/tp @s -30 -60 26` on any server.
