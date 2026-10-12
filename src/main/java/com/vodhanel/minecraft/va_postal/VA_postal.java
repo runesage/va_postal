@@ -19,7 +19,6 @@ import net.citizensnpcs.api.ai.BehaviorController;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.api.npc.NPCRegistry;
-import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -31,7 +30,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
-import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Score;
@@ -160,7 +158,6 @@ public class VA_postal extends JavaPlugin {
     public static Inventory central_po_inventory = null;
     public static boolean central_po_log_book_check = false;
     public static int check_new_mail_secs = 0;
-    public static Permission perms = null;
     public static boolean private_mailboxes = false;
     public static boolean strict_door_nav = true;
     public static boolean debug = false;
@@ -329,7 +326,6 @@ public class VA_postal extends JavaPlugin {
         RouteMngr.npc_delete_all(true);
         wtr_stuck_npc = new Stuck_NPC();
         setupScoreboard();
-        setupPermissions();
         com.vodhanel.minecraft.va_postal.store.MailStores.open(getDataFolder(), new com.vodhanel.minecraft.va_postal.store.MailStores.Settings(
                 getConfig().getString(GetConfig.path_format("storage.type"), "sqlite"),
                 getConfig().getString(GetConfig.path_format("network.server_id"), "main"),
@@ -408,25 +404,6 @@ public class VA_postal extends JavaPlugin {
         com.vodhanel.minecraft.va_postal.store.MailStores.close();
     }
 
-    private synchronized void setupPermissions() {
-        try {
-            Class.forName("net.milkbowl.vault.permission.Permission");
-        } catch (ClassNotFoundException e) {
-            perms = null;
-            Util.cinform("[Postal] Using Bukkit for permissions.");
-            return;
-        }
-        RegisteredServiceProvider<Permission> rsp;
-        rsp = getServer().getServicesManager().getRegistration(Permission.class);
-        if (rsp == null || rsp.getProvider() == null) {
-            // Vault is installed but no permissions plugin registered with it.
-            perms = null;
-            Util.cinform("[Postal] No Vault permissions provider, using Bukkit for permissions.");
-            return;
-        }
-        perms = rsp.getProvider();
-        Util.cinform("[Postal] Using Vault for permissions hook.");
-    }
 
     private synchronized void setupEconomy() {
         economy_configured = false;

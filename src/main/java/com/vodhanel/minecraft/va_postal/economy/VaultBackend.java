@@ -11,7 +11,11 @@ import java.util.UUID;
  * Plain Vault (net.milkbowl.vault.economy). Uses player accounts only, never the bank API:
  * EssentialsX, XConomy and TheNewEconomy don't implement banks, and XConomy returns null from them.
  * Office accounts are player accounts held by an {@link NpcAccountHolder}.
+ * <p>
+ * VaultUnlocked's API marks this package deprecated in favour of its own (see {@link VaultUnlockedBackend}, which
+ * is preferred when present), but plain Vault only offers this one: kept on purpose for servers still on Vault.
  */
+@SuppressWarnings("deprecation")
 final class VaultBackend implements EconomyBackend {
     private final Economy econ;
 

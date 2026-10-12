@@ -37,24 +37,13 @@ public class Cmdexecutor implements CommandExecutor {
     public static boolean hasPermission(Player player, String node) {
         String splayer = player.getName().toLowerCase().trim();
 
-        if (VA_postal.perms != null) {
-            if (VA_postal.perms.has(player, "postal.admin")) {
-                Util.perm_inform("Vault: postal.admin, " + splayer);
-                return true;
-            }
-            if (VA_postal.perms.has(player, node)) {
-                Util.perm_inform("Vault: " + node + ", " + splayer);
-                return true;
-            }
-        } else {
-            if (player.hasPermission("postal.admin")) {
-                Util.perm_inform("Bukkit: postal.admin");
-                return true;
-            }
-            if (player.hasPermission(node)) {
-                Util.perm_inform("Bukkit: " + node + ", " + splayer);
-                return true;
-            }
+        if (player.hasPermission("postal.admin")) {
+            Util.perm_inform("Bukkit: postal.admin");
+            return true;
+        }
+        if (player.hasPermission(node)) {
+            Util.perm_inform("Bukkit: " + node + ", " + splayer);
+            return true;
         }
 
         if ((VA_postal.using_towny()) &&
@@ -68,24 +57,13 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public static boolean hasPermission_ext(Player player, String node, String stown, String saddress) {
-        if (VA_postal.perms != null) {
-            if (VA_postal.perms.has(player, "postal.admin")) {
-                Util.perm_inform("Vault: postal.admin, " + player);
-                return true;
-            }
-            if (VA_postal.perms.has(player, node)) {
-                Util.perm_inform("Vault: " + node + ", " + player);
-                return true;
-            }
-        } else {
-            if (player.hasPermission("postal.admin")) {
-                Util.perm_inform("Bukkit: postal.admin, " + player);
-                return true;
-            }
-            if (player.hasPermission(node)) {
-                Util.perm_inform("Bukkit: " + node + ", " + player);
-                return true;
-            }
+        if (player.hasPermission("postal.admin")) {
+            Util.perm_inform("Bukkit: postal.admin, " + player);
+            return true;
+        }
+        if (player.hasPermission(node)) {
+            Util.perm_inform("Bukkit: " + node + ", " + player);
+            return true;
         }
 
 
