@@ -57,6 +57,7 @@ public final class PostalEconomy {
         return rsp == null || rsp.getProvider() == null ? null : new VaultUnlockedBackend(rsp.getProvider());
     }
 
+    @SuppressWarnings("deprecation") // plain Vault's API: see VaultBackend
     private static EconomyBackend legacy_vault(Plugin plugin) {
         try {
             Class.forName("net.milkbowl.vault.economy.Economy");

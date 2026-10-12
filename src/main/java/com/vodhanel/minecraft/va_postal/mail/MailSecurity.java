@@ -31,30 +31,16 @@ public class MailSecurity {
         String splayer = player.getName().toLowerCase().trim();
         boolean valid_admin_attempt = false;
 
-        if (VA_postal.perms != null) {
-            if ((VA_postal.perms.has(player, "postal.admin")) && (VA_postal.admin_bypass)) {
-                Util.perm_inform("Vault (validated): postal.admin, " + splayer);
-                return true;
-            }
-            if (VA_postal.perms.has(player, "postal.admin")) {
-                valid_admin_attempt = true;
-            }
-            if ((!player.isOp()) && (VA_postal.perms.has(player, node))) {
-                Util.perm_inform("Vault: " + node + ", " + splayer);
-                return true;
-            }
-        } else {
-            if ((player.hasPermission("postal.admin")) && (VA_postal.admin_bypass)) {
-                Util.perm_inform("Bukkit (validated): postal.admin, " + splayer);
-                return true;
-            }
-            if (player.hasPermission("postal.admin")) {
-                valid_admin_attempt = true;
-            }
-            if ((!player.isOp()) && (player.hasPermission(node))) {
-                Util.perm_inform("Bukkit: " + node + ", " + splayer);
-                return true;
-            }
+        if ((player.hasPermission("postal.admin")) && (VA_postal.admin_bypass)) {
+            Util.perm_inform("Bukkit (validated): postal.admin, " + splayer);
+            return true;
+        }
+        if (player.hasPermission("postal.admin")) {
+            valid_admin_attempt = true;
+        }
+        if ((!player.isOp()) && (player.hasPermission(node))) {
+            Util.perm_inform("Bukkit: " + node + ", " + splayer);
+            return true;
         }
 
 
@@ -79,30 +65,16 @@ public class MailSecurity {
     public static synchronized boolean hasPermission_ext(Player player, String node, String stown, String saddress) {
         boolean valid_admin_attempt = false;
 
-        if (VA_postal.perms != null) {
-            if ((VA_postal.perms.has(player, "postal.admin")) && (VA_postal.admin_bypass)) {
-                Util.perm_inform("Vault (validated): postal.admin, " + player);
-                return true;
-            }
-            if (VA_postal.perms.has(player, "postal.admin")) {
-                valid_admin_attempt = true;
-            }
-            if ((!player.isOp()) && (VA_postal.perms.has(player, node))) {
-                Util.perm_inform("Vault: " + node + ", " + player);
-                return true;
-            }
-        } else {
-            if ((player.hasPermission("postal.admin")) && (VA_postal.admin_bypass)) {
-                Util.perm_inform("Bukkit (validated): postal.admin, " + player);
-                return true;
-            }
-            if (player.hasPermission("postal.admin")) {
-                valid_admin_attempt = true;
-            }
-            if ((!player.isOp()) && (player.hasPermission(node))) {
-                Util.perm_inform("Bukkit: " + node + ", " + player);
-                return true;
-            }
+        if ((player.hasPermission("postal.admin")) && (VA_postal.admin_bypass)) {
+            Util.perm_inform("Bukkit (validated): postal.admin, " + player);
+            return true;
+        }
+        if (player.hasPermission("postal.admin")) {
+            valid_admin_attempt = true;
+        }
+        if ((!player.isOp()) && (player.hasPermission(node))) {
+            Util.perm_inform("Bukkit: " + node + ", " + player);
+            return true;
         }
 
 

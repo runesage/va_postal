@@ -519,7 +519,7 @@ public class RouteMngr {
             VA_postal.wtr_nav[id].getDefaultParameters().range(100.0F);
             VA_postal.wtr_nav[id].getDefaultParameters().speedModifier(1.0F);
 
-            VA_postal.wtr_nav[id].getDefaultParameters().useNewPathfinder(true);
+            VA_postal.wtr_nav[id].getDefaultParameters().pathfinderType(net.citizensnpcs.api.ai.PathfinderType.CITIZENS);
             VA_postal.wtr_nav[id].getDefaultParameters().stuckAction(VA_postal.wtr_stuck_npc);
             VA_postal.wtr_nav[id].getDefaultParameters().distanceMargin(cit_distanceMargin);
             VA_postal.wtr_nav[id].getDefaultParameters().stationaryTicks(cit_stationaryTicks);
