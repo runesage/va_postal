@@ -260,12 +260,13 @@ run_server "$WORK_DIR/phase12.log" "postal start" "sleep:15" \
 
 # Phase 13: address deeds (docs/design/deeds.md), driven from the console with the test helper, which uses a
 # server-held deed on a chest just as a player's right-click would. A chest the postman can reach becomes an
-# address, with its sign and a surveyed route; one sealed in glass is refused and no address is made; a name the
+# address, with its sign and a surveyed route; one sealed in a glass room (wide enough that no place within the
+# surveyor's two blocks of the mailbox is outside) is refused and no address is made; a name the
 # office already has can't be deeded; the office suggests house names.
 echo "== Phase 13: address deeds"
 run_server "$WORK_DIR/phase13.log" \
     "setblock 44 -60 6 minecraft:chest[facing=south]" \
-    "fill 26 -61 6 32 -56 12 minecraft:glass hollow" "setblock 29 -60 9 minecraft:chest[facing=south]" \
+    "fill 24 -61 4 34 -55 16 minecraft:glass hollow" "setblock 29 -60 9 minecraft:chest[facing=south]" \
     "postal deed names testville 5" \
     "postal deed test testville Rose Cottage 44 -60 6" "sleep:20" \
     "postal deed test testville ivy_lodge 29 -60 9" "sleep:20" \
