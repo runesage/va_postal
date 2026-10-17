@@ -37,7 +37,14 @@ naming like the other Postal NPCs.
   Citizens.
 - **Name:** the Postmaster General.
 - **Look:** it faces the nearest player within a few blocks, and holds a book and quill.
-- **Counter menu:** right-clicking the clerk opens an inventory menu of Central's services. A service is
+- **Greeting:** the clerk greets a player who comes up to the counter in chat ("Good day, {player}. Central
+  Post Office, how may I help?") and says goodbye when they walk off. The lines come from the language file.
+- **Forms:** anything that needs typing or confirming (an office name, a sale price, a denial reason) opens a
+  native dialog screen (Paper's dialog API: text fields, number inputs and confirm/cancel buttons). The dialog
+  API is marked experimental, so each form falls back to chat prompts if dialogs aren't available or stop
+  working after an update.
+- **Counter menu:** right-clicking the clerk opens an inventory menu of Central's services, with themed icons
+  (a written book for charters, a gold ingot for sales, paper for rates, a filled map for the network map). A service is
   only available through the clerk, so the player has to be at Central:
   - **Charters:** buy one, collect an approved one, reissue a lost note, refund an expired one (§3);
   - **Sell an office:** back to Central, or accept a sale from another player (§3);
@@ -264,7 +271,5 @@ into a `office_stats` table.
     an office with it has a ceremony (particles, bell, server-wide notice).
 15. Charters need admin approval by default; `/postal charter autoapprove on|off` or the config turns that
     off. Applicants hear the decision by letter.
-
-## 11. Open questions
-
-1. The counter: an inventory menu (as in §2), or the clerk talking the player through it in chat?
+16. The counter is an inventory menu; forms that need typing use dialog screens (with a chat fallback, as the
+    dialog API is experimental); the clerk greets and says goodbye in chat.
