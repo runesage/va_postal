@@ -103,13 +103,14 @@ public final class DeedCommand {
         }
         String office = C_Postoffice.town_complete(args[2]);
         int count = args.length > 3 ? Math.max(1, Math.min(20, parse(args[3], 5))) : 5;
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < count; i++) {
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        for (int i = 0; i < count * 4 && names.size() < count; i++) {
             String n = Deeds.suggest_name(office, sender instanceof Player p ? p.getLocation() : null);
             if (n != null) {
-                out.append(out.length() == 0 ? "" : ", ").append(DeedDocument.display(n));
+                names.add(DeedDocument.display(n));
             }
         }
+        String out = String.join(", ", names);
         Deeds.inform(sender, "&7Suggestions for " + DeedDocument.display(office) + ": &f" + out);
     }
 
