@@ -284,6 +284,16 @@ public class GetConfig {
     }
 
     /** Mail can only be addressed within this many blocks of a post office in the same world (0: anywhere). */
+    /** Days an unused deed lasts before it expires (docs/design/deeds.md §4). */
+    public static synchronized int deed_expiry_days() {
+        return Math.max(1, int_value(VA_postal.plugin.getConfig(), path_format("settings.deeds.expiry_days"), 14));
+    }
+
+    /** The part of an expired deed's price that isn't refunded, 0 to 1. */
+    public static synchronized double deed_expiry_fee() {
+        return Math.min(1.0D, Math.max(0.0D, double_value(VA_postal.plugin.getConfig(), path_format("settings.deeds.expiry_fee"), 0.10D)));
+    }
+
     public static synchronized int mail_office_distance() {
         String spath = path_format("settings.mail_office_distance");
         try {

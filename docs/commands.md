@@ -49,6 +49,13 @@ Where the network last saw a player (server, online or when last seen), as `/add
 Writes a tracked test letter and hands it in at the from-office, as a player would; the destination can be another server's office.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
+##### `deed <give | sell | list | names | reissue | expire | test> ...`
+Address deeds (`docs/design/deeds.md`): an address bought as a signed document and created where its holder right-clicks a chest with it. Postal first surveys a route from the office to the spot in front of the chest; if the postman can't get there, nothing is made, the deed stays in hand, and the holder is told where the route stopped. Players will buy deeds from an office's clerk; until then staff issue them:
+- `give <player> <office> [name]`: a free deed (no name: the office suggests a house name). `sell` is the same, charged the address price, which Central holds until the deed is used (then half goes to the office) or lapses.
+- `list [player]`: a player's deeds and their state. `names <office> [count]`: house names the office would suggest (Rose Cottage, The Old Forge, Ashdene...; the words are in `names.yml`, the deed's wording in `deeds.yml`).
+- `reissue <player> <deed>`: a new copy of a lost deed; older copies stop working.
+- `expire`: lapses the deeds whose time is up now (they're checked hourly); a lapsed deed is refunded less `Settings.Deeds.Expiry_fee` (default 10%). Deeds last `Settings.Deeds.Expiry_days` (default 14).
+- `test <office> <name> <x> <y> <z> [world]`: uses a server-held deed on the chest at x y z, for testing from the console.
 ##### `bank [newday | report [days] | policy [<setting> <value>]]`
 Central's balance, what it owes and its target, and every office's owner, balance, reserve,
 withdrawable amount and arrears. `newday` runs a Postal economy day now; `report` shows the daily flow

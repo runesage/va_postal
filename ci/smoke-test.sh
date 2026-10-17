@@ -258,6 +258,20 @@ run_server "$WORK_DIR/phase12.log" "postal start" "sleep:15" \
     "postal stop" "sleep:1" "postal start" "sleep:1" "postal stop" "sleep:1" "postal start" "sleep:1" \
     "postal start" "sleep:25" "postal stop" "sleep:12"
 
+# Phase 13: address deeds (docs/design/deeds.md), driven from the console with the test helper, which uses a
+# server-held deed on a chest just as a player's right-click would. A chest the postman can reach becomes an
+# address, with its sign and a surveyed route; one sealed in glass is refused and no address is made; a name the
+# office already has can't be deeded; the office suggests house names.
+echo "== Phase 13: address deeds"
+run_server "$WORK_DIR/phase13.log" \
+    "setblock 44 -60 6 minecraft:chest[facing=south]" \
+    "fill 26 -61 6 32 -56 12 minecraft:glass hollow" "setblock 29 -60 9 minecraft:chest[facing=south]" \
+    "postal deed names testville 5" \
+    "postal deed test testville Rose Cottage 44 -60 6" "sleep:20" \
+    "postal deed test testville ivy_lodge 29 -60 9" "sleep:20" \
+    "postal deed test testville home 44 -60 6" \
+    "alist testville" "data get block 44 -60 7 front_text" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -412,6 +426,26 @@ check "phase11: no NullPointerException or Postal stack trace" no_match "NullPoi
 check "phase12: no NPC errors or Postal stack traces after quick restarts" \
     no_match "Exception creating NPC|NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase12.log"
 check "phase12: a start while running is refused" grep -q "Dispatcher is already running" "$WORK_DIR/phase12.log"
+check "phase13: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase13.log"
+check "phase13: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase13.log"
+check "phase13: the office suggests house names" grep -q "Suggestions for Testville: [A-Z]" <(plain phase13)
+check "phase13: a deed opened Rose Cottage" grep -q "Welcome to Rose Cottage, Testville" <(plain phase13)
+check "phase13: Rose Cottage has its mailbox sign" grep -qi "rose_cottage" <(plain phase13 | grep "has the following block data")
+check "phase13: Rose Cottage has a surveyed route" python3 - "$CONFIG" <<'PY'
+import sys
+lines = open(sys.argv[1]).read().split("\n")
+start = next(i for i, l in enumerate(lines) if l.strip().lower() == "rose_cottage:")
+depth = len(lines[start]) - len(lines[start].lstrip())
+block = []
+for l in lines[start + 1:]:
+    if l.strip() and len(l) - len(l.lstrip()) <= depth:
+        break
+    block.append(l.strip())
+assert "Route:" in block and "'0':" in block, block
+PY
+check "phase13: a chest the postman can't reach is refused" grep -q "couldn't reach this chest" <(plain phase13)
+check "phase13: no address is made for it" no_match "ivy_lodge" "$CONFIG"
+check "phase13: a name the office has can't be deeded" grep -q "already has an address called Home" <(plain phase13)
 
 echo
 echo "---- Postal output (phase 2) ----"

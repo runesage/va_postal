@@ -46,13 +46,40 @@ public final class RouteSurvey {
     public record Outcome(String office, String address, boolean saved, String message) {
     }
 
+    /**
+     * A survey to a place that isn't an address yet (docs/design/deeds.md §3): whether the office's postman could
+     * walk there, and the route if so, which {@link #save_probe} saves once the address exists.
+     */
+    public record Probe(boolean ok, String message, World world, Result result) {
+    }
+
     /** Surveys one address's route, after any surveys already queued; {@code done} runs on the main thread. */
     public static void survey(String office, String address, Consumer<Outcome> done) {
+        enqueue(next -> run(office, address, outcome -> {
+            done.accept(outcome);
+            next.run();
+        }));
+    }
+
+    /**
+     * Surveys a route from {@code office} to {@code to} without saving it, after any surveys already queued;
+     * {@code done} runs on the main thread.
+     */
+    public static void probe(String office, Location to, Consumer<Probe> done) {
+        enqueue(next -> run_probe(office, to, p -> {
+            done.accept(p);
+            next.run();
+        }));
+    }
+
+    /** Saves a successful probe as {@code address}'s route, as a survey would have. */
+    public static Outcome save_probe(String office, String address, Probe p) {
+        return save(p.world(), office, address, p.result(), 0L);
+    }
+
+    private static void enqueue(Consumer<Runnable> job) {
         synchronized (queue) {
-            queue.add(() -> run(office, address, outcome -> {
-                done.accept(outcome);
-                next();
-            }));
+            queue.add(() -> job.accept(RouteSurvey::next));
             if (!running) {
                 running = true;
                 Bukkit.getScheduler().runTask(VA_postal.plugin, RouteSurvey::next);
@@ -114,7 +141,26 @@ public final class RouteSurvey {
             return;
         }
         World world = from.getWorld();
-        survey_within(world, office, address, from, to, Surveyor.MARGIN, done);
+        survey_within(world, from, to, Surveyor.MARGIN, message -> done.accept(new Outcome(office, address, false, message)),
+                (r, ms) -> done.accept(save(world, office, address, r, ms)));
+    }
+
+    private static void run_probe(String office, Location to, Consumer<Probe> done) {
+        SurveyGrid.init();
+        Location from = Util.str2location(C_Postoffice.get_local_po_location_by_name(office));
+        if (from == null || to == null || to.getWorld() == null) {
+            done.accept(new Probe(false, from == null ? "the post office has no location" : "no place to survey to", null, null));
+            return;
+        }
+        if (!from.getWorld().equals(to.getWorld())) {
+            done.accept(new Probe(false, "it's in another world from the post office", null, null));
+            return;
+        }
+        World world = from.getWorld();
+        survey_within(world, from, to, Surveyor.MARGIN, message -> done.accept(new Probe(false, message, world, null)),
+                (r, ms) -> done.accept(r.ok()
+                        ? new Probe(true, r.waypoints().size() + " waypoints over " + (r.path().size() - 1) + " blocks", world, r)
+                        : new Probe(false, "no route found: " + r.failure(), world, r)));
     }
 
     /**
@@ -122,17 +168,17 @@ public final class RouteSurvey {
      * the search runs into the edge of that box, it tries once more with {@link Surveyor#WIDE_MARGIN}: the way
      * round may just be long.
      */
-    private static void survey_within(World world, String office, String address, Location from, Location to, int margin,
-                                      Consumer<Outcome> done) {
+    private static void survey_within(World world, Location from, Location to, int margin, Consumer<String> failed,
+                                      java.util.function.BiConsumer<Result, Long> found) {
         int fx = from.getBlockX(), fy = from.getBlockY(), fz = from.getBlockZ();
         int tx = to.getBlockX(), ty = to.getBlockY(), tz = to.getBlockZ();
         int pad = margin + 3;
         int cx1 = (Math.min(fx, tx) - pad) >> 4, cx2 = (Math.max(fx, tx) + pad) >> 4;
         int cz1 = (Math.min(fz, tz) - pad) >> 4, cz2 = (Math.max(fz, tz) + pad) >> 4;
         if ((long) (cx2 - cx1 + 1) * (cz2 - cz1 + 1) > MAX_CHUNKS) {
-            done.accept(new Outcome(office, address, false, margin == Surveyor.MARGIN
-                    ? "the address is too far from its post office to survey"
-                    : "no route found within " + Surveyor.MARGIN + " blocks, and a wider search would cover too much of the map"));
+            failed.accept(margin == Surveyor.MARGIN
+                    ? "it's too far from the post office to survey"
+                    : "no route found within " + Surveyor.MARGIN + " blocks, and a wider search would cover too much of the map");
             return;
         }
         List<CompletableFuture<Chunk>> loading = new ArrayList<>();
@@ -159,9 +205,9 @@ public final class RouteSurvey {
                         long ms = (System.nanoTime() - t0) / 1_000_000L;
                         Bukkit.getScheduler().runTask(VA_postal.plugin, () -> {
                             if (!r.ok() && r.hit_edge() && margin < Surveyor.WIDE_MARGIN) {
-                                survey_within(world, office, address, from, to, Surveyor.WIDE_MARGIN, done);
+                                survey_within(world, from, to, Surveyor.WIDE_MARGIN, failed, found);
                             } else {
-                                done.accept(save(world, office, address, r, ms));
+                                found.accept(r, ms);
                             }
                         });
                     });

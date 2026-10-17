@@ -165,6 +165,18 @@ public class Cmdexecutor implements CommandExecutor {
             }
             return true;
         }
+        if ("deed".equals(sub)) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            try {
+                com.vodhanel.minecraft.va_postal.deed.DeedCommand.command(player, args);
+            } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                Util.pinform(player, "&cThe mail store is unavailable: " + e.getMessage());
+            }
+            return true;
+        }
         if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
                 || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
                 || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub) || "whois".equals(sub)) {
@@ -375,6 +387,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("reconcile".equals(args[0].toLowerCase().trim())) {
             P_MailAdmin.reconcile(sender);
+            return true;
+        }
+        if ("deed".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.deed.DeedCommand.command(sender, args);
             return true;
         }
         switch (args[0].toLowerCase().trim()) {
