@@ -353,6 +353,18 @@ public class VA_postal extends JavaPlugin {
         plugin.getServer().getPluginManager().registerEvents(new BukkitListener(plugin), plugin);
         plugin.getServer().getPluginManager().registerEvents(new CitizensListener(plugin), plugin);
         plugin.getServer().getPluginManager().registerEvents(new RouteEditor(plugin), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.deed.DeedListener(), plugin);
+        // Unused deeds lapse when their time is up, with or without an economy (docs/design/deeds.md §4).
+        plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
+            try {
+                int lapsed = com.vodhanel.minecraft.va_postal.deed.Deeds.expire_due();
+                if (lapsed > 0) {
+                    Util.cinform("[Postal] " + lapsed + " unused deed(s) lapsed.");
+                }
+            } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                Util.cinform("[Postal] Couldn't expire deeds: " + e.getMessage());
+            }
+        }, 1200L, 72000L);
 
         Cmdexecutor executor = new Cmdexecutor(this);
         getCommand("postal").setExecutor(executor);

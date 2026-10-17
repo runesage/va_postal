@@ -93,7 +93,7 @@ public final class P_Bank {
 
     /**
      * Central's refunds: office prices of player-owned offices plus its half of player-owned addresses, plus
-     * all postage held in escrow for mail not yet delivered.
+     * all postage held in escrow for mail not yet delivered, plus what open deeds hold until they're used or lapse.
      */
     public static double central_liability() {
         int owned_offices = 0;
@@ -105,7 +105,8 @@ public final class P_Bank {
             owned_addresses += player_owned_addresses(office);
         }
         return Reserves.central_liability(owned_offices, C_Economy.po_purchase_price(), C_Economy.office_floor(),
-                owned_addresses, C_Economy.addr_purchase_price()) + EconomyState.held_total();
+                owned_addresses, C_Economy.addr_purchase_price()) + EconomyState.held_total()
+                + com.vodhanel.minecraft.va_postal.deed.Deeds.held();
     }
 
     public static double central_target() {

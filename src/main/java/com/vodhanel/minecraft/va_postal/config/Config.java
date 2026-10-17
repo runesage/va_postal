@@ -193,6 +193,9 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);
         VA_postal.plugin.getConfig().addDefault(srp, 0);
 
+        // Deeds (docs/design/deeds.md): how long an unused deed lasts, and what its expiry keeps of the refund.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.deeds.expiry_days"), 14);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.deeds.expiry_fee"), 0.10D);
         VA_postal.plugin.getConfig().options().copyDefaults(true);
         VA_postal.plugin.saveConfig();
     }

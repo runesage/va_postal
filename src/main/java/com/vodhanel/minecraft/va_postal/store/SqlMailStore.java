@@ -23,7 +23,7 @@ import java.util.UUID;
 public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
     static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql",
-            "V5__network_player.sql"};
+            "V5__network_player.sql", "V6__deed.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -556,6 +556,159 @@ public final class SqlMailStore implements MailStore {
         } catch (SQLException e) {
             throw new StoreException("Mail store write failed", e);
         }
+    }
+
+    // ---- Deeds -----------------------------------------------------------------------------
+
+    private static final String DEED_COLUMNS = "deed_id, kind, state, holder_uuid, holder_name, server_id, office, name, "
+            + "name_lower, price, issue_no, created_at, expires_at, updated_at";
+
+    @Override
+    public Deed create_deed(Deed d) {
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                if (name_reserved(c, d.kind(), d.office(), d.name())) {
+                    c.rollback();
+                    throw new ConflictException("The name " + d.name() + " is already taken");
+                }
+                try (PreparedStatement ps = c.prepareStatement("INSERT INTO deed (" + DEED_COLUMNS
+                        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    ps.setString(1, d.id().toString());
+                    ps.setString(2, d.kind().name());
+                    ps.setString(3, d.state().name());
+                    ps.setString(4, d.holder().toString());
+                    ps.setString(5, d.holder_name());
+                    ps.setString(6, d.server_id());
+                    ps.setString(7, d.office());
+                    ps.setString(8, d.name());
+                    ps.setString(9, d.name().toLowerCase(java.util.Locale.ROOT));
+                    ps.setBigDecimal(10, BigDecimal.valueOf(d.price()));
+                    ps.setInt(11, d.issue());
+                    ps.setLong(12, d.created_at());
+                    ps.setLong(13, d.expires_at());
+                    ps.setLong(14, d.updated_at());
+                    ps.executeUpdate();
+                }
+                c.commit();
+                return d;
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not record deed " + d.id(), e);
+        }
+    }
+
+    private static boolean name_reserved(Connection c, Deed.Kind kind, String office, String name) throws SQLException {
+        // A charter's name is the office it founds: unique across the network. An address is unique in its office.
+        String sql = "SELECT COUNT(*) FROM deed WHERE kind = ? AND name_lower = ? AND state IN ('PENDING', 'ISSUED')"
+                + (kind == Deed.Kind.ADDRESS ? " AND office = ?" : "");
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, kind.name());
+            ps.setString(2, name.toLowerCase(java.util.Locale.ROOT));
+            if (kind == Deed.Kind.ADDRESS) {
+                ps.setString(3, office);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
+    @Override
+    public Optional<Deed> deed(UUID id) {
+        return deeds("WHERE deed_id = ?", id.toString()).stream().findFirst();
+    }
+
+    @Override
+    public boolean deed_state(UUID id, Deed.State from, Deed.State to, long now) {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "UPDATE deed SET state = ?, updated_at = ? WHERE deed_id = ? AND state = ?")) {
+            ps.setString(1, to.name());
+            ps.setLong(2, now);
+            ps.setString(3, id.toString());
+            ps.setString(4, from.name());
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new StoreException("Could not update deed " + id, e);
+        }
+    }
+
+    @Override
+    public Optional<Deed> reissue_deed(UUID id, long now) {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "UPDATE deed SET issue_no = issue_no + 1, updated_at = ? WHERE deed_id = ? AND state IN ('PENDING', 'ISSUED')")) {
+            ps.setLong(1, now);
+            ps.setString(2, id.toString());
+            if (ps.executeUpdate() != 1) {
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not reissue deed " + id, e);
+        }
+        return deed(id);
+    }
+
+    @Override
+    public boolean deed_name_reserved(Deed.Kind kind, String office, String name) {
+        try (Connection c = source.getConnection()) {
+            return name_reserved(c, kind, office, name);
+        } catch (SQLException e) {
+            throw new StoreException("Could not read deeds", e);
+        }
+    }
+
+    @Override
+    public List<Deed> deeds_of(UUID holder) {
+        return deeds("WHERE holder_uuid = ? ORDER BY created_at DESC", holder.toString());
+    }
+
+    @Override
+    public List<Deed> deeds_due(long now) {
+        List<Deed> out = new ArrayList<>();
+        for (Deed d : deeds("WHERE server_id = ? AND state IN ('PENDING', 'ISSUED') ORDER BY expires_at", server_id)) {
+            if (d.expires_at() <= now) {
+                out.add(d);
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public double deeds_held() {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT SUM(price) FROM deed WHERE server_id = ? AND state IN ('PENDING', 'ISSUED')")) {
+            ps.setString(1, server_id);
+            try (ResultSet rs = ps.executeQuery()) {
+                BigDecimal sum = rs.next() ? rs.getBigDecimal(1) : null;
+                return sum == null ? 0.0D : sum.doubleValue();
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read deeds", e);
+        }
+    }
+
+    private List<Deed> deeds(String where, String arg) {
+        List<Deed> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT " + DEED_COLUMNS + " FROM deed " + where)) {
+            ps.setString(1, arg);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new Deed(UUID.fromString(rs.getString(1)), Deed.Kind.valueOf(rs.getString(2)),
+                            Deed.State.valueOf(rs.getString(3)), UUID.fromString(rs.getString(4)), rs.getString(5),
+                            rs.getString(6), rs.getString(7), rs.getString(8), rs.getBigDecimal(10).doubleValue(),
+                            rs.getInt(11), rs.getLong(12), rs.getLong(13), rs.getLong(14)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read deeds", e);
+        }
+        return out;
     }
 
     // ---- Network ---------------------------------------------------------------------------

@@ -1,0 +1,58 @@
+# House names that Postal suggests when a player buys an address (docs/design/deeds.md §5). The player can
+# always type their own. Edit freely: give your world its own flavour.
+#
+# A suggestion is one of the shapes below with each {list} replaced by a word from that list, for example
+# "{tree}{ending}" -> "Ashdene". Spaces become underscores (Rose_Cottage), and a suggestion longer than the 15
+# characters a sign line holds is skipped.
+#
+# settings: words and shapes for the biome around the mailbox. A setting's lists replace the general ones of
+# the same name, and its shapes are tried first, half the time. Settings: arid, snowy, water, woodland, hills,
+# meadow.
+
+words:
+  tree: [Oak, Ash, Elm, Birch, Rowan, Hazel, Holly, Willow, Beech, Yew, Alder, Larch, Cedar, Hawthorn, Maple, Pine, Thorn]
+  flower: [Rose, Ivy, Lilac, Primrose, Bluebell, Heather, Clover, Foxglove, Laurel, Jasmine, Fern, Bramble, Violet]
+  trade: [Forge, Mill, Bakery, Rectory, Dairy, Smithy, Granary, Vicarage, Tannery, Brewery, Chapel, Toll House]
+  feature: [Meadow, Hill, River, Valley, Brook, Field, Orchard, Moor, Fell]
+  bird: [Wren, Robin, Lark, Finch, Swallow, Owl, Heron, Kestrel, Thrush, Rook, Swift]
+  ending: [dene, hurst, leigh, combe, mead, field, wood, holme, ley, croft, garth, wick, stead]
+
+shapes:
+  - "{flower} Cottage"
+  - "{tree} Cottage"
+  - "The Old {trade}"
+  - "{tree}{ending}"
+  - "{feature} View"
+  - "{tree} House"
+  - "{flower} Lodge"
+  - "{bird}s Rest"
+  - "{bird}s Nest"
+  - "{tree} Lea"
+  - "Little {tree}s"
+
+settings:
+  arid:
+    words:
+      tree: [Acacia, Palm, Olive]
+      flower: [Sage, Thyme, Aloe, Marigold]
+      feature: [Dune, Mesa, Canyon, Oasis, Sandy]
+    shapes: ["Sandstone House", "{feature} House", "Sunhaven", "{flower} Cottage", "{feature} View"]
+  snowy:
+    words:
+      tree: [Pine, Spruce, Fir, Birch]
+      feature: [Frost, Snow, Winter, Glacier, Icy]
+    shapes: ["{feature} Lodge", "{feature}fell", "Winterbourne", "{tree} Lodge", "Hearthside"]
+  water:
+    words:
+      feature: [Brook, River, Lake, Ford, Weir, Mill]
+    shapes: ["{feature}side", "Mill Pond", "Waterside", "Ferry House", "{bird} Wharf", "The Boathouse"]
+  woodland:
+    shapes: ["{tree}wood", "Forest Lodge", "{tree} Glade", "{tree} Hollow", "Woodcutters"]
+  hills:
+    words:
+      feature: [Hill, Crag, Tor, Ridge, Fell, Down]
+    shapes: ["Hilltop", "Windrush", "{feature} Top", "{feature} View", "High {tree}s"]
+  meadow:
+    words:
+      feature: [Meadow, Field, Green, Lea, Clover]
+    shapes: ["{feature}bank", "{feature} Farm", "Haymakers", "{flower} Meadow", "Buttercup Hill"]

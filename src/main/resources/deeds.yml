@@ -1,0 +1,29 @@
+# The wording of the documents Postal hands out (docs/design/deeds.md §4). Edit freely; & colour codes work.
+#
+# Placeholders: {address}, {office}, {world}, {server}, {holder}, {date}, {expires}, {deed_id}, {postmaster},
+# {price}. A book page holds about 14 short lines: keep each page short, or it's cut off.
+
+address:
+  # The item's name in the inventory.
+  name: "&6Deed of Address: &f{address}"
+  # The book's title (at most 32 characters, by Minecraft's rules) and author.
+  title: "Deed of Address"
+  author: "{postmaster}"
+  pages:
+    - |-
+      &l   Deed of Address&r
+
+      &l{address}&r
+      &o{office}&r
+
+      Know all by these presents that &l{holder}&r is granted the address of {address}, served by the {office} Post Office, in {world}.
+
+      &8Deed No. {deed_id}
+      &8Entered {date}
+    - |-
+      The holder shall fix this deed upon the mailbox of their choosing, within reach of the {office} Post Office, on or before {expires}; unused, it lapses.
+
+      This deed is not transferable.
+
+
+      &o{postmaster}

@@ -482,4 +482,82 @@ abstract class MailStoreContract {
         }
         store = new SqlMailStore(fresh, "main", null, dialect());
     }
+
+    // ---- Deeds ----------------------------------------------------------------------------
+
+    private Deed deed(Deed.Kind kind, String server, String office, String name, double price, long created, long expires) {
+        return new Deed(UUID.randomUUID(), kind, Deed.State.ISSUED, UUID.randomUUID(), "Steve", server, office, name,
+                price, 1, created, expires, created);
+    }
+
+    @Test
+    void deedsRoundTrip() {
+        Deed d = store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "rose_cottage", 250.5, 10L, 20L));
+        assertEquals(d, store.deed(d.id()).orElseThrow());
+        assertTrue(store.deed(UUID.randomUUID()).isEmpty());
+    }
+
+    @Test
+    void anOpenAddressDeedReservesItsNameInItsOffice() {
+        Deed d = store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "rose_cottage", 100, 1L, 99L));
+        assertTrue(store.deed_name_reserved(Deed.Kind.ADDRESS, "riverside", "Rose_Cottage"));
+        assertThrows(ConflictException.class,
+                () -> store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "ROSE_COTTAGE", 100, 2L, 99L)));
+        // Another office may have its own Rose Cottage.
+        store.create_deed(deed(Deed.Kind.ADDRESS, "main", "hillcrest", "rose_cottage", 100, 3L, 99L));
+        // Once used, the name is the address's, not the deed's: free as far as deeds go.
+        assertTrue(store.deed_state(d.id(), Deed.State.ISSUED, Deed.State.USED, 5L));
+        assertFalse(store.deed_name_reserved(Deed.Kind.ADDRESS, "riverside", "rose_cottage"));
+    }
+
+    @Test
+    void aCharterReservesItsNameAcrossTheNetwork() {
+        store.create_deed(deed(Deed.Kind.CHARTER, "main", "brookfield", "brookfield", 1000, 1L, 99L));
+        assertThrows(ConflictException.class,
+                () -> store.create_deed(deed(Deed.Kind.CHARTER, "other", "brookfield", "Brookfield", 1000, 2L, 99L)));
+        assertFalse(store.deed_name_reserved(Deed.Kind.ADDRESS, "brookfield", "brookfield"));
+    }
+
+    @Test
+    void deedStateChangesOnlyFromTheExpectedState() {
+        Deed d = store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "ivy_lodge", 100, 1L, 99L));
+        assertFalse(store.deed_state(d.id(), Deed.State.PENDING, Deed.State.ISSUED, 2L));
+        assertTrue(store.deed_state(d.id(), Deed.State.ISSUED, Deed.State.USED, 3L));
+        assertFalse(store.deed_state(d.id(), Deed.State.ISSUED, Deed.State.EXPIRED, 4L)); // used already: no double use
+        Deed after = store.deed(d.id()).orElseThrow();
+        assertEquals(Deed.State.USED, after.state());
+        assertEquals(3L, after.updated_at());
+    }
+
+    @Test
+    void aReissueBumpsTheIssueOfAnOpenDeedOnly() {
+        Deed d = store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "the_old_forge", 100, 1L, 99L));
+        assertEquals(2, store.reissue_deed(d.id(), 5L).orElseThrow().issue());
+        store.deed_state(d.id(), Deed.State.ISSUED, Deed.State.USED, 6L);
+        assertTrue(store.reissue_deed(d.id(), 7L).isEmpty());
+        assertEquals(2, store.deed(d.id()).orElseThrow().issue());
+    }
+
+    @Test
+    void dueAndHeldCountThisServersOpenDeedsOnly() {
+        Deed late = store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "ashdene", 100, 1L, 50L));
+        store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "oakhurst", 40.25, 1L, 500L));
+        Deed used = store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "elmleigh", 1000, 1L, 10L));
+        store.deed_state(used.id(), Deed.State.ISSUED, Deed.State.USED, 2L);
+        store.create_deed(deed(Deed.Kind.ADDRESS, "other", "riverside", "hollycombe", 7, 1L, 10L));
+        assertEquals(List.of(late.id()), store.deeds_due(100L).stream().map(Deed::id).toList());
+        assertEquals(140.25, store.deeds_held(), 1e-9);
+    }
+
+    @Test
+    void aPlayersDeedsNewestFirst() {
+        UUID steve = UUID.randomUUID();
+        Deed first = new Deed(UUID.randomUUID(), Deed.Kind.ADDRESS, Deed.State.ISSUED, steve, "Steve", "main", "riverside",
+                "wrens_rest", 1, 1, 10L, 99L, 10L);
+        Deed second = new Deed(UUID.randomUUID(), Deed.Kind.ADDRESS, Deed.State.ISSUED, steve, "Steve", "main", "hillcrest",
+                "larks_nest", 1, 1, 20L, 99L, 20L);
+        store.create_deed(first);
+        store.create_deed(second);
+        assertEquals(List.of(second.id(), first.id()), store.deeds_of(steve).stream().map(Deed::id).toList());
+    }
 }

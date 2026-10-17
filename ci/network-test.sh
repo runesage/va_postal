@@ -197,9 +197,11 @@ mailbox() { # server: the last answer to 'data get block 40 -60 0' (its Home mai
 in_mailbox() { [ -n "$2" ] && mailbox "$1" | grep -q "$2"; }      # server mail-id
 not_in_mailbox() { ! in_mailbox "$1" "$2"; }
 A="$WORK_DIR/alpha.txt"; B="$WORK_DIR/beta.txt"
+# The newest schema: the highest migration number (V6__deed.sql -> 6), so a new migration doesn't need this edited.
+SCHEMA="$(ls "$(dirname "$0")/../src/main/resources/db" | sed -n 's/^V\([0-9][0-9]*\)__.*/\1/p' | sort -n | tail -1)"
 for s in alpha beta; do
     log="$WORK_DIR/$s.txt"
-    check "$s: mail store open on schema 5 as '$s'" grep -q "schema 5, server id '$s'" "$log"
+    check "$s: mail store open on schema $SCHEMA as '$s'" grep -q "schema $SCHEMA, server id '$s'" "$log"
     check "$s: no Postal stack traces" no_match "at .*com\.vodhanel\." "$log"
     check "$s: no command exceptions" no_match "Command exception: /?postal" "$log"
     check "$s: no watchdog dump" no_match "The server has not responded for" "$log"
