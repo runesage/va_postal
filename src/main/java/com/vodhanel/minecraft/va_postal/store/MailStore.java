@@ -130,6 +130,34 @@ public interface MailStore extends AutoCloseable {
 
     java.util.Optional<NetworkPlayer> player(UUID id);
 
+    // ---- Deeds (docs/design/deeds.md) ----------------------------------------------------------------
+
+    /**
+     * Records a new deed. An open deed (pending or issued) reserves its name: for an address, within its office;
+     * for a charter, across the network. Raises {@link ConflictException} if an open deed already has the name.
+     */
+    Deed create_deed(Deed deed);
+
+    java.util.Optional<Deed> deed(UUID id);
+
+    /** Moves a deed from {@code from} to {@code to}; false if it wasn't in {@code from} (someone got there first). */
+    boolean deed_state(UUID id, Deed.State from, Deed.State to, long now);
+
+    /** A new issue of an open deed's document; the older copies stop working. Empty if the deed isn't open. */
+    java.util.Optional<Deed> reissue_deed(UUID id, long now);
+
+    /** True if an open deed of {@code kind} reserves {@code name} at {@code office} (any office, for a charter). */
+    boolean deed_name_reserved(Deed.Kind kind, String office, String name);
+
+    /** A player's deeds, newest first. */
+    List<Deed> deeds_of(UUID holder);
+
+    /** This server's open deeds whose time ran out by {@code now}. */
+    List<Deed> deeds_due(long now);
+
+    /** The money this server's open deeds hold in Central's account. */
+    double deeds_held();
+
     @Override
     void close();
 }
