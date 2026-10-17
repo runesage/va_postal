@@ -1,7 +1,8 @@
 # Design: Central Office
 
-**Status:** draft for discussion. **Plan reference:** `docs/plans/postal-revival-v3.md` §3 (Central Office
-Redesign).
+**Status:** draft for discussion, revised after the mail store (persistent state P1-P4), the cross-server
+network and the P.O. box design (`docs/design/po-boxes.md`) landed. **Plan reference:**
+`docs/plans/postal-revival-v3.md` §3 (Central Office Redesign).
 
 ## 1. Goals
 
@@ -16,6 +17,10 @@ there and players have no reason to go. This design makes Central the place that
 The split of responsibilities: **Central owns the network and anything that needs authority; local offices
 own their residents.** Addresses stay with their local office.
 
+**Central is the office owners' window onto "the server".** Everything an owner does with authority behind
+it (chartering an office, selling one, rates) is done in person at Central's counter. Central does **not**
+gate the mail itself: letters flow between offices as they do today whether or not anyone visits Central.
+
 Out of scope here: Towny integration (its own branch); a dead letter office (dropped); PO boxes (a later
 local-office feature, §9); and the insurance fund, which comes with parcels in persistent-state phase P2.
 
@@ -24,8 +29,12 @@ local-office feature, §9); and the insurance fund, which comes with parcels in 
 A Citizens NPC who stays at Central's counter. It doesn't walk routes, and it uses the bundled skin and
 naming like the other Postal NPCs.
 
-- **Spawn:** spawned with the dispatcher at Central's location (or a `Clerk_location` set with
-  `/postal clerk here`), and removed on stop, like the other Postal NPCs. It is never saved by Citizens.
+- **Staffed whenever the mail runs:** the clerk is spawned when the dispatcher starts, at Central's location
+  (or a `Clerk_location` set with `/postal clerk here`), and leaves when it stops, like the other Postal NPCs.
+  While the mail runs, Central is always staffed: a heartbeat check respawns the clerk if it has gone
+  (killed by a plugin, unloaded with its chunk, despawned) and puts it back at its post if it has been moved.
+  While the dispatcher is stopped, Central is closed and the counter can't be used. It is never saved by
+  Citizens.
 - **Name:** the Postmaster General.
 - **Look:** it faces the nearest player within a few blocks, and holds a book and quill.
 - **Counter menu:** right-clicking the clerk opens an inventory menu of Central's services. A service is
@@ -35,6 +44,21 @@ naming like the other Postal NPCs.
   - **Postage rates:** the current base rates and every office's discount;
   - **Network map** (§6).
 - Admin commands keep working from anywhere. The counter rule applies only to players.
+
+### Protecting Central
+
+Central is shared by everyone, so Postal protects it itself, without relying on a protection plugin:
+
+- **The clerk** is invulnerable, can't be pushed, pulled, leashed, ridden or set on fire, and keeps its
+  equipment. It stays at its post (the heartbeat above puts it back).
+- **Central's chest and its sign** can only be broken by admins. Explosions (creepers, TNT, beds, crystals)
+  leave them standing, pistons can't move them, hoppers and droppers can't take from or put into the chest,
+  and fire can't burn the sign.
+- **What players can do:** open the counter menu, and use the chest only as Postal allows (as today).
+- Attempts are logged (`Settings.Report_grief`), so staff can see who tried.
+
+Local offices keep today's rules (their owners protect them with claims); the same protection could be offered
+to them later.
 
 ## 3. Charters
 
@@ -46,8 +70,8 @@ themselves, through Central:
 
 1. **Buy a charter at Central.** At the counter, the player picks a name for the office and pays the post
    office purchase price. The name is checked and reserved there, so name clashes are settled at Central.
-   They get a **charter note**: a written item naming the office and its holder, carrying a charter id.
-   Central holds the payment until the charter is used.
+   They get a **charter note** (§3, "The charter document"). Central holds the payment until the charter is
+   used.
 2. **Open the office with it.** Holding the note, the player right-clicks the chest that will be the office's
    chest. Postal checks that:
    - the player is the charter's holder;
@@ -55,13 +79,52 @@ themselves, through Central:
    - it's far enough from other offices (`Charter.Min_distance`).
 
    The office is then created at that chest. Postal places the office sign on it, the player becomes the
-   owner, and the payment seeds the office as in `docs/economy.md`. The note is used up.
-3. **Admin approval (optional).** With `Charter.Require_approval: true`, a charter is only sold after
-   `/postal charter approve <player> <name>`; the player applies at the counter and collects the note
-   there once it's approved.
+   owner, and the payment seeds the office as in `docs/economy.md`. The note is used up, and the opening is
+   marked (below).
+3. **Admin approval (on by default).** The player applies at the counter: they choose the name (reserved
+   while the application is open) and pay, and the payment is held. Staff see open applications with
+   `/postal charter pending` and decide with `/postal charter approve <player> <name>` or
+   `/postal charter deny <player> <name> [reason]`. The player is told either way, by a letter from the
+   Postmaster General delivered like any mail, and on approval collects the note at the counter. A denied
+   application is refunded in full and its name released.
+   - `Charter.Require_approval: true` is the default. `/postal charter autoapprove on|off` changes it (and
+     saves it to the config), for servers that would rather sell charters straight away.
 
 **Protection plugins** decide where an office may go without Postal knowing about them: if the player isn't
 allowed to open the chest (a claim, a region), the right-click never reaches Postal.
+
+### The charter document
+
+The note is a signed written book that reads like a real charter, with a short ceremony when it's used.
+
+- **Item:** a written book titled `Charter of <Office> Post Office`, authored by the Postmaster General, with
+  an enchanted shimmer. A hidden charter id (in the item's data) is what Postal checks; the text is for
+  reading.
+- **Template:** the wording comes from `charter.yml`, so a server can rewrite it. Placeholders:
+  `{office}`, `{town}` (the office's display name), `{world}`, `{server}`, `{holder}`, `{date}`, `{expires}`,
+  `{charter_id}`, `{postmaster}` (the clerk's name), `{price}`.
+- **Default wording** (two pages):
+
+  > **Charter of {office} Post Office**
+  >
+  > By authority of the Central Post Office of {server}, and under the hand of {postmaster}, a post office
+  > is hereby chartered in the name of **{office}**, in the world of {world}.
+  >
+  > Charter No. {charter_id}, granted this {date} to **{holder}**, who shall keep its counter, serve its
+  > residents, and carry the mail faithfully to and from Central.
+
+  > The holder shall open this office within the realm by placing this charter upon the office's chest, on
+  > or before {expires}. Unused, this charter lapses and its name is released.
+  >
+  > This charter is not transferable. The office may be sold only through Central.
+  >
+  > Sealed at Central, {date}.
+  > {postmaster}, Postmaster General
+
+- **Opening ceremony:** when a charter opens an office: a burst of particles over the chest, a bell, and a
+  server-wide notice: *"A new post office has opened in {office}! Chartered to {holder}."* Each part can be
+  turned off (`Charter.Announce`, `Charter.Effects`).
+- The opened office's first log book (the "Postal log" every office gets) begins with a copy of its charter.
 
 **Charter notes:**
 - **Bound to the buyer.** Only the holder named on it can use it, so Central always knows who it chartered.
@@ -70,6 +133,10 @@ allowed to open the chest (a claim, a region), the right-click never reaches Pos
   the holder can collect a refund at the counter, minus `Charter.Expiry_fee` (default 10%).
 - **Lost notes.** The counter reissues a note for the same charter, and the old one stops working (the
   charter id is checked when it's used).
+- **Records:** charters, applications and offers are rows in the mail store (schema V6), so they survive
+  restarts, and expiry, refunds and reissues are checked against the record, not the item.
+- **Names across servers:** office names are reserved network-wide through the shared directory, so two
+  servers on one network can't charter the same name. Each server has its own Central and clerk.
 
 ### Selling an office
 
@@ -169,8 +236,7 @@ into a `office_stats` table.
 
 ## 9. Later
 
-- **PO boxes:** a rented PO box at a local office, for players without an address. It belongs with the
-  local offices, not Central.
+- **PO boxes:** designed separately (`docs/design/po-boxes.md`) as a local-office feature, not Central's.
 - **Congestion:** dispatch slows as Central's hourly volume rises, with `/expedite` as the paid way past
   it. Off by default.
 - **Insurance fund:** with parcels in persistent-state P2.
@@ -190,3 +256,15 @@ into a `office_stats` table.
 8. The clerk is the Postmaster General.
 9. Towny integration is out of scope here; it comes in its own branch.
 10. Charter notes are bound to their buyer and can't be traded.
+11. The clerk staffs Central whenever the mail is running, and is respawned and put back at its post if
+    anything removes or moves it. Central is closed while the dispatcher is stopped.
+12. Central gates only the owners' dealings with the server (charters, sales, rates), never the flow of mail.
+13. Central's clerk, chest and sign are protected by Postal itself against griefing.
+14. The charter note is a readable charter, worded from an editable template with placeholders, and opening
+    an office with it has a ceremony (particles, bell, server-wide notice).
+15. Charters need admin approval by default; `/postal charter autoapprove on|off` or the config turns that
+    off. Applicants hear the decision by letter.
+
+## 11. Open questions
+
+1. The counter: an inventory menu (as in §2), or the clerk talking the player through it in chat?
