@@ -10,7 +10,8 @@ import java.util.UUID;
  * real player owns, and offline players (owners, senders, recipients) that the fork's Player-typed
  * code needs to refer to while they aren't online.
  * <p>
- * Only identity is meaningful: the UUID and the name (also returned as display/list/custom name).
+ * Only identity is meaningful: the UUID and the name (also returned as display/list/custom name, as a
+ * String or a component).
  * Every other Player method answers null/false/0, so messages to an offline stand-in are dropped.
  * Built as a dynamic proxy so it doesn't have to track every method Paper adds to {@link Player}.
  */
@@ -37,6 +38,11 @@ public final class ServerPlayer {
                         case "getPlayerListName":
                         case "getCustomName":
                             return shown;
+                        case "displayName":
+                        case "playerListName":
+                        case "customName":
+                            // The Adventure getters (no arguments); the setters of the same name return nothing.
+                            return args == null || args.length == 0 ? net.kyori.adventure.text.Component.text(shown) : null;
                         case "equals":
                             return proxy == args[0];
                         case "hashCode":

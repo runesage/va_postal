@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.config;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import org.bukkit.configuration.ConfigurationSection;
@@ -90,7 +91,7 @@ public class C_List {
                         if (owner == null || owner == VA_postal.SERVER) {
                             sowner = "Server";
                         } else {
-                            sowner = owner.getDisplayName();
+                            sowner = Text.legacy(owner.displayName());
                         }
                         sowner = fixed_len(sowner, 20, " ");
                         display = saddress + sowner + sinterval;
@@ -123,7 +124,7 @@ public class C_List {
                     if (owner == null || owner == VA_postal.SERVER) {
                         sowner = "&7&oServer";
                     } else {
-                        sowner = "&f&r" + owner.getDisplayName();
+                        sowner = "&f&r" + Text.legacy(owner.displayName());
                     }
                     sowner = fixed_len(sowner + "&7&o", 28, "-");
                     sworld = "&7&o" + get_world(C_Postoffice.get_local_po_location_by_name(stown));
@@ -157,7 +158,7 @@ public class C_List {
                     if (owner == null || owner == VA_postal.SERVER) {
                         sowner = "&7&oServer";
                     } else {
-                        sowner = "&f&r" + owner.getDisplayName();
+                        sowner = "&f&r" + Text.legacy(owner.displayName());
                     }
                     sowner = fixed_len(sowner, 20, " ");
                     sworld = get_world(C_Postoffice.get_local_po_location_by_name(stown));

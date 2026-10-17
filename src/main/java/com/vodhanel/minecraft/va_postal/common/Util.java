@@ -50,10 +50,15 @@ public class Util {
             for (int a = 0; a < 3; a++) {
                 parsed[a] = ((int) Double.parseDouble(arg[(a + 1)].trim()));
             }
-            location = new Location(Bukkit.getWorld(arg[0]), parsed[0], parsed[1], parsed[2], 0.0F, 0.0F);
-            // Util.dinform("str2location: LOC IS "+location);
-        } catch (NumberFormatException numberFormatException) {
-            Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: " + str + " " + numberFormatException);
+            World world = Bukkit.getWorld(arg[0].trim());
+            if (world == null) {
+                Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: world not loaded: " + str);
+                return null;
+            }
+            location = new Location(world, parsed[0], parsed[1], parsed[2], 0.0F, 0.0F);
+        } catch (RuntimeException e) {
+            // Malformed string (NumberFormatException, ArrayIndexOutOfBoundsException, ...)
+            Util.dinform(AnsiColor.RED + "STR2LOCATION FAIL: " + str + " " + e);
             return null;
         }
         return location;
@@ -322,14 +327,6 @@ public class Util {
         }
     }
 
-    public static void calibrate_compass(Player player) {
-        if (player == null) {
-            return;
-        }
-        Location loc_ref = player.getWorld().getBlockAt(0, 0, -12550820).getLocation();
-        player.setCompassTarget(loc_ref);
-    }
-
     public static double get_direction_to_target(Player player, Location loc_target) {
         if ((player == null) || (loc_target == null)) {
             return -1000.0D;
@@ -439,14 +436,15 @@ public class Util {
                 if ((p_poffice == null) || (poffice.contains(p_poffice))) {
                     if (!poffice.equals(l_poffice)) {
                         owner = "Server";
-                        if (C_Owner.is_local_po_owner_defined(poffice)) {
-                            owner = C_Owner.get_owner_local_po(poffice).getDisplayName();
+                        String po_owner_name = C_Owner.get_owner_local_po_name(poffice);
+                        if (po_owner_name != null) {
+                            owner = po_owner_name;
                         }
                         sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(poffice));
                         disp = fmt_po + fixed_len(poffice.toUpperCase(), 16, fmt_fill);
                         disp = disp + " " + fmt_ownr + owner + " " + fmt_wrld + Util.df(sworld);
-                        if ((player == null) && (i != 0)) {
-                            cinform(disp);
+                        if (player == null) {
+                            cinform(disp); // the console too gets the first office (it went to pinform(null), lost)
                         } else {
                             if ((detail) && (i != 0)) {
                                 pinform(player, "");
@@ -458,8 +456,9 @@ public class Util {
 
                     if (detail) {
                         owner = " server";
-                        if (C_Owner.is_address_owner_defined(poffice, address)) {
-                            owner = " " + C_Owner.get_owner_address(poffice, address).getDisplayName();
+                        String addr_owner_name = C_Owner.get_owner_address_name(poffice, address);
+                        if (addr_owner_name != null) {
+                            owner = " " + addr_owner_name;
                         }
                         disp = fmt_addr + fixed_len(Util.df(address), 16, fmt_fill);
                         disp = disp + fmt_ownr + owner;
@@ -547,12 +546,15 @@ public class Util {
             for (int a = 0; a < 3; a++) {
                 parsed[a] = Double.parseDouble(arg[(a + 1)].trim());
             }
-            location = new Location(Bukkit.getWorld(arg[0]), parsed[0], parsed[1], parsed[2]);
-        } catch (NumberFormatException numberFormatException) {
-            return null;
+            World w = Bukkit.getWorld(arg[0].trim());
+            if (w == null) {
+                return null; // world removed/renamed/not loaded
+            }
+            location = new Location(w, parsed[0], parsed[1], parsed[2]);
+            return w.getBlockAt(location);
+        } catch (RuntimeException e) {
+            return null; // malformed string
         }
-        World w = location.getWorld();
-        return w.getBlockAt(location);
     }
 
     public static World str2world(String sworld) {
@@ -636,7 +638,7 @@ public class Util {
     public static void spinform(Player player, String message) {
         if (player != null) {
             try {
-                player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+                player.sendMessage(Text.color(message));
             } catch (Exception ignored) {
             }
         }
@@ -648,7 +650,30 @@ public class Util {
 
     public static void binform(String message) {
         try {
-            VA_postal.plugin.getServer().broadcastMessage(ChatColor.translateAlternateColorCodes("&".charAt(0), message));
+            VA_postal.plugin.getServer().broadcast(Text.component(Text.color(message)));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static final java.util.regex.Pattern ANSI_ESCAPE = java.util.regex.Pattern.compile("\u001B\\[[0-9;]*m");
+    private static final java.util.regex.Pattern PROBLEM_WORDS =
+            java.util.regex.Pattern.compile("\\b(failed|cannot)\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** Removes ANSI colour escapes, and the leading "[Postal] " the plugin logger adds itself. */
+    static String strip_ansi(String message) {
+        String plain = ANSI_ESCAPE.matcher(message).replaceAll("");
+        return plain.startsWith("[Postal] ") ? plain.substring("[Postal] ".length()) : plain;
+    }
+
+    /** Warning for red messages and ones that say something failed or cannot be done; info otherwise. */
+    static java.util.logging.Level console_level(String message) {
+        return (message.contains(AnsiColor.RED) || PROBLEM_WORDS.matcher(message).find())
+                ? java.util.logging.Level.WARNING : java.util.logging.Level.INFO;
+    }
+
+    private static void console_log(String message, java.util.logging.Level level) {
+        try {
+            VA_postal.plugin.getLogger().log(level, strip_ansi(message));
         } catch (Exception ignored) {
         }
     }
@@ -656,39 +681,26 @@ public class Util {
     public static void cinform(String message) {
         if ((!VA_postal.quiet) &&
                 (message != null) && (!message.isEmpty())) {
-            try {
-                System.out.println(message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, console_level(message));
         }
     }
 
     public static void perm_inform(String message) {
         if ((VA_postal.permtalk) &&
                 (message != null) && (!message.isEmpty())) {
-            message = "\033[1;32m[Postal] \033[1;37m" + message;
-            try {
-                System.out.println(message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, java.util.logging.Level.INFO);
         }
     }
 
     public static void con_type(String message) {
         if ((message != null) && (!message.isEmpty())) {
-            try {
-                System.out.println(message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, console_level(message));
         }
     }
 
     public static void dinform(String message) {
         if ((message != null) && (!message.isEmpty()) && (VA_postal.debug)) {
-            try {
-                System.out.println("\033[1;33m" + message + AnsiColor.WHITE);
-            } catch (Exception ignored) {
-            }
+            console_log(message, java.util.logging.Level.INFO);
         }
     }
 
@@ -762,7 +774,7 @@ public class Util {
         try {
             String sadjusted_loc = put_point_on_ground(slocation, false);
             Location adjusted_loc = str2location(sadjusted_loc);
-            if (sadjusted_loc == null) {
+            if (adjusted_loc == null) {
                 cinform(error + " " + slocation);
                 return;
             }
@@ -793,6 +805,9 @@ public class Util {
     public static synchronized String put_point_on_ground(String slocation, boolean ground_block) {
         //Util.dinform("put_point_on_ground: "+slocation + " "+ground_block);
         Location base = simplified_copy(slocation);
+        if (base == null) {
+            return slocation; // unparseable, or its world isn't loaded: nothing to put on the ground
+        }
         Location test_loc = simplified_copy(base);
         Block block = valid_waypnt_block(test_loc);
         if (ground_block) {
@@ -890,7 +905,10 @@ public class Util {
         //Util.dinform("valid_waypnt_block: " + AnsiColor.GREEN + "location " + AnsiColor.WHITE + "= [" + AnsiColor.YELLOW + location + AnsiColor.WHITE + "]");
         //Util.dinform("valid_waypnt_block: " + block + " " + block.getType() + " " + block.getType().isSolid() + " " + block.getType().isOccluding());
 
-        if (block.getType().isSolid())
+        // Solid and something you'd bump into: Bukkit counts signs, banners and pressure plates as solid, so the
+        // [Postal_Mail] sign hung in front of every mailbox put the postman's standing spot on top of it, a block
+        // up, where Citizens couldn't take him; he stopped wherever he was, off to one side.
+        if (block.getType().isSolid() && !block.isPassable())
             return block;
         else
             return null;
@@ -1071,10 +1089,10 @@ public class Util {
                     } catch (Exception e) {
                         continue;
                     }
-                    if (kplyr.getDisplayName().length() >= splyr.length()) {
-                        if (kplyr.getDisplayName().toLowerCase().trim().contains(splyr)) {
+                    if (Text.legacy(kplyr.displayName()).length() >= splyr.length()) {
+                        if (Text.legacy(kplyr.displayName()).toLowerCase().trim().contains(splyr)) {
                             result = aPlayer;
-                            if (Objects.equals(kplyr.getDisplayName().toLowerCase(), splayer)) {
+                            if (Objects.equals(Text.legacy(kplyr.displayName()).toLowerCase(), splayer)) {
                                 return result;
                             }
 
@@ -1102,8 +1120,8 @@ public class Util {
                 if (hit > 1) {
                     for (int i = 0; i < hit; i++) {
 
-                        test = collection[i].getDisplayName().toLowerCase().trim();
-                        if (!test.equals(collection[i].getDisplayName().trim())) {
+                        test = Text.legacy(collection[i].displayName()).toLowerCase().trim();
+                        if (!test.equals(Text.legacy(collection[i].displayName()).trim())) {
                             case_save = collection[i];
                         }
                         if (!test.equals(last_match)) {
@@ -1171,7 +1189,7 @@ public class Util {
         int hit = 0;
 
         for (Player aPlayer_list : player_list) {
-            kplyr = aPlayer_list.getDisplayName().toLowerCase().trim();
+            kplyr = Text.legacy(aPlayer_list.displayName()).toLowerCase().trim();
             if ((kplyr.contains(splyr)) || (all)) {
                 result = aPlayer_list;
 
@@ -1198,7 +1216,7 @@ public class Util {
         Map<Player, String> player_list = new HashMap<>();
         try {
             for (Player a_player : onlineplayers) {
-                player_list.put(a_player, a_player.getDisplayName());
+                player_list.put(a_player, Text.legacy(a_player.displayName()));
             }
 
             for (OfflinePlayer a_player : offlineplayers) {
@@ -1365,20 +1383,6 @@ public class Util {
             result++;
         }
         return result;
-    }
-
-    public static BlockFace int2BF(int face) {
-        switch (face) {
-            default:
-            case 2:
-                return BlockFace.NORTH;
-            case 3:
-                return BlockFace.SOUTH;
-            case 4:
-                return BlockFace.WEST;
-            case 5:
-                return BlockFace.EAST;
-        }
     }
 
     public static Player UUID2Player(String id) {

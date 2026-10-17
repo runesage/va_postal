@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
@@ -133,7 +134,9 @@ public class BookManip {
             boolean fixed_accept = false;
             boolean fixed_refuse = false;
 
-            spage[0] = spage[0].replace("[shipping label]", "[statement]");
+            // The label reads "[Shipping Label]": a case-sensitive replace missed it, so a statement still
+            // looked like a label to /accept and /refuse.
+            spage[0] = spage[0].replaceAll("(?i)\\[shipping label\\]", "[statement]");
 
             for (int i = 1; i < spage.length; i++) {
                 if (spage[i].contains("§2/accept")) {
@@ -209,6 +212,41 @@ public class BookManip {
         return false;
     }
 
+    /** True if {@code item} is a shipping label (addressed or not). */
+    /**
+     * True if this is a parcel's statement (what a label becomes once the parcel is accepted or refused),
+     * including statements stamped before "[statement]" was written reliably.
+     */
+    public static boolean is_parcel_statement(ItemStack item) {
+        if (item == null || item.getType() != Material.WRITTEN_BOOK) {
+            return false;
+        }
+        Book book = new Book(item);
+        String[] pages = book.is_valid() ? book.getPages() : null;
+        if (pages == null || pages.length == 0 || pages[0] == null) {
+            return false;
+        }
+        if (pages[0].toLowerCase().contains("[statement]")) {
+            return true;
+        }
+        for (String p : pages) {
+            if (p != null && (p.contains("Shipment Accepted") || p.contains("Shipment Refused"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean is_shipping_label(ItemStack item) {
+        if (item == null || item.getType() != Material.WRITTEN_BOOK) {
+            return false;
+        }
+        Book book = new Book(item);
+        String[] pages = book.is_valid() ? book.getPages() : null;
+        return pages != null && pages.length > 0 && pages[0] != null
+                && pages[0].toLowerCase().contains("[shipping label]");
+    }
+
     public static synchronized String[] parcel_list(Inventory inventory) {
         if (inventory == null) {
             return null;
@@ -225,7 +263,6 @@ public class BookManip {
                 } else {
                     String sqty = MailGen.ifixed_len(ind_item.getAmount(), 2);
                     String name = Util.df(ind_item.getType().name().toLowerCase());
-                    lines_and_items[(slot + 50)] = MailGen.stack2serial(ind_item);
 
                     if (name.length() >= 16) {
                         name = name.substring(0, 16);
@@ -239,52 +276,6 @@ public class BookManip {
             return lines_and_items;
         }
         return null;
-    }
-
-    public static synchronized Inventory parcel_fill_chest(Block block, ItemStack ind_item) {
-        Book book = new Book(ind_item);
-        String[] pages = book.getPages();
-
-        String name = "";
-
-        Chest chest = (Chest) block.getState();
-        if (chest == null) {
-            book = null;
-            return null;
-        }
-
-
-        Inventory inventory = chest.getInventory();
-
-
-        String[] parts = null;
-        ItemStack items = null;
-        for (int i = 10; i < 37; i++) {
-            if ((pages[i] != null) && (!pages[i].isEmpty())) {
-                int dur;
-                int qty;
-                try {
-                    parts = pages[i].split(",");
-                    if (parts.length == 4) {
-                        name = parts[0].trim();
-                        qty = Util.str2int(parts[1]);
-                        dur = Util.str2int(parts[3]);
-                    } else {
-                        continue;
-                    }
-                } catch (NumberFormatException numberFormatException) {
-                    continue;
-                }
-                items = MailGen.serial2stack(name, qty, dur);
-                if (items == null) {
-                    Util.cinform("[Postal] Could not restore parcel item " + name + " x" + qty);
-                    continue;
-                }
-                inventory.setItem(i - 10, items);
-            }
-        }
-        book = null;
-        return inventory;
     }
 
     public static synchronized String[] parcel_pages(Player player, Inventory inventory) {
@@ -481,11 +472,15 @@ public class BookManip {
         line_3 = Util.df(saddr);
         if (sowner == null) {
             if (saddr.contains("[Local]")) {
-                if (C_Owner.is_local_po_owner_defined(stown)) {
-                    line_4 = C_Owner.get_owner_local_po(stown).getName();
+                String owner_name = C_Owner.get_owner_local_po_name(stown);
+                if (owner_name != null) {
+                    line_4 = owner_name;
                 }
-            } else if (C_Owner.is_address_owner_defined(stown, saddr)) {
-                line_4 = C_Owner.get_owner_address(stown, saddr).getName();
+            } else {
+                String owner_name = C_Owner.get_owner_address_name(stown, saddr);
+                if (owner_name != null) {
+                    line_4 = owner_name;
+                }
             }
         }
         //Util.dinform("sowner for "+stown+" "+saddr+" was "+sowner);
@@ -498,10 +493,10 @@ public class BookManip {
         }
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
-            sign.setLine(0, line_1);
-            sign.setLine(1, line_2);
-            sign.setLine(2, line_3);
-            sign.setLine(3, line_4);
+            Text.line(sign, 0, line_1);
+            Text.line(sign, 1, line_2);
+            Text.line(sign, 2, line_3);
+            Text.line(sign, 3, line_4);
             sign.update();
         }
     }

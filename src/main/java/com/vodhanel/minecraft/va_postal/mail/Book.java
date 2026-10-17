@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import org.bukkit.Material;
@@ -31,7 +32,7 @@ public class Book {
         try {
             author = bookData.getAuthor();
             title = bookData.getTitle();
-            lpages = bookData.getPages();
+            lpages = bookData.pages().stream().map(Text::legacy).toList();
         } catch (Exception e) {
             valid_book = false;
         }
@@ -53,6 +54,12 @@ public class Book {
     }
 
     public static String makeFirstMailPage(String town, String address, String attention, String mf1, String mf2, String author, String title, String fdate, Player Author, Player Attention) {
+        return makeFirstMailPageById(town, address, attention, mf1, mf2, author, title, fdate,
+                Author != null ? Author.getUniqueId() : null, Attention != null ? Attention.getUniqueId() : null);
+    }
+
+    /** By UUID, so mail can be addressed to a player who is offline or on another server. */
+    public static String makeFirstMailPageById(String town, String address, String attention, String mf1, String mf2, String author, String title, String fdate, java.util.UUID Author, java.util.UUID Attention) {
         String spage = "";
         spage += "§7§oTo:\n";
         spage += "§c  " + town + "\n";
@@ -67,8 +74,8 @@ public class Book {
         spage += "§8  " + title + "\n";
         spage += "\n";
         spage += "§7" + fdate + "\n";
-        spage += (Author != null ? Author.getUniqueId() : "") + "\n";
-        spage += (Attention != null ? Attention.getUniqueId() : "") + "\n";
+        spage += (Author != null ? Author.toString() : "") + "\n";
+        spage += (Attention != null ? Attention.toString() : "") + "\n";
         return spage;
     }
 
@@ -84,6 +91,19 @@ public class Book {
         if (!new_itemstack) {
             bookData.setAuthor(sAuthor);
         }
+    }
+
+    /**
+     * Whether mail titled {@code title} (its destination office) and authored {@code author} (its destination
+     * address) is for the mailbox at {@code office}'s {@code address}. Both must match: a letter for another town's
+     * Home, posted in this town's Home mailbox, is outgoing mail, not mail for here.
+     */
+    public static boolean addressed_to(String title, String author, String office, String address) {
+        return plain(author).equals(plain(address)) && plain(title).equals(plain(office));
+    }
+
+    private static String plain(String s) {
+        return s == null ? "" : s.replaceAll("\u00a7.", "").toLowerCase().trim();
     }
 
     public String getTitle() {
@@ -192,12 +212,12 @@ public class Book {
                 if (i < pages.length) {
                     sPages[i] = pages[i];
                     if (!new_itemstack) {
-                        bookData.setPage(i, pages[i]);
+                        bookData.page(i, Text.component(pages[i]));
                     }
                 } else {
                     sPages[i] = " ";
                     if (!new_itemstack) {
-                        bookData.addPage(" ");
+                        bookData.addPages(Text.component(" "));
                     }
                 }
             }
@@ -207,7 +227,7 @@ public class Book {
         } else {
             pages[index] = text;
             if (!new_itemstack) {
-                bookData.setPage(index, text);
+                bookData.page(index, Text.component(text));
             }
         }
         return true;
@@ -223,7 +243,7 @@ public class Book {
         newBookData.setAuthor(author);
         newBookData.setTitle(title);
         for (int i = 0; i < pages.length; i++) {
-            newBookData.addPage(pages[i]);
+            newBookData.addPages(Text.component(pages[i]));
         }
         newbook.setItemMeta(newBookData);
         return newbook;

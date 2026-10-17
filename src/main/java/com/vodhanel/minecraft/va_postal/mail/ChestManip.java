@@ -205,14 +205,12 @@ public class ChestManip {
         String X;
         String Y;
         String Z;
-        String sdir;
-        byte dir;
+        org.bukkit.block.BlockFace dir;
         try {
             X = parts_c[0].trim();
             Y = parts_c[1].trim();
             Z = parts_c[2].trim();
-            sdir = parts_c[3].trim();
-            dir = Byte.parseByte(sdir);
+            dir = org.bukkit.block.BlockFace.valueOf(parts_c[3].trim());
         } catch (Exception e) {
             return null;
         }
@@ -245,7 +243,7 @@ public class ChestManip {
             if (test_block.getType().isAir()) {
                 try {
                     test_block.setType(Material.CHEST);
-                    BlockFacing.set_facing(test_block, Util.int2BF(dir));
+                    BlockFacing.set_facing(test_block, dir);
                     return test_block;
                 } catch (Exception e) {
                     return null;
@@ -255,53 +253,23 @@ public class ChestManip {
         return null;
     }
 
-    public static synchronized void parcel_remove_origen_chest(ItemStack ind_item) {
-        Book book;
-        try {
-            book = new Book(ind_item);
-        } catch (Exception e) {
-            return;
-        }
-        String[] spage = book.getPages();
-        String[] parts = spage[1].split("\n");
-        String sworld = parts[0].substring(2).trim();
-        String scoords = parts[1].trim();
-        String[] parts_c = scoords.split(",");
-        String X;
-        String Y;
-        String Z;
-        try {
-            X = parts_c[0].trim();
-            Y = parts_c[1].trim();
-            Z = parts_c[2].trim();
-        } catch (Exception e) {
-            return;
-        }
-        String slocation = sworld + "," + X + "," + Y + "," + Z;
-        Location location = Util.str2location(slocation);
-        World w = location.getWorld();
-        Block block = w.getBlockAt(location);
-        if (block == null) {
-            return;
-        }
-        if (!(block.getState() instanceof Chest)) {
-            return;
-        }
-        Chest chest = (Chest) block.getState();
-
-        chest.getInventory().clear();
-
-        SignManip.remove_sign_id_chest(block);
-        block.setType(Material.AIR);
+    public static synchronized void add_to_central_chest(ItemStack book_item) {
+        add_to_central_chest(book_item, Letters.Move.UNTRACKED);
     }
 
-    public static synchronized void add_to_central_chest(ItemStack book_item) {
+    /** Adds the book to Central's chest (after 12 ticks), then commits {@code move}. */
+    public static synchronized void add_to_central_chest(ItemStack book_item, Letters.Move move) {
         if (book_item == null) {
+            move.cancel("nothing to add");
             return;
         }
-        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> VA_postal.central_po_inventory.addItem(book_item), 12L);
-
-
+        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
+            if (VA_postal.central_po_inventory != null && VA_postal.central_po_inventory.addItem(book_item).isEmpty()) {
+                move.commit();
+            } else {
+                move.cancel("Central's chest unavailable or full"); // reconciliation re-materialises it there
+            }
+        }, 12L);
     }
 
     public static synchronized void set_central_chest_inv() {

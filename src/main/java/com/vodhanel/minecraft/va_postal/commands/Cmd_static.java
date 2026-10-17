@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.mail.CodLabel;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
@@ -12,6 +13,9 @@ import com.vodhanel.minecraft.va_postal.listeners.RouteEditor;
 import com.vodhanel.minecraft.va_postal.mail.Book;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
+import com.vodhanel.minecraft.va_postal.mail.HoldTag;
+import com.vodhanel.minecraft.va_postal.mail.Letters;
+import com.vodhanel.minecraft.va_postal.mail.MailIds;
 import com.vodhanel.minecraft.va_postal.mail.SignManip;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -66,6 +70,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/expedite <PostOffice> <address> &7&o(alias: /ex)");
         Util.pinform(player, " &7&oSet the central post office");
         Util.pinform(player, " &f&r/setcentral");
+        Util.pinform(player, " &7&oPostal accounts: Central and every office; run a Postal day now");
+        Util.pinform(player, " &f&r/postal bank [newday]");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oSet a town address");
@@ -118,6 +124,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/gps <PostOffice> [Address] &7&o(alias: /gpsp)");
         Util.pinform(player, " &7&oPush a route schedule forward");
         Util.pinform(player, " &f&r/expedite <PostOffice> <address> &7&o(alias: /ex)");
+        Util.pinform(player, " &7&oYour post offices' money: balance, deposit, withdraw (down to the reserve)");
+        Util.pinform(player, " &f&r/postal office [PostOffice] [balance|deposit <amt>|withdraw <amt|all>]");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oDefine route from local post office to address");
@@ -226,44 +234,23 @@ public class Cmd_static {
     public static void validate_route(Player player, String stown, String saddress) {
         boolean waypoint_exist = C_Route.is_waypoint_defined(stown, saddress, 0);
         if (!waypoint_exist) {
+            // No route yet: the post office surveys one. The address stays closed until it has a route.
             C_Dispatcher.open_address(stown, saddress, false);
-            Util.cinform("There is no route " + stown + ", " + saddress + ", closing route.");
+            Util.pinform(player, "&7&oThe post office is surveying a route to your address...");
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.survey(stown, saddress, o -> {
+                com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.report(player, o);
+                if (o.saved()) {
+                    C_Dispatcher.open_address(stown, saddress, true);
+                } else {
+                    Util.pinform(player, "&7&oSet the route by hand with &f&r/setroute " + Util.df(stown) + " " + Util.df(saddress) + "&7&o.");
+                }
+            });
         }
     }
 
+    /** {@code /accept}: the parcel's items from its record, exactly once (see Parcels). */
     public static boolean accept_worker(Player player, ItemStack stack, double price) {
-        String splayer = player.getName().trim();
-        Block block = ChestManip.parcel_place_chest_accept(player);
-        if (block == null) {
-            Util.pinform(player, "&7&oUnable to place parcel here.");
-            return false;
-        }
-
-        if (price > 0.0D) {
-            java.util.UUID sender = new Book(stack).extractEmbeddedAuthorId();
-            if (sender == null) {
-                Util.cinform("[Postal] Unable charge for COD.");
-                Util.pinform(player, "&7&oUnable to collect COD for this parcel.");
-                block.setType(org.bukkit.Material.AIR);
-                return false;
-            }
-            if (!P_Economy.charge_player(player, price)) {
-                Util.pinform(player, "&7&oUnable to collect COD payment.");
-                block.setType(org.bukkit.Material.AIR);
-                return false;
-            }
-            P_Economy.pay_player(Bukkit.getOfflinePlayer(sender), price);
-        }
-
-        Inventory inventory = BookManip.parcel_fill_chest(block, stack);
-        if (inventory == null) {
-            Util.pinform(player, "&7&oUnable to complete shipment.");
-            return false;
-        }
-
-        ItemStack stamped = BookManip.stamp_parcel_statement(player, stack, true);
-        player.getInventory().setItemInMainHand(stamped);
-        return true;
+        return com.vodhanel.minecraft.va_postal.mail.Parcels.accept(player, stack);
     }
 
     public static void cod_worker(Player player, ItemStack stack, double cod_price) {
@@ -274,9 +261,13 @@ public class Cmd_static {
         }
         ItemStack stamped = stamp_cod(stack, cod_price);
         if (stamped == null) return;
-        stack = null;
+        if (!no_charge) {
+            // Held with the label's postage; settled on delivery (half to Central, half to the sending office).
+            stamped = P_Economy.hold_cod_surcharge(player, stamped);
+            if (stamped == null) return;
+        }
+        com.vodhanel.minecraft.va_postal.mail.Parcels.set_cod(stamped, cod_price, player);
         player.getInventory().setItemInMainHand(stamped);
-        if (!no_charge) P_Economy.charge_cod_surcharge(player);
     }
 
     public static ItemStack stamp_cod(ItemStack ind_item, double price) {
@@ -292,7 +283,7 @@ public class Cmd_static {
         pages[0] = "";
         for (String part : parts) pages[0] = (pages[0] + part + "\n");
         Book stamped_book = new Book(title, author, pages);
-        return stamped_book.generateItemStack();
+        return HoldTag.carry(ind_item, MailIds.carry(ind_item, stamped_book.generateItemStack()));
     }
 
     public static double cod_amount(ItemStack ind_item) {
@@ -320,7 +311,7 @@ public class Cmd_static {
         return book.extractEmbeddedAuthor();
     }
 
-    public static boolean parcel_worker(Player player, String attention, Player Attention, String stown, String saddress) {
+    public static boolean parcel_worker(Player player, String attention, java.util.UUID Attention, String stown, String saddress) {
         Block block = ChestManip.get_parcel_chest(player);
         String slocation = Util.location2str(block.getLocation());
 
@@ -330,8 +321,9 @@ public class Cmd_static {
         String chest_dir = "";
         Chest chest = (Chest) block.getState();
         if (chest == null) return false;
-        // Shipping labels keep v4's chest direction byte (2-5) so old labels still parse.
-        int c_data = BlockFacing.to_legacy(BlockFacing.facing(block));
+        // The label records which way the chest faces, to rebuild it facing the same way.
+        org.bukkit.block.BlockFace facing = BlockFacing.facing(block);
+        String c_data = facing == null ? "NORTH" : facing.name();
         Inventory inventory = chest.getInventory();
 
         if (inventory.getSize() > 27) {
@@ -344,7 +336,7 @@ public class Cmd_static {
             Util.pinform(player, "&7&oNothing in the chest to ship.");
             return false;
         }
-        String[] pages = new String[49];
+        String[] pages = new String[12];
         pages[0] = ("§7" + sworld + "\n");
         pages[0] = (pages[0] + scoords + "," + c_data + "\n\n");
         int line = 3;
@@ -375,24 +367,41 @@ public class Cmd_static {
             if (page >= 9) break;
         }
 
-        while (page < pages.length) {
-            pages[page] = "";
-            page++;
-        }
-
-        System.arraycopy(item_list, 50, pages, 9, 27);
+        // The items themselves go into the parcel's record (Parcels.packaged); the label only lists them.
+        pages = java.util.Arrays.copyOf(pages, Math.max(1, page));
 
 
         String splayer = player.getName().trim();
         if (splayer.length() > 15) splayer = splayer.substring(0, 15);
         Book new_book = new Book("[shipping label]", splayer, pages);
         ItemStack new_stack = new_book.generateItemStack();
-        addr_worker(player, inventory, new_stack, attention, Attention, stown, saddress);
+        if (!addr_worker(player, inventory, new_stack, attention, Attention, stown, saddress, block)) {
+            return false;
+        }
         BookManip.standard_addr_sign(slocation, 2, stown, saddress, splayer);
         return true;
     }
 
-    public static void addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, Player OriginalPlayerAttention, String stown, String saddress) {
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, java.util.UUID OriginalPlayerAttention, String stown, String saddress) {
+        return addr_worker(player, inventory, stack, attention, OriginalPlayerAttention, stown, saddress, null, null);
+    }
+
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, java.util.UUID OriginalPlayerAttention, String stown, String saddress, Block parcel_chest) {
+        return addr_worker(player, inventory, stack, attention, OriginalPlayerAttention, stown, saddress, parcel_chest, null);
+    }
+
+    /**
+     * {@code parcel_chest}: the chest a new parcel is being packed from (null when addressing a letter).
+     * {@code dest_server}: the server {@code stown} is on, for a letter to another server (null: this one); its
+     * title is then {@code server:office}.
+     */
+    public static boolean addr_worker(Player player, Inventory inventory, ItemStack stack, String attention, java.util.UUID OriginalPlayerAttention, String stown, String saddress, Block parcel_chest, String dest_server) {
+        boolean network = dest_server != null;
+        if (network && (inventory != null || parcel_chest != null)) {
+            // Items never cross servers (persistent-state §6): parcels stay on the server they were packed on.
+            Util.pinform(player, "&7&oOnly letters can be sent to another server.");
+            return false;
+        }
         Book book = new Book(stack);
         String title;
         String author;
@@ -404,7 +413,7 @@ public class Cmd_static {
         boolean re_address = false;
         if (page1.contains("[not-processed]")) {
             re_address = true;
-            town = Util.df(stown);
+            town = network ? dest_server + ":" + Util.df(stown) : Util.df(stown);
             address = Util.df(saddress);
             String[] parts = page1.split("\n");
             title = Util.df(parts[10].substring(2).trim());
@@ -413,7 +422,7 @@ public class Cmd_static {
         } else {
             title = proper(book.getTitle());
             author = book.getAuthor();
-            town = Util.df(stown);
+            town = network ? dest_server + ":" + Util.df(stown) : Util.df(stown);
             address = Util.df(saddress);
             existing_pages = book.getPages_with_blank_first_page();
         }
@@ -424,10 +433,52 @@ public class Cmd_static {
         Date date = new Date();
         String fdate = formatter.format(date);
 
-        existing_pages[0] = Book.makeFirstMailPage(town, address, attention, null, null, author, title, fdate, pauthor, OriginalPlayerAttention);
+        existing_pages[0] = Book.makeFirstMailPageById(town, address, attention, null, null, author, title, fdate,
+                pauthor != null ? pauthor.getUniqueId() : null, OriginalPlayerAttention);
 
         Book new_book = new Book(town, address, existing_pages);
         ItemStack new_stack = new_book.generateItemStack();
+        // Postage is held now and settled on delivery by the offices that handle it (re-addressing keeps the hold).
+        boolean parcel = (inventory != null) || title.equalsIgnoreCase(Util.df("[shipping label]"));
+        if (parcel && network) {
+            Util.pinform(player, "&7&oOnly letters can be sent to another server.");
+            return false;
+        }
+        if (network && com.vodhanel.minecraft.va_postal.store.MailStores.active() == null) {
+            Util.pinform(player, "&7&oLetters to another server can't be sent while the mail store is closed.");
+            return false;
+        }
+        if (parcel && parcel_chest == null) {
+            // A parcel's destination is part of its record; re-addressing would leave the two disagreeing.
+            Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
+            return false;
+        }
+        new_stack = P_Economy.hold_postage(player, stack, new_stack, parcel, network);
+        if (new_stack == null) {
+            return false;
+        }
+        if (parcel) {
+            ItemStack recorded = com.vodhanel.minecraft.va_postal.mail.Parcels.packaged(new_stack, player, parcel_chest,
+                    Letters.nearest_office(player), stown, saddress, OriginalPlayerAttention);
+            if (recorded == null) {
+                P_Economy.cancel_hold(HoldTag.read(new_stack)); // nothing was shipped: give the postage back
+                return false;
+            }
+            new_stack = recorded;
+        } else {
+            // A letter: record it and tag the book with its mail id.
+            ItemStack posted = Letters.posted(MailIds.carry(stack, new_stack), player.getUniqueId(), Letters.nearest_office(player),
+                    dest_server, stown, saddress, OriginalPlayerAttention);
+            if (network && !Letters.record(posted).filter(r -> dest_server.equals(r.dest_server)).isPresent()) {
+                // Only a tracked letter can cross: an untracked one would never leave Central.
+                if (P_Economy.active_hold(stack) == null) {
+                    P_Economy.cancel_hold(HoldTag.read(new_stack), "&6Postal refunded the postage for the letter it couldn't send.");
+                }
+                Util.pinform(player, "&7&oThe mail store couldn't record this letter, so it can't go to another server now. Try again shortly.");
+                return false;
+            }
+            new_stack = posted;
+        }
         if ((inventory != null) &&
                 (title.equals(Util.df("[shipping label]")))) {
 
@@ -439,13 +490,10 @@ public class Cmd_static {
         }
 
         player.getInventory().setItemInMainHand(new_stack);
-        if (VA_postal.economy_configured)
-            if (inventory == null) if (!re_address) P_Economy.charge_postage(player, stown);
-            else Util.pinform(player, "&6There is no charge for re-addressing.");
-            else P_Economy.charge_shipping(player, stown);
         Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
         Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(saddress) + " &7&otown of &9&o" + Util.df(stown));
         Util.pinform(player, "&7&oAttention: &9&o" + attention);
+        return true;
     }
 
     public static void distr_worker(Player player, ItemStack stack, String sdistribution, String srch_stown, int iexpiration) {
@@ -618,7 +666,7 @@ public class Cmd_static {
         return result;
     }
 
-    public static boolean att_worker(boolean create, Player player, ItemStack stack, String attention, Player original) {
+    public static boolean att_worker(boolean create, Player player, ItemStack stack, String attention, java.util.UUID original) {
         Book book = new Book(stack);
         String title;
         String author;
@@ -648,24 +696,13 @@ public class Cmd_static {
             Format formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
             Date date = new Date();
             String fdate = formatter.format(date);
-            String spage = "";
-            spage = spage + "§7§oTo:\n";
-            spage = spage + "§c " + town + "\n";
-            spage = spage + "§9 " + address + "\n";
-            spage = spage + "§7§oAttention:\n";
-            spage = spage + "§2 " + attention + "\n";
-            spage = spage + "§7§oMailed from:\n";
-            spage = spage + "§7 [not-processed]\n";
-            spage = spage + "§7 [not-processed]\n";
-            spage = spage + "§7§oWritten by:\n";
-            spage = spage + "§8 " + author + "\n";
-            spage = spage + "§8 " + title + "\n";
-            spage = spage + "§7 \n";
-            spage = spage + "§7" + fdate + "\n";
-            existing_pages[0] = spage;
+            // Same layout as /addr: the stamping code reads fixed columns and the sender/recipient UUID lines.
+            existing_pages[0] = Book.makeFirstMailPageById(town, address, attention, null, null, author, title, fdate,
+                    pauthor != null ? pauthor.getUniqueId() : book.extractEmbeddedAuthorId(), original);
             Book new_book = new Book(town, address, existing_pages);
-            ItemStack new_stack = new_book.generateItemStack();
+            ItemStack new_stack = HoldTag.carry(stack, MailIds.carry(stack, new_book.generateItemStack()));
             player.getInventory().setItemInMainHand(new_stack);
+            Letters.attention_changed(new_stack, player.getUniqueId(), original);
             Util.pinform(player, "&7&oTitle &9&o" + title + " &7&oAuthor &9&o" + author);
             Util.pinform(player, "&7&oAddressed to &9&o" + Util.df(address) + " &7&otown of &9&o" + Util.df(town));
             Util.pinform(player, "&7&oAttention: &9&o" + attention);
@@ -696,11 +733,11 @@ public class Cmd_static {
 
             cost = P_Economy.charge_po_purchase(player, subject, stown);
             if (cost > 0.0D) if (player == null) Util.con_type(subject + " charged " + ef(cost));
-            else Util.pinform(player, subject.getDisplayName() + " charged " + ef(cost));
+            else Util.pinform(player, Text.legacy(subject.displayName()) + " charged " + ef(cost));
         } else if (subject != null) {
             C_Owner.set_owner_local_po(stown, subject);
-            if (player == null) Util.con_type(Util.df(stown) + " is now owned by " + subject.getDisplayName());
-            else Util.pinform(player, Util.df(stown) + " is now owned by " + subject.getDisplayName());
+            if (player == null) Util.con_type(Util.df(stown) + " is now owned by " + Text.legacy(subject.displayName()));
+            else Util.pinform(player, Util.df(stown) + " is now owned by " + Text.legacy(subject.displayName()));
         } else {
             if (C_Owner.is_local_po_owner_defined(stown)) C_Owner.del_owner_local_po(stown);
             if (player == null) Util.con_type("Owner removed from: " + Util.df(stown));

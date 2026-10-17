@@ -2,6 +2,10 @@
 Permissions: `none`
 Displays a menu with commands available to the player.
 <br>
+#### `/postal network`
+Permissions: `none`
+On a network of servers: when the mail ship (or whatever `Network.Vehicle` calls it) next leaves for the other servers, how many letters are waiting at Central for it, what's on its way here, and the other servers.
+<br>
 #### `/postal <start/stop/admin/chests/talk/quiet/speed>`
 Permissions: `postal.admin`
 Administrator commands for postal:
@@ -19,6 +23,40 @@ Stops postal, pauses all queues, and leaves the postmen for the citizens API to 
 Restarts postal.
 ##### `chests`
 Lists all chests and locations _(only works when running)_
+##### `track <mail id | recent>`
+Shows a tracked letter's state, where it is, and its full history; `recent` lists the ten most recently changed letters.
+##### `reconcile`
+Runs the mail reconciliation check now (normally every 5 minutes), for loaded chunks: finishes interrupted moves, marks letters missing from their chests as MISSING, removes stale copies and flags forged postal books.
+##### `survey <PostOffice> [address | missing | all]`
+Surveys routes: Postal finds a walking route from the post office to the address over the blocks as they are now, and saves it as an ordinary route (so `/showroute` shows it and `/setroute` can still adjust it). `missing` (the default) surveys the addresses that have no route, `all` replaces every route in the office. A new address is surveyed automatically when it's registered with `/setaddr`. The survey keeps to roads and stairs, walks through doors and gates, climbs ladders, and won't swim, cross crops or drop more than three blocks; if there's no such way, it says how close it got.
+##### `testparcel <from PostOffice> <to PostOffice> <address> [cod] [retired]`
+Packs a test parcel (an enchanted, renamed diamond sword, oak logs, golden apples) in a chest beside the from-office, locks it and hands its label in at that office, as a player would after `/package`. Optional COD amount. With `retired`, the parcel also carries an item recorded under an id this Minecraft doesn't have, as if an upgrade had removed it: whoever opens the parcel gets everything else, plus a message naming what was left out.
+##### `recover <mail id> [x y z]`
+Rebuilds lost mail from its record: a parcel's items in a new chest at x y z (or two blocks in front of you), a letter into your inventory. The record closes as RECOVERED, so the original is never routed or accepted.
+##### `accept <mail id> [x y z]` / `refuse <mail id>`
+Accepts (items in a chest at x y z, no COD) or refuses (items back where it was packed) a delivered parcel for its recipient. For testing without a second player.
+##### `setstate <mail id> <state>`
+Forces a record into a state, keeping where it is. Testing only; recorded in its history as forced by an admin.
+
+`last` can be used in place of a mail id for the newest mail.
+##### `store`
+The mail store's health: SQLite or MySQL, the schema version, this server's id, how many calls it has made and how long they take (average and slowest, and the time spent on the main thread), failures, and the servers sharing the database. With MySQL, watch the main-thread time: every call waits for the database.
+##### `directory [server]`
+The network directory: the offices each server has published, with their address counts, or one server's offices and addresses. Each server republishes its own every minute when they change.
+##### `whois <player>`
+Where the network last saw a player (server, online or when last seen), as `/addr` finds them.
+##### `testletter <from PostOffice> <to PostOffice|server:office> <address> [player]`
+Writes a tracked test letter and hands it in at the from-office, as a player would; the destination can be another server's office.
+##### `testletter <from PostOffice> <to PostOffice> <address>`
+Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
+##### `bank [newday | report [days] | policy [<setting> <value>]]`
+Central's balance, what it owes and its target, and every office's owner, balance, reserve,
+withdrawable amount and arrears. `newday` runs a Postal economy day now; `report` shows the daily flow
+log; `policy` shows or changes the economy settings at runtime. See `docs/economy.md`.
+<br>
+#### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all>]`
+Permissions: owner of the post office (admins may view any)
+An office owner's account: see the balance, deposit, or withdraw down to the reserve.
 <br>
 #### `/go [PostOffice] [Address]` _`(No address defaults to central)`_
 Permissions: `postal.gotocentral, postal.gotolocal, postal.gotoaddr`
@@ -32,18 +70,25 @@ Teleports the player to the given address, postoffice, or central office.
 <br>
 #### `/addr <PostOffice> <address> [player]`
 Permissions: `postal.addr`
-Address a signed book in your hand _(to `player`)_ at `PostOffice:Address`
+Address a signed book in your hand _(to `player`)_ at `PostOffice:Address`.
+
+On a network of servers sharing one mail store, `PostOffice` can be another server's office: its name, or `server:office` when several servers have an office by that name (your own server's offices always win a plain name). Only the letter's text travels; the postage is the network rate (`Economy.Postage.Letter.Network`).
+
+`player` can be any player the network knows, online or not, on any server: the letter still goes to the address's mailbox, marked for their attention.
 <br>
 #### `/att [player]`
 Permissions: `postal.att`
-Re-Addresses the unprocessed book in your hand to `player`
+Re-Addresses the unprocessed book in your hand to `player` (any player the network knows, as for `/addr`)
 No argument defaults the addressed to "`[resident]`"
 <br>
 #### `/package <PostOffice> <address> [player]`
 Permissions: `postal.package`
 Alias: `/pk`
 Package a chest full of goods, the player must stand near the chest, with it having no signs near or on.
-Otherwise, this command is used in the same was as `/addr`
+Otherwise, this command is used in the same was as `/addr`, except that parcels can't go to another server: only letters cross servers, so no items ever leave the server they were packed on.
+The goods go into the post office's records straight away (with all their enchantments, names and data); the empty chest stays, locked by its `[Postal_Ship]` sign, until a courier collects it when the label is first picked up.
+
+`/package cancel`, holding the label before it's posted, unpacks the goods back into that chest and refunds the postage.
 <br>
 #### `/cod <price>`
 Permissions: `postal.cod`
@@ -57,6 +102,7 @@ Permissions: `postal.accept, postal.refuse`
 `/accept` will accept the package and the attached COD payments, if the player can't pay these, the command is denied.
 It will place the package (chest) in front of the player.
 `/refuse` will refuse the package for the player, and place it back at it's origin, it will display an error when it cannot place it back.
+A parcel is accepted or refused only once: its items come from the post office's record, not the label, so a copy of a label can't get them a second time.
 <br>
 #### `/dist <"all"/"owners"> [PostOffice] [Expiration Days]`
 Permissions: `postal.distr`
@@ -112,6 +158,8 @@ Subcommands:
 ```
 `/setowner` resolves in `/setaddr` or `/setlocal` first, depending on the arguments.
 Both give the ownership of the postal object in question (`address` or `PostOffice`) to `player`
+With the economy on, a player without these permissions can still buy an **unowned** post office or address,
+but only for themselves: the player named pays the purchase price, so only they can agree to it.
 <br>
 #### `/showroute [[PostOffice] <address>]`
 Permissions: `postal.showroute`

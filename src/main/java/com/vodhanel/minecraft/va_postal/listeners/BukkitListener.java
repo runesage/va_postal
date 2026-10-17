@@ -283,6 +283,14 @@ public class BukkitListener implements Listener {
 
         if (InventoryType.CHEST == event.getInventory().getType()) {
             MailSecurity.event_check_chest_for_new_mail(event.getInventory());
+            // A shipping label just posted: the courier goes for its chest now, before the postman comes.
+            if (BookManip.is_there_a_postal_log(event.getInventory())) {
+                for (ItemStack item : event.getInventory().getContents()) {
+                    if (BookManip.is_shipping_label(item)) {
+                        com.vodhanel.minecraft.va_postal.mail.Parcels.label_posted(item);
+                    }
+                }
+            }
         }
     }
 
@@ -327,11 +335,13 @@ public class BukkitListener implements Listener {
             Util.pinform(player, msg);
         }
         Util.list_newmail(player);
+        com.vodhanel.minecraft.va_postal.mail.Network.player_joined(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public static void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        com.vodhanel.minecraft.va_postal.mail.Network.player_left(player);
 
         if ((VA_postal.plistener_player != null) &&
                 (VA_postal.plistener_player == player)) {
@@ -346,7 +356,9 @@ public class BukkitListener implements Listener {
             return;
         }
         Entity spawned = event.getEntity();
-        if (((spawned instanceof Monster)) &&
+        // Enemy, not just Monster: slimes, magma cubes, phantoms, ghasts, hoglins and shulkers are hostile without
+        // being Monsters, and a slime shoving a postman along a narrow path is enough to get him stuck.
+        if ((spawned instanceof Monster || spawned instanceof org.bukkit.entity.Enemy) &&
                 (!GetConfig.allow_monster_spawn())) {
             Chunk chunk = event.getLocation().getChunk();
             if (is_chunk_on_route(chunk)) {
@@ -414,8 +426,10 @@ public class BukkitListener implements Listener {
             return;
         }
         Location location = Util.str2location(slocation);
-        Chunk chunk = location.getChunk();
-        append_temp_chunk_list(chunk);
+        if (location == null) {
+            return; // bad/unloaded-world entry: skip it, keep the rest of the route's chunks
+        }
+        append_temp_chunk_list(location.getChunk());
     }
 
     public static synchronized void add_new_route_to_chunklist(String stown, String saddress) {

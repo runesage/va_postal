@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.listeners;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.commands.Cmd_static;
 import com.vodhanel.minecraft.va_postal.common.*;
@@ -758,18 +759,18 @@ public class RouteEditor implements Listener {
             }
             String display_title = df(addr);
             VA_postal.plistener_hud_board = VA_postal.plistener_sb_manager.getNewScoreboard();
-            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Dst_To_Poffce:", "dummy");
-            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Dst_To_Addrss:", "dummy");
-            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Elv_To_Addrss:", "dummy");
-            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Dst_To_Lst_WP:", "dummy");
-            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Total_WPoints:", "dummy");
+            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Dst_To_Poffce:", org.bukkit.scoreboard.Criteria.DUMMY, net.kyori.adventure.text.Component.text("Dst_To_Poffce:"));
+            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Dst_To_Addrss:", org.bukkit.scoreboard.Criteria.DUMMY, net.kyori.adventure.text.Component.text("Dst_To_Addrss:"));
+            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Elv_To_Addrss:", org.bukkit.scoreboard.Criteria.DUMMY, net.kyori.adventure.text.Component.text("Elv_To_Addrss:"));
+            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Dst_To_Lst_WP:", org.bukkit.scoreboard.Criteria.DUMMY, net.kyori.adventure.text.Component.text("Dst_To_Lst_WP:"));
+            VA_postal.plistener_hud_objective = VA_postal.plistener_hud_board.registerNewObjective("Total_WPoints:", org.bukkit.scoreboard.Criteria.DUMMY, net.kyori.adventure.text.Component.text("Total_WPoints:"));
             VA_postal.plistener_hud_objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-            VA_postal.plistener_hud_objective.setDisplayName(display_title);
-            VA_postal.plistener_hud_po = VA_postal.plistener_hud_objective.getScore(Bukkit.getOfflinePlayer(ChatColor.GREEN + "Dst_To_Poffce:"));
-            VA_postal.plistener_hud_addr = VA_postal.plistener_hud_objective.getScore(Bukkit.getOfflinePlayer(ChatColor.GREEN + "Dst_To_Addrss:"));
-            VA_postal.plistener_hud_addr_elev = VA_postal.plistener_hud_objective.getScore(Bukkit.getOfflinePlayer(ChatColor.BLUE + "Elv_To_Addrss:"));
-            VA_postal.plistener_hud_lwp = VA_postal.plistener_hud_objective.getScore(Bukkit.getOfflinePlayer(ChatColor.YELLOW + "Dst_To_Lst_WP:"));
-            VA_postal.plistener_hud_tot = VA_postal.plistener_hud_objective.getScore(Bukkit.getOfflinePlayer(ChatColor.GOLD + "Total_WPoints:"));
+            VA_postal.plistener_hud_objective.displayName(Text.component(display_title));
+            VA_postal.plistener_hud_po = VA_postal.plistener_hud_objective.getScore("§aDst_To_Poffce:");
+            VA_postal.plistener_hud_addr = VA_postal.plistener_hud_objective.getScore("§aDst_To_Addrss:");
+            VA_postal.plistener_hud_addr_elev = VA_postal.plistener_hud_objective.getScore("§9Elv_To_Addrss:");
+            VA_postal.plistener_hud_lwp = VA_postal.plistener_hud_objective.getScore("§eDst_To_Lst_WP:");
+            VA_postal.plistener_hud_tot = VA_postal.plistener_hud_objective.getScore("§6Total_WPoints:");
             VA_postal.plistener_player.setScoreboard(VA_postal.plistener_hud_board);
             Location loc_po = Util.str2location(C_Postoffice.get_local_po_location_by_name(po));
             Location loc_addr = Util.str2location(C_Address.get_address_location(po, addr));

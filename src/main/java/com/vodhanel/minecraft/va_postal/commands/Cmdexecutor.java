@@ -1,11 +1,13 @@
 package com.vodhanel.minecraft.va_postal.commands;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import org.bukkit.Particle;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
 import com.vodhanel.minecraft.va_postal.listeners.RouteEditor;
 import com.vodhanel.minecraft.va_postal.listeners.RouteView;
+import com.vodhanel.minecraft.va_postal.mail.Network;
 import com.vodhanel.minecraft.va_postal.mail.BookManip;
 import com.vodhanel.minecraft.va_postal.mail.ChestManip;
 import org.bukkit.Location;
@@ -35,24 +37,13 @@ public class Cmdexecutor implements CommandExecutor {
     public static boolean hasPermission(Player player, String node) {
         String splayer = player.getName().toLowerCase().trim();
 
-        if (VA_postal.perms != null) {
-            if (VA_postal.perms.has(player, "postal.admin")) {
-                Util.perm_inform("Vault: postal.admin, " + splayer);
-                return true;
-            }
-            if (VA_postal.perms.has(player, node)) {
-                Util.perm_inform("Vault: " + node + ", " + splayer);
-                return true;
-            }
-        } else {
-            if (player.hasPermission("postal.admin")) {
-                Util.perm_inform("Bukkit: postal.admin");
-                return true;
-            }
-            if (player.hasPermission(node)) {
-                Util.perm_inform("Bukkit: " + node + ", " + splayer);
-                return true;
-            }
+        if (player.hasPermission("postal.admin")) {
+            Util.perm_inform("Bukkit: postal.admin");
+            return true;
+        }
+        if (player.hasPermission(node)) {
+            Util.perm_inform("Bukkit: " + node + ", " + splayer);
+            return true;
         }
 
         if ((VA_postal.using_towny()) &&
@@ -66,24 +57,13 @@ public class Cmdexecutor implements CommandExecutor {
     }
 
     public static boolean hasPermission_ext(Player player, String node, String stown, String saddress) {
-        if (VA_postal.perms != null) {
-            if (VA_postal.perms.has(player, "postal.admin")) {
-                Util.perm_inform("Vault: postal.admin, " + player);
-                return true;
-            }
-            if (VA_postal.perms.has(player, node)) {
-                Util.perm_inform("Vault: " + node + ", " + player);
-                return true;
-            }
-        } else {
-            if (player.hasPermission("postal.admin")) {
-                Util.perm_inform("Bukkit: postal.admin, " + player);
-                return true;
-            }
-            if (player.hasPermission(node)) {
-                Util.perm_inform("Bukkit: " + node + ", " + player);
-                return true;
-            }
+        if (player.hasPermission("postal.admin")) {
+            Util.perm_inform("Bukkit: postal.admin, " + player);
+            return true;
+        }
+        if (player.hasPermission(node)) {
+            Util.perm_inform("Bukkit: " + node + ", " + player);
+            return true;
         }
 
 
@@ -131,6 +111,26 @@ public class Cmdexecutor implements CommandExecutor {
         return false;
     }
 
+    /** An "x,y,z" point in the player's world, or null if it isn't three finite numbers. */
+    private static Location test_point(Player player, String sxyz) {
+        String[] xyz = sxyz.split(",");
+        if (xyz.length != 3) {
+            return null;
+        }
+        double[] d = new double[3];
+        try {
+            for (int i = 0; i < 3; i++) {
+                d[i] = Double.parseDouble(xyz[i].trim());
+                if (!Double.isFinite(d[i])) {
+                    return null;
+                }
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return new Location(player.getWorld(), d[0], d[1], d[2]);
+    }
+
     public static boolean postal(boolean console, CommandSender sender, String cmd, String[] args) {
         if (args.length == 0) {
             if (hasPermission(player, "postal.admin")) {
@@ -144,6 +144,51 @@ public class Cmdexecutor implements CommandExecutor {
             }
 
             Cmd_static.menu_player(player);
+            return true;
+        }
+        if ("office".equals(args[0].toLowerCase().trim())) {
+            P_Bank.office_command(player, args, hasPermission(player, "postal.admin"));
+            return true;
+        }
+        String sub = args[0].toLowerCase().trim();
+        if ("survey".equals(sub)) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(player, args);
+            return true;
+        }
+        if ("network".equals(sub)) {
+            for (String line : Network.schedule()) {
+                Util.pinform(player, line);
+            }
+            return true;
+        }
+        if ("bank".equals(sub) || "track".equals(sub) || "testletter".equals(sub) || "reconcile".equals(sub)
+                || "testparcel".equals(sub) || "recover".equals(sub) || "accept".equals(sub) || "refuse".equals(sub)
+                || "setstate".equals(sub) || "store".equals(sub) || "directory".equals(sub) || "whois".equals(sub)) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            try {
+            if ("bank".equals(sub)) P_Bank.command(player, args);
+            else if ("track".equals(sub)) P_MailAdmin.track(player, args);
+            else if ("reconcile".equals(sub)) P_MailAdmin.reconcile(player);
+            else if ("testparcel".equals(sub)) P_MailAdmin.testparcel(player, args);
+            else if ("recover".equals(sub)) P_MailAdmin.recover(player, args);
+            else if ("accept".equals(sub)) P_MailAdmin.accept(player, args);
+            else if ("refuse".equals(sub)) P_MailAdmin.refuse(player, args);
+            else if ("setstate".equals(sub)) P_MailAdmin.setstate(player, args);
+            else if ("store".equals(sub)) P_MailAdmin.store(player);
+            else if ("directory".equals(sub)) P_MailAdmin.directory(player, args);
+            else if ("whois".equals(sub)) P_MailAdmin.whois(player, args);
+            else P_MailAdmin.testletter(player, args);
+            } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                // The database is down or failing: say so rather than "an internal error occurred".
+                Util.pinform(player, "&cThe mail store is unavailable: " + e.getMessage());
+            }
             return true;
         }
         if ("speed".equals(args[0].toLowerCase().trim())) {
@@ -163,7 +208,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.pinform(player, "&7&cProblem with the number you used.");
                 return true;
             }
-            if ((result < 0.5F) || (result > 2.0F)) {
+            if (!((result >= 0.5F) && (result <= 2.0F))) { // so NaN is refused too
                 Util.pinform(player, "&7&cSpeed must be 0.5 - 2.0");
                 return true;
             }
@@ -207,6 +252,10 @@ public class Cmdexecutor implements CommandExecutor {
         if ("start".equals(args[0].toLowerCase().trim())) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            if (VA_Dispatcher.dispatcher_running) {
+                Util.pinform(player, "&7&oDispatcher is already running.");
                 return true;
             }
             VA_Dispatcher.start_up(false);
@@ -260,6 +309,7 @@ public class Cmdexecutor implements CommandExecutor {
             VA_postal.towny_opt_in = GetConfig.towny_opt_in();
             VA_postal.showroute_PE = GetConfig.showroute_PE();
             VA_postal.showroute_COL = GetConfig.showroute_COLOR();
+            VA_postal.wtr_speed = GetConfig.speed();
 
             Config.LoadConfiguration();
 
@@ -267,10 +317,12 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         if ("test".equals(args[0].toLowerCase().trim()) && hasPermission(player, "postal.admin") && args.length >= 3) {
-            String[] xyz1 = args[1].split(",");
-            String[] xyz2 = args[2].split(",");
-            Location one = new Location(player.getWorld(), Double.parseDouble(xyz1[0]), Double.parseDouble(xyz1[1]), Double.parseDouble(xyz1[2]));
-            Location two = new Location(player.getWorld(), Double.parseDouble(xyz2[0]), Double.parseDouble(xyz2[1]), Double.parseDouble(xyz2[2]));
+            Location one = test_point(player, args[1]);
+            Location two = test_point(player, args[2]);
+            if (one == null || two == null) {
+                Util.pinform(player, "&7&oUsage: &f&r/postal test <x,y,z> <x,y,z> &7&oDraws a line between two points.");
+                return true;
+            }
             Particles.displayLine(one, two, player, Particle.PORTAL);
             return true;
         }
@@ -282,10 +334,71 @@ public class Cmdexecutor implements CommandExecutor {
         if (args.length == 0) {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
-            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute>");
+            Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/survey>");
+            Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate/store/directory>");
             return true;
         }
 
+        if ("bank".equals(args[0].toLowerCase().trim())) {
+            P_Bank.command(sender, args);
+            return true;
+        }
+        if ("office".equals(args[0].toLowerCase().trim())) {
+            P_Bank.office_command(sender, args, true);
+            return true;
+        }
+        if ("survey".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.navigation.survey.RouteSurvey.command(sender, args);
+            return true;
+        }
+        if ("track".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.track(sender, args);
+            return true;
+        }
+        if ("store".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.store(sender);
+            return true;
+        }
+        if ("directory".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.directory(sender, args);
+            return true;
+        }
+        if ("whois".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.whois(sender, args);
+            return true;
+        }
+        if ("network".equals(args[0].toLowerCase().trim())) {
+            for (String line : Network.schedule()) {
+                sender.sendMessage(Text.color(line));
+            }
+            return true;
+        }
+        if ("reconcile".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.reconcile(sender);
+            return true;
+        }
+        switch (args[0].toLowerCase().trim()) {
+            case "testparcel":
+                P_MailAdmin.testparcel(sender, args);
+                return true;
+            case "recover":
+                P_MailAdmin.recover(sender, args);
+                return true;
+            case "accept":
+                P_MailAdmin.accept(sender, args);
+                return true;
+            case "refuse":
+                P_MailAdmin.refuse(sender, args);
+                return true;
+            case "setstate":
+                P_MailAdmin.setstate(sender, args);
+                return true;
+            default:
+        }
+        if ("testletter".equals(args[0].toLowerCase().trim())) {
+            P_MailAdmin.testletter(sender, args);
+            return true;
+        }
         if ("conc".equals(args[0].toLowerCase().trim())) {
             if (VA_postal.wtr_concurrent) {
                 VA_postal.wtr_concurrent = false;
@@ -334,7 +447,7 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.con_type("Must be a floating point number.");
                 return true;
             }
-            if ((result < 0.5F) || (result > 2.0F)) {
+            if (!((result >= 0.5F) && (result <= 2.0F))) { // so NaN is refused too
                 Util.con_type("Speed factor must be 0.5 - 2.0");
                 return true;
             }
@@ -711,7 +824,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for address. See list:");
             return true;
         }
-        if (!hasPermission_ext(player, "postal.closeaddr", stown, "null")) {
+        if (!hasPermission_ext(player, "postal.closeaddr", stown, saddress)) {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
@@ -789,7 +902,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for address. See list:");
             return true;
         }
-        if (!hasPermission_ext(player, "postal.openaddr", stown, "null")) {
+        if (!hasPermission_ext(player, "postal.openaddr", stown, saddress)) {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
@@ -1268,6 +1381,28 @@ public class Cmdexecutor implements CommandExecutor {
         return true;
     }
 
+    /**
+     * Mail can only be addressed near a post office in the player's world, so it can't be addressed from a
+     * world or place no office serves (docs/economy.md).
+     */
+    private static boolean near_post_office(Player player) {
+        int max = GetConfig.mail_office_distance();
+        if (max <= 0) {
+            return true;
+        }
+        String[] offices = C_Arrays.geo_po_list_sorted(player);
+        if ((offices != null) && (offices.length > 0)) {
+            try {
+                if (Integer.parseInt(offices[0].split(",")[0].trim()) <= max) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        Util.pinform(player, "&7&oYou need to be within " + max + " blocks of a post office to address mail.");
+        return false;
+    }
+
     public static boolean address(boolean console, CommandSender sender, String cmd, String[] args) {
         if ((!hasPermission(player, "postal.addr")) && (VA_postal.using_towny()) && (!P_Towny.is_towny_resident_by_tvrs(player))) {
             Util.pinform(player, "&7&oRequired permission not present.");
@@ -1282,24 +1417,41 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oYou must have a signed book in your hand.");
             return true;
         }
-        String stown = C_Postoffice.town_complete(args[0]);
-        if ("null".equals(stown)) {
+        if (BookManip.is_shipping_label(stack)) {
+            // Refused straight away, not after a confirmation: a parcel's destination is part of its record.
+            Util.pinform(player, "&7&oA shipping label can't be re-addressed. Use &f&r/package cancel&7&o and package it again.");
+            return true;
+        }
+        Network.Resolved resolved = Network.resolve_office(args[0]);
+        if (resolved.office() == null) {
+            if (!resolved.choices().isEmpty()) {
+                Util.pinform(player, "&7&oSeveral servers have a post office called that. Write one as &f&rserver:office&7&o:");
+                Util.pinform(player, "&9&o" + String.join(", ", resolved.choices()));
+                return true;
+            }
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
                 P_Towny.list_towny_tree(player, false, null, false);
             else Util.list_postal_tree(player, false, null);
             Util.pinform(player, "&7&oNeed more letters for post office. See list:");
             return true;
         }
-        double price = 0.0D;
-        if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_postage(player, stown);
-            if (price < 0.0D) {
-                Util.pinform(player, "&f&oYou don't have enough money to cover postage.");
+        Network.Office office = resolved.office();
+        String stown = office.office();
+        if (!near_post_office(player)) {
+            return true;
+        }
+        double price = P_Economy.postage_to_hold(stack, BookManip.is_shipping_label(stack), office.remote());
+        if ((price > 0.0D) && (!P_Economy.does_player_have_amount(player, price))) {
+            Util.pinform(player, "&f&oYou don't have enough money to cover postage.");
+            return true;
+        }
+        String saddress = office.remote() ? Network.remote_address(office, args[1]) : C_Address.addresses_complete(stown, args[1]);
+        if (saddress == null || "null".equals(saddress)) {
+            if (office.remote()) {
+                Util.pinform(player, "&7&oNo address at &9&o" + office.label() + "&7&o matches that. Its addresses: &9&o"
+                        + String.join(", ", Network.remote_addresses(office)));
                 return true;
             }
-        }
-        String saddress = C_Address.addresses_complete(stown, args[1]);
-        if ("null".equals(saddress)) {
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
                 P_Towny.list_towny_tree(player, true, stown, false);
             else Util.list_postal_tree(player, true, stown);
@@ -1308,24 +1460,35 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         String attention = "[Resident]";
-        Player originalAttention = null;
-        if (args.length == 3) {
-            Player player = Util.player_complete(args[2]);
-            if (player != null) {
-                attention = player.getDisplayName();
-                originalAttention = player;
+        java.util.UUID originalAttention = null;
+        String where = null;
+        if (args.length == 3 && !"[Resident]".equalsIgnoreCase(args[2])) {
+            // Any player the network knows, online or not, on any server: the letter still goes to the address.
+            Network.Recipient recipient = Network.find_player(args[2]);
+            if (recipient == null) {
+                Util.pinform(player, "&7&oNo player called &f&r" + args[2] + "&7&o is known on this network.");
+                return true;
             }
+            attention = recipient.name();
+            originalAttention = recipient.id();
+            where = recipient.where();
         }
 
 
         if (is_player_comfirmation_registered(player)) {
-            Cmd_static.addr_worker(player, null, stack, attention, originalAttention, stown, saddress);
+            Cmd_static.addr_worker(player, null, stack, attention, originalAttention, stown, saddress, null, office.server());
             deregister_player_comfirmation(player);
         } else {
-            Util.pinform(player, "&7&oReady to address to: &9&o" + Util.df(stown) + ", " + Util.df(saddress) + ", " + Util.df(attention));
-            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage.");
+            Util.pinform(player, "&7&oReady to address to: &9&o" + (office.remote() ? office.server() + ":" : "") + Util.df(stown)
+                    + ", " + Util.df(saddress) + ", " + Util.df(attention) + (where == null ? "" : " &7&o(" + where + ")"));
+            if (office.remote()) {
+                Util.pinform(player, "&7&oThis letter goes to another server. Only the letter travels: nothing else in it.");
+                if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage to another server.");
+            } else if (price > 0.0D) {
+                Util.pinform(player, "&fYou will be charged " + ef(price) + " for postage, held until delivery; local mail gets the difference back.");
+            }
 
-            String scommand = "/addr " + stown + " " + saddress + " " + attention;
+            String scommand = "/addr " + office.label() + " " + saddress + " " + attention;
             register_player_comfirmation(player, scommand);
         }
 
@@ -1412,13 +1575,22 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
+        // The parcel's record decides whether it can be accepted (delivered, not yet filled), not the label's text.
         ItemStack stack = player.getInventory().getItemInMainHand();
-        if (!BookManip.holding_valid_shipper(player, stack, true)) {
+        if (BookManip.is_parcel_statement(stack)) {
+            Util.pinform(player, "&c&oThat's a statement: this parcel has already been accepted or refused.");
+            return true;
+        }
+        if (!BookManip.is_shipping_label(stack)) {
             Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
         }
+        // Checked before asking for confirmation, so a parcel that can't be accepted is refused at once.
+        if (!com.vodhanel.minecraft.va_postal.mail.Parcels.can_open(player, stack)) {
+            return true;
+        }
 
-        double price = Cmd_static.cod_amount(stack);
+        double price = com.vodhanel.minecraft.va_postal.mail.Parcels.cod_of(stack);
         if ((price > 0.0D) &&
                 (!P_Economy.does_player_have_amount(player, price))) {
             Util.pinform(player, "&7&oYou don't have enough money to pay for this COD.");
@@ -1460,30 +1632,16 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         ItemStack stack = player.getInventory().getItemInMainHand();
-        if (!BookManip.holding_valid_shipper(player, stack, true)) {
-            Util.pinform(player, "&7&oYou must have a valid parcel statement in your hand.");
+        if (BookManip.is_parcel_statement(stack)) {
+            Util.pinform(player, "&c&oThat's a statement: this parcel has already been accepted or refused.");
+            return true;
+        }
+        if (!BookManip.is_shipping_label(stack)) {
+            Util.pinform(player, "&7&oYou must have a valid shipping label in your hand.");
             return true;
         }
 
-        Block block = ChestManip.parcel_place_chest_refuse(stack);
-        if (block == null) {
-            Util.pinform(player, "&7&oUnable to place parcel at origin.");
-            return true;
-        }
-
-
-        Inventory inventory = BookManip.parcel_fill_chest(block, stack);
-        if (inventory == null) {
-            Util.pinform(player, "&7&oUnable to complete shipment return.");
-            return true;
-        }
-
-
-        ItemStack stamped = BookManip.stamp_parcel_statement(player, stack, false);
-        player.getInventory().setItemInMainHand(null);
-        BookManip.parcel_stmnt_to_chest(inventory, stamped, block, 4);
-        Util.pinform(player, "&7&oShipment has been returned to sender.");
-
+        com.vodhanel.minecraft.va_postal.mail.Parcels.refuse(player, stack);
         return true;
     }
 
@@ -1492,8 +1650,19 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oRequired permission not present.");
             return true;
         }
+        if ((args.length == 1) && ("cancel".equalsIgnoreCase(args[0]))) {
+            // A parcel not yet posted: its items go back in the chest it was packed in.
+            ItemStack label = player.getInventory().getItemInMainHand();
+            if (!BookManip.holding_valid_shipper(player, label, false)) {
+                Util.pinform(player, "&7&oHold the unposted shipping label you want to cancel.");
+                return true;
+            }
+            com.vodhanel.minecraft.va_postal.mail.Parcels.cancel(player, label);
+            return true;
+        }
         if ((args.length < 2) || ("?".equals(args[0]))) {
             Util.pinform(player, "&7&oUsage: &f&r/package <PostOffice> <Address> [player] &7&oto package a chest in front of you");
+            Util.pinform(player, "&7&o       &f&r/package cancel &7&oholding an unposted label, to unpack it");
             return true;
         }
         Block block = ChestManip.at_chest(player);
@@ -1518,6 +1687,12 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
 
+        Network.Resolved resolved = Network.resolve_office(args[0]);
+        if (resolved.office() != null && resolved.office().remote() || !resolved.choices().isEmpty()) {
+            // Items never cross servers (persistent-state §6): parcels can only go to this server's offices.
+            Util.pinform(player, "&7&oParcels can't be sent to another server; only letters can.");
+            return true;
+        }
         String stown = C_Postoffice.town_complete(args[0]);
         if ("null".equals(stown)) {
             if ((VA_postal.using_towny()) && (P_Towny.is_this_a_town_by_loc(player)))
@@ -1526,13 +1701,13 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&7&oNeed more letters for post office. See list:");
             return true;
         }
-        double price = 0.0D;
-        if (VA_postal.economy_configured) {
-            price = P_Economy.has_price_of_shipping(player, stown);
-            if (price < 0.0D) {
-                Util.pinform(player, "&f&oYou don't have enough money to cover shipping.");
-                return true;
-            }
+        if (!near_post_office(player)) {
+            return true;
+        }
+        double price = P_Economy.postage_to_hold(null, true);
+        if ((price > 0.0D) && (!P_Economy.does_player_have_amount(player, price))) {
+            Util.pinform(player, "&f&oYou don't have enough money to cover shipping.");
+            return true;
         }
         String saddress = C_Address.addresses_complete(stown, args[1]);
         if ("null".equals(saddress)) {
@@ -1544,10 +1719,15 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         String attention = "[Resident]";
-        Player Attention = null;
-        if (args.length == 3) {
-            Attention = Util.player_complete(args[2]);
-            if (Attention != null) attention = Attention.getDisplayName();
+        java.util.UUID Attention = null;
+        if (args.length == 3 && !"[Resident]".equalsIgnoreCase(args[2])) {
+            Network.Recipient recipient = Network.find_player(args[2]);
+            if (recipient == null) {
+                Util.pinform(player, "&7&oNo player called &f&r" + args[2] + "&7&o is known on this network.");
+                return true;
+            }
+            attention = recipient.name();
+            Attention = recipient.id();
         }
 
         if (is_player_comfirmation_registered(player)) {
@@ -1559,7 +1739,7 @@ public class Cmdexecutor implements CommandExecutor {
         } else {
             Util.pinform(player, "&7&oReady create shipping label");
             Util.pinform(player, "&7&oAddressed to: &9&o" + Util.df(stown) + ", " + Util.df(saddress) + ", " + Util.df(attention));
-            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for shipping.");
+            if (price > 0.0D) Util.pinform(player, "&fYou will be charged " + ef(price) + " for shipping, held until delivery; local shipments get the difference back.");
 
             String scommand = "/package " + stown + " " + saddress + " " + attention;
             register_player_comfirmation(player, scommand);
@@ -1592,7 +1772,7 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         double cod_price = Util.str2double(args[0]);
-        if (cod_price <= 0.0D) {
+        if (!Double.isFinite(cod_price) || cod_price < 0.01D) { // NaN and Infinity parse, and a label shows cents
             Util.pinform(player, "&f&oProblem reading the price: " + args[0]);
             return true;
         }
@@ -1626,13 +1806,15 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
         String attention = "[Resident]";
-        Player original = null;
-        if (args.length >= 1) {
-            Player player = Util.player_complete(args[0]);
-            if (player != null) {
-                attention = player.getDisplayName();
-                original = player;
+        java.util.UUID original = null;
+        if (args.length >= 1 && !"[Resident]".equalsIgnoreCase(args[0])) {
+            Network.Recipient recipient = Network.find_player(args[0]);
+            if (recipient == null) {
+                Util.pinform(player, "&7&oNo player called &f&r" + args[0] + "&7&o is known on this network.");
+                return true;
             }
+            attention = recipient.name();
+            original = recipient.id();
         }
 
         if (!Cmd_static.att_worker(false, player, stack, attention, original)) return true;
@@ -1701,7 +1883,11 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "");
             Util.pinform(player, "&7&oUsage: &f&r/gps <PostOffice> [Address] &7&oto set your compass");
             Util.pinform(player, "");
-            Util.pinform(player, "&7Dist Cmp  Post-Office--  Address------- Qwner--------");
+            if (g_list == null) { // nothing in this world (the list was dereferenced regardless: an internal error)
+                Util.pinform(player, "&7&oNo post offices or addresses in this world.");
+                return true;
+            }
+            Util.pinform(player, "&7Dist Cmp  Post-Office--  Address------- Owner--------");
             for (int i = 0; i < g_list.length; i++) {
                 String[] parts = g_list[i].split(",");
                 if (parts.length == 4) {
@@ -1711,10 +1897,14 @@ public class Cmdexecutor implements CommandExecutor {
                     boolean is_po = false;
                     if (saddr.equalsIgnoreCase("post_office")) {
                         is_po = true;
-                        if (C_Owner.is_local_po_owner_defined(stown))
-                            sownr = Util.df(C_Owner.get_owner_local_po(stown).getDisplayName());
-                    } else if (C_Owner.is_address_owner_defined(stown, saddr))
-                        sownr = Util.df(C_Owner.get_owner_address(stown, saddr).getDisplayName());
+                        String po_owner_name = C_Owner.get_owner_local_po_name(stown);
+                        if (po_owner_name != null)
+                            sownr = Util.df(po_owner_name);
+                    } else {
+                        String addr_owner_name = C_Owner.get_owner_address_name(stown, saddr);
+                        if (addr_owner_name != null)
+                            sownr = Util.df(addr_owner_name);
+                    }
 
                     sownr = fixed_len(Util.df(sownr), 14, "-");
                     String hding = parts[3];
@@ -1822,14 +2012,21 @@ public class Cmdexecutor implements CommandExecutor {
                 Util.player_list_match(player, args[2]);
                 return true;
             }
-            subject = psubject.getDisplayName();
+            subject = Text.legacy(psubject.displayName());
         }
 
 
-        if (((!VA_postal.economy_configured) || (C_Owner.is_address_owner_defined(stown, saddress))) &&
-                (!hasPermission_ext(player, "postal.owneraddr", stown, saddress))) {
-            Util.pinform(player, "&7&oRequired permission not present.");
-            return true;
+        // Without the permission, a player may only buy an unowned address for themselves (see ownerlocal).
+        if (!hasPermission_ext(player, "postal.owneraddr", stown, saddress)) {
+            boolean for_sale = VA_postal.economy_configured && !C_Owner.is_address_owner_defined(stown, saddress);
+            if (!for_sale) {
+                Util.pinform(player, "&7&oRequired permission not present.");
+                return true;
+            }
+            if ((psubject == null) || (!psubject.getUniqueId().equals(player.getUniqueId()))) {
+                Util.pinform(player, "&7&oYou can only buy an address for yourself.");
+                return true;
+            }
         }
 
         double price = 0.0D;
@@ -1952,10 +2149,18 @@ public class Cmdexecutor implements CommandExecutor {
         }
 
 
-        if (((!VA_postal.economy_configured) || (C_Owner.is_local_po_owner_defined(stown))) &&
-                (!hasPermission_ext(player, "postal.ownerlocal", stown, "null"))) {
-            Util.pinform(player, "&7&oRequired permission not present.");
-            return true;
+        // Without the permission, a player may only buy an unowned office for themselves: the buyer pays, so
+        // only the buyer can agree to it (v4 let anyone charge any online player).
+        if (!hasPermission_ext(player, "postal.ownerlocal", stown, "null")) {
+            boolean for_sale = VA_postal.economy_configured && !C_Owner.is_local_po_owner_defined(stown);
+            if (!for_sale) {
+                Util.pinform(player, "&7&oRequired permission not present.");
+                return true;
+            }
+            if ((subject == null) || (!subject.getUniqueId().equals(player.getUniqueId()))) {
+                Util.pinform(player, "&7&oYou can only buy a post office for yourself.");
+                return true;
+            }
         }
 
         double price = 0.0D;
@@ -1979,12 +2184,12 @@ public class Cmdexecutor implements CommandExecutor {
             Cmd_static.ownerlocal_worker(player, stown, subject);
             deregister_player_comfirmation(player);
         } else {
-            Util.pinform(player, "Ready to make " + (subject != null ? subject.getDisplayName() : "the Server") + " the post office owner of " + Util.df(stown));
+            Util.pinform(player, "Ready to make " + (subject != null ? Text.legacy(subject.displayName()) : "the Server") + " the post office owner of " + Util.df(stown));
             if ((subject != null) &&
                     (price > 0.0D)) Util.pinform(player, "&f&o" + subject + "&7&o will be charged &f&o" + ef(price));
 
 
-            String scommand = "/ownerlocal " + stown + " " + (subject != null ? subject.getDisplayName() : "server");
+            String scommand = "/ownerlocal " + stown + " " + (subject != null ? Text.legacy(subject.displayName()) : "server");
             register_player_comfirmation(player, scommand);
         }
         return true;
@@ -2351,20 +2556,19 @@ public class Cmdexecutor implements CommandExecutor {
 
         int a_hits = 0;
         int p_hits = 0;
-        Player srch_param = arg_player;
+        java.util.UUID srch_id = arg_player.getUniqueId();
         Util.pinform(player, "");
-        Util.pinform(player, "&f&l" + arg_player);
+        Util.pinform(player, "&f&l" + arg_player.getName()); // not the Player's toString, "CraftPlayer{name=...}"
         String[] town_list = C_Arrays.town_list();
         if (town_list == null) return true;
         for (String stown : town_list) {
             String sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(stown));
             String dstown = fixed_len(Util.df(stown), 15, "-");
             sworld = Util.df(sworld);
-            Player po_owner;
             String saddress = fixed_len("Post-Office", 15, "-");
             if (C_Owner.is_local_po_owner_defined(stown)) {
-                po_owner = C_Owner.get_owner_local_po(stown);
-                if (po_owner == srch_param) {
+                // By UUID: an offline owner is a fresh stand-in object every time, so == never matched.
+                if (srch_id.equals(C_Owner.get_owner_local_po_id(stown))) {
                     Util.pinform(player, "    &6&o" + dstown + "  &6&o" + saddress + "  &f&o" + sworld);
                     p_hits++;
                 }
@@ -2373,8 +2577,7 @@ public class Cmdexecutor implements CommandExecutor {
             if (addr_list != null) for (String anAddr_list : addr_list) {
                 saddress = anAddr_list;
                 if (C_Owner.is_address_owner_defined(stown, saddress)) {
-                    Player addr_owner = C_Owner.get_owner_address(stown, saddress);
-                    if (addr_owner == srch_param) {
+                    if (srch_id.equals(C_Owner.get_owner_address_id(stown, saddress))) {
                         saddress = fixed_len(Util.df(saddress), 15, "-");
                         Util.pinform(player, "    &a&o" + dstown + "  &a&o" + saddress + "  &f&o" + sworld);
                         a_hits++;
@@ -2382,7 +2585,9 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
-
+        if (p_hits + a_hits == 0) {
+            Util.pinform(player, "    &7&oOwns no post offices or addresses.");
+        }
         return true;
     }
 
@@ -2403,20 +2608,19 @@ public class Cmdexecutor implements CommandExecutor {
 
         int a_hits = 0;
         int p_hits = 0;
-        Player srch_param = arg_player;
+        java.util.UUID srch_id = arg_player.getUniqueId();
         Util.con_type("");
-        Util.con_type(arg_player.toString());
+        Util.con_type(arg_player.getName());
         String[] town_list = C_Arrays.town_list();
         if (town_list == null) return true;
         for (String stown : town_list) {
             String sworld = C_List.get_world(C_Postoffice.get_local_po_location_by_name(stown));
             String dstown = fixed_len(Util.df(stown), 15, "-");
             sworld = Util.df(sworld);
-            Player po_owner;
             String saddress = fixed_len("Post-Office", 15, "-");
             if (C_Owner.is_local_po_owner_defined(stown)) {
-                po_owner = C_Owner.get_owner_local_po(stown);
-                if (po_owner == srch_param) {
+                // By UUID: an offline owner is a fresh stand-in object every time, so == never matched.
+                if (srch_id.equals(C_Owner.get_owner_local_po_id(stown))) {
                     Util.con_type("\033[0;33m    " + dstown + "  " + saddress + "  " + sworld);
                     p_hits++;
                 }
@@ -2425,8 +2629,7 @@ public class Cmdexecutor implements CommandExecutor {
             if (addr_list != null) for (String anAddr_list : addr_list) {
                 saddress = anAddr_list;
                 if (C_Owner.is_address_owner_defined(stown, saddress)) {
-                    Player addr_owner = C_Owner.get_owner_address(stown, saddress);
-                    if (addr_owner == srch_param) {
+                    if (srch_id.equals(C_Owner.get_owner_address_id(stown, saddress))) {
                         saddress = fixed_len(Util.df(saddress), 15, "-");
                         Util.con_type("\033[0;32m    " + dstown + "  " + saddress + "  " + sworld);
                         a_hits++;
@@ -2434,7 +2637,9 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
-
+        if (p_hits + a_hits == 0) {
+            Util.con_type("    Owns no post offices or addresses.");
+        }
         return true;
     }
 
@@ -2678,7 +2883,14 @@ public class Cmdexecutor implements CommandExecutor {
         // Anything that isn't a player (console, RCON, command blocks, other plugins) gets the console
         // commands; only players reach the player-only commands below.
         if (!(sender instanceof Player)) {
-            if (cmd.getName().equalsIgnoreCase("postal")) result = postal_con(true, sender, cmd.getName(), args);
+            if (cmd.getName().equalsIgnoreCase("postal")) {
+                try {
+                    result = postal_con(true, sender, cmd.getName(), args);
+                } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
+                    sender.sendMessage("The mail store is unavailable: " + e.getMessage());
+                    result = true;
+                }
+            }
 
             if (cmd.getName().equalsIgnoreCase("alist")) result = alist_con(true, sender, cmd.getName(), args);
 

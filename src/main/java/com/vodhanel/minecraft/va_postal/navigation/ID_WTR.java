@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.navigation;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
 import com.vodhanel.minecraft.va_postal.common.P_Towny;
@@ -95,10 +96,22 @@ public class ID_WTR {
 
         String slocation = Util.put_point_on_ground(VA_postal.wtr_slocation_address_spawn[id], false);
         Location target = Util.str2location(slocation);
+        if (target != null) {
+            target.add(0.5, 0, 0.5);
+        }
         if (VA_postal.wtr_npc[id].getEntity().getLocation() != target) {
             VA_postal.wtr_nav[id].getDefaultParameters().speedModifier(0.5F);
             Util.dinform(AnsiColor.GREEN + "AAA: New target for " + id + " " + target);
-            VA_postal.wtr_nav[id].setTarget(target);
+            // The last step, to stand at the mailbox: straight to the middle of the spot when it's close and level.
+            // Citizens' pathfinder always finishes at the corner of the block it's given, and from beside a corner he
+            // set off again for the route home off to one side: up a one-wide alley, he caught on its mouth.
+            Location at = VA_postal.wtr_npc[id].getEntity().getLocation();
+            if (target != null && at.getWorld() == target.getWorld() && at.getBlockY() == target.getBlockY()
+                    && at.distanceSquared(target) <= 16.0D) {
+                VA_postal.wtr_nav[id].setStraightLineTarget(target);
+            } else {
+                VA_postal.wtr_nav[id].setTarget(target);
+            }
             if ((VA_postal.wtr_controller[id] != null) &&
                     (VA_postal.wtr_controller[id].isPaused())) {
                 VA_postal.wtr_controller[id].setPaused(false);
@@ -197,7 +210,7 @@ public class ID_WTR {
         }
         if (!VA_postal.wtr_npc_player[id].isValid()) {
             Util.dinform(AnsiColor.RED + "SNR: NPC PLAYER IS INVALID " + id);
-            Util.dinform(AnsiColor.RED + "SNR: " + VA_postal.wtr_npc_player[id].getLocation() + " " + VA_postal.wtr_npc_player[id].getDisplayName());
+            Util.dinform(AnsiColor.RED + "SNR: " + VA_postal.wtr_npc_player[id].getLocation() + " " + Text.legacy(VA_postal.wtr_npc_player[id].displayName()));
             //return false;
         }
         if (VA_postal.wtr_nav[id] == null) {
@@ -274,6 +287,8 @@ public class ID_WTR {
     }
 
     public static synchronized void cancel_route(int id) {
+        Doorway.reset(id);
+        Climb.reset(id);
         if ((!VA_Dispatcher.dispatcher_running) || (!VA_postal.wtr_goal_active[id])) {
             return;
         }
@@ -309,6 +324,12 @@ public class ID_WTR {
         }
     }
 
+    /** True while slot id still holds this spawned NPC (a restart replaces the arrays and the NPCs). */
+    static boolean same_postman(int id, net.citizensnpcs.api.npc.NPC npc) {
+        return npc != null && VA_postal.wtr_npc != null && id >= 0 && id < VA_postal.wtr_npc.length
+                && VA_postal.wtr_npc[id] == npc && npc.isSpawned();
+    }
+
     public static void safe_stop(int id) {
         if ((VA_postal.wtr_controller[id] != null) &&
                 (!VA_postal.wtr_controller[id].isPaused())) {
@@ -327,6 +348,15 @@ public class ID_WTR {
             Location target = VA_postal.wtr_waypoint[id];
 
 
+            // At the wrong height he isn't there, however close: beside a bridge isn't on it (and from there,
+            // heading for the far end of the deck, he walked into the river under it).
+            // Up to just under a block below it, though: on a carpet or a thin snow layer he stands a little above the
+            // block the waypoint was put on top of.
+            double dy = npc_loc.getY() - target.getBlockY();
+            if (dy > 0.9D || dy < -0.95D) {
+                return false;
+            }
+
             int nx = npc_loc.getBlockX();
             int nz = npc_loc.getBlockZ();
             int tx = (int) Math.floor(target.getX());
@@ -339,6 +369,30 @@ public class ID_WTR {
             //Util.dinform(AnsiColor.L_GREEN + "at_waypoint for " + id + ": npc: " + nx + "," + nz + " target: " + tx + "," + tz + AnsiColor.YELLOW + " navigation location: " + navx + "," + navz + " " + ((navx == tx && navz == tz) ? AnsiColor.L_GREEN + "MATCH" : AnsiColor.RED + "NO MATCH"));
             if ((nx == tx) && (nz == tz)) {
                 return true;
+            }
+
+            // Ladders are exact both ways. Still on one, he hasn't reached anywhere off it, however close: at the foot
+            // of the cellar's ladder the next two waypoints counted from there, and he set off for the mailbox still
+            // holding on, and froze. And a waypoint on a ladder counts only at its column, where Postal climbs him:
+            // from two blocks away he was left to Citizens, which can't climb.
+            if (Climb.on_ladder(target)) {
+                return Climb.in_column(npc_loc, target);
+            }
+            if (Climb.climbable(npc_loc.getBlock())) {
+                return false; // the corner allowance is for climbing onto a ladder, not for counting a step off it
+            }
+
+            // The top or foot of a climb (a stair, a step, a drop): close, and at its height. The usual 2 blocks let
+            // him clip the corner of a bridge's stair from the side and carry on from beside the bridge, not on it.
+            Location last = VA_postal.wtr_waypoint_last[id];
+            if (last != null && Math.abs(last.getBlockY() - target.getBlockY()) >= 1) {
+                double dx = npc_loc.getX() - target.getX(), dz = npc_loc.getZ() - target.getZ();
+                return Math.sqrt(dx * dx + dz * dz) <= 1.25D && Math.abs(npc_loc.getY() - target.getBlockY()) <= 0.6D;
+            }
+
+            // The generous radii below never reach through a door: he'd "arrive" from the wrong side of it.
+            if (Doorway.door_between(npc_loc, target)) {
+                return false;
             }
 
             //Util.dinform(AnsiColor.CYAN + "DISTANCE: "+npc_loc.distance(target));
@@ -358,6 +412,7 @@ public class ID_WTR {
     }
 
     public static void invoke_next_waypoint(int id) {
+        Doorway.reset(id); // a crossing for the waypoint he's leaving is over (a finished one has removed itself)
         if (!VA_postal.wtr_waypoint_completed[id]) {
             VA_postal.wtr_waypoint_completed[id] = true;
             VA_postal.wtr_watchdog_stuck_retry[id] = 0;
@@ -494,8 +549,9 @@ public class ID_WTR {
         set_door_open(block, false, quiet);
     }
 
-    private static void set_door_open(Block block, boolean open, boolean quiet) {
-        if (block == null || !is_route_door(block.getType())) {
+    static void set_door_open(Block block, boolean open, boolean quiet) {
+        boolean hatch = block != null && Tag.TRAPDOORS.isTagged(block.getType());
+        if (block == null || !is_route_door(block.getType()) && !hatch) {
             return;
         }
         BlockData data = block.getBlockData();
@@ -508,6 +564,8 @@ public class ID_WTR {
             Sound sound;
             if (Tag.FENCE_GATES.isTagged(block.getType())) {
                 sound = open ? Sound.BLOCK_FENCE_GATE_OPEN : Sound.BLOCK_FENCE_GATE_CLOSE;
+            } else if (hatch) {
+                sound = open ? Sound.BLOCK_WOODEN_TRAPDOOR_OPEN : Sound.BLOCK_WOODEN_TRAPDOOR_CLOSE;
             } else {
                 sound = open ? Sound.BLOCK_WOODEN_DOOR_OPEN : Sound.BLOCK_WOODEN_DOOR_CLOSE;
             }
@@ -603,12 +661,18 @@ public class ID_WTR {
                 walk_to(id, f_door_loc, 0.5F);
             }
         } else {
+            // Each step checks it's still the same postman: a dispatcher restart in between replaces them.
+            final net.citizensnpcs.api.npc.NPC npc = VA_postal.wtr_npc[id];
             VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
+                if (!same_postman(id, npc)) return;
                 ID_WTR.walk_to(id, f_door_loc, 0.5F);
                 VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
-                    faceLocation(VA_postal.wtr_npc[id].getEntity(), f_target);
+                    if (!same_postman(id, npc)) return;
+                    faceLocation(npc.getEntity(), f_target);
                     if (VA_postal.lookclose_on_route) {
-                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> VA_postal.wtr_npc[id].getOrAddTrait(LookClose.class).lookClose(true), 40L);
+                        VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin, () -> {
+                            if (same_postman(id, npc)) npc.getOrAddTrait(LookClose.class).lookClose(true);
+                        }, 40L);
                     }
                 }, 20L);
             }, 60L);
@@ -719,7 +783,9 @@ public class ID_WTR {
         }
 
 
-        if (!VA_postal.wtr_door[id]) {
+        // v4's door sequencer is off: Doorway takes postmen through doors as they reach them. It juggled the
+        // waypoints around a door on timers and kept getting stuck there (and once looped forever).
+        if (!VA_postal.wtr_door[id] && !Doorway.ENABLED) {
             if (VA_postal.wtr_swaypoint[id] == null) {
                 Util.dinform(AnsiColor.RED + "WAYPOINT " + id + " IS NULL");
             }

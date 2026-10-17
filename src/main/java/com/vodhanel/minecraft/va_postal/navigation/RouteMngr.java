@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.navigation;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.*;
 import com.vodhanel.minecraft.va_postal.config.*;
@@ -151,12 +152,12 @@ public class RouteMngr {
         if (postman.equals(raw) || pmaster.equals(raw)) {
             return true;
         }
-        String name = org.bukkit.ChatColor.stripColor(npc.getName());
+        String name = Text.strip(npc.getName());
         return name != null && (name.equals(strip(postman)) || name.equals(strip(pmaster)));
     }
 
     private static String strip(String name) {
-        return org.bukkit.ChatColor.stripColor(org.bukkit.ChatColor.translateAlternateColorCodes('&', name));
+        return Text.strip(Text.color(name));
     }
 
     /**
@@ -206,6 +207,8 @@ public class RouteMngr {
     }
 
     public static synchronized void delete_npc(int id) {
+        Doorway.reset(id); // never leave a door or hatch open behind a postman who's gone
+        Climb.reset(id);
         if (VA_postal.wtr_nav[id] != null) VA_postal.wtr_nav[id] = null;
         if (VA_postal.wtr_goal[id] != null) VA_postal.wtr_goal[id] = null;
         if (VA_postal.wtr_goalselector[id] != null) VA_postal.wtr_goalselector[id] = null;
@@ -230,6 +233,8 @@ public class RouteMngr {
             return;
         }
 
+        Doorway.reset(id); // nothing carried over from his last route
+        Climb.reset(id);
         VA_postal.wtr_last_stuck_action[id] = "";
         VA_postal.wtr_last_stuck_stamp[id] = System.currentTimeMillis();
         VA_postal.wtr_watchdog_stuck_stamp[id] = System.currentTimeMillis();
@@ -324,8 +329,11 @@ public class RouteMngr {
                 if (VA_postal.dynmap_configured) P_Dynmap.update_pos(id, false, false, false);
             }
         } else {
+            Doorway.reset(id);
+            Climb.reset(id);
             lookclose_on_route(id, false);
             VA_postal.wtr_goal_active[id] = false;
+            com.vodhanel.minecraft.va_postal.mail.Letters.route_finished(id);
             C_Dispatcher.reset_pro_de_motion(VA_postal.wtr_qpair[id]);
             C_Queue.queue_pair_activity_flag(VA_postal.wtr_qpair[id], false, true, true);
             if (VA_postal.dynmap_configured) P_Dynmap.update_pos(id, false, false, true);
@@ -333,6 +341,8 @@ public class RouteMngr {
     }
 
     public static synchronized void cancel_route(int id) {
+        Doorway.reset(id);
+        Climb.reset(id);
         if ((!VA_Dispatcher.dispatcher_running) || (!VA_postal.wtr_goal_active[id])) return;
         VA_postal.wtr_done[id] = true;
 
@@ -509,10 +519,20 @@ public class RouteMngr {
             VA_postal.wtr_nav[id].getDefaultParameters().range(100.0F);
             VA_postal.wtr_nav[id].getDefaultParameters().speedModifier(1.0F);
 
-            VA_postal.wtr_nav[id].getDefaultParameters().useNewPathfinder(true);
+            VA_postal.wtr_nav[id].getDefaultParameters().pathfinderType(net.citizensnpcs.api.ai.PathfinderType.CITIZENS);
             VA_postal.wtr_nav[id].getDefaultParameters().stuckAction(VA_postal.wtr_stuck_npc);
             VA_postal.wtr_nav[id].getDefaultParameters().distanceMargin(cit_distanceMargin);
             VA_postal.wtr_nav[id].getDefaultParameters().stationaryTicks(cit_stationaryTicks);
+            // Plan paths through doors and gates (and open them on the way). Without it Citizens treats a door,
+            // even one Postal has opened, as solid, so a route through a door always got "stuck" there.
+            if (!VA_postal.wtr_nav[id].getDefaultParameters().hasExaminer(net.citizensnpcs.api.astar.pathfinder.DoorExaminer.class)) {
+                VA_postal.wtr_nav[id].getDefaultParameters().examiner(new net.citizensnpcs.api.astar.pathfinder.DoorExaminer());
+            }
+
+            // Citizens walks on water (see DryGround); surveyed routes never touch it.
+            if (cit_avoidWater) {
+                DryGround.apply(VA_postal.wtr_nav[id].getDefaultParameters());
+            }
 
             for (BlockExaminer examiner : VA_postal.wtr_nav[id].getDefaultParameters().examiners())
                 Util.dinform("EXAMINER: " + examiner);
@@ -589,7 +609,10 @@ public class RouteMngr {
     }
 
     private static synchronized void dynamic_waypoint_adjustment(int id) {
-        VA_postal.wtr_swaypoint[id] = Util.put_point_on_ground(VA_postal.wtr_swaypoint[id], cit_ground_waypoint);
+        // A waypoint on a ladder stays where it is: Climb takes him up or down to it.
+        if (!Climb.on_ladder(Util.str2location(VA_postal.wtr_swaypoint[id]))) {
+            VA_postal.wtr_swaypoint[id] = Util.put_point_on_ground(VA_postal.wtr_swaypoint[id], cit_ground_waypoint);
+        }
         VA_postal.wtr_waypoint[id] = Util.str2location(VA_postal.wtr_swaypoint[id]);
     }
 

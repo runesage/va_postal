@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
+import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.BlockFacing;
 import org.bukkit.Location;
@@ -42,7 +43,7 @@ public class SignManip {
         }
         if ((block.getState() instanceof Sign)) {
             Sign sign = (Sign) block.getState();
-            if (sign.getLine(0).contains(key)) {
+            if (Text.line(sign, 0).contains(key)) {
                 return true;
             }
         }
@@ -57,22 +58,22 @@ public class SignManip {
         if ((block.getState() instanceof Sign)) {
             Sign sign = (Sign) block.getState();
             if ((line == 1) &&
-                    (sign.getLine(0).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 0).toLowerCase().contains(stext))) {
                 return true;
             }
 
             if ((line == 2) &&
-                    (sign.getLine(1).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 1).toLowerCase().contains(stext))) {
                 return true;
             }
 
             if ((line == 3) &&
-                    (sign.getLine(2).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 2).toLowerCase().contains(stext))) {
                 return true;
             }
 
             if ((line == 4) &&
-                    (sign.getLine(3).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 3).toLowerCase().contains(stext))) {
                 return true;
             }
         }
@@ -88,7 +89,7 @@ public class SignManip {
             return -1;
         }
         Sign sign = (Sign) block.getState();
-        String key = sign.getLine(0).trim();
+        String key = Text.line(sign, 0).trim();
         if (key.contains("[Postal_Mail]"))
             return 1;
         if (key.contains("[Postal_Ship]"))
@@ -113,15 +114,15 @@ public class SignManip {
         Sign sign = (Sign) block.getState();
         String[] set = new String[3];
         try {
-            set[0] = sign.getLine(1).trim();
+            set[0] = Text.line(sign, 1).trim();
             if ((set[0] == null) || (set[0].isEmpty())) {
                 set[0] = "null";
             }
-            set[1] = sign.getLine(2).trim();
+            set[1] = Text.line(sign, 2).trim();
             if ((set[1] == null) || (set[1].isEmpty())) {
                 set[1] = "null";
             }
-            set[2] = sign.getLine(3).trim();
+            set[2] = Text.line(sign, 3).trim();
             if ((set[2] == null) || (set[2].isEmpty())) {
                 set[2] = "null";
             }
@@ -204,7 +205,7 @@ public class SignManip {
                     String detail;
                     if (front.getState() instanceof Sign) {
                         Sign sign = (Sign) front.getState();
-                        detail = "sign " + java.util.Arrays.toString(sign.getLines());
+                        detail = "sign [" + Text.line(sign, 0) + ", " + Text.line(sign, 1) + ", " + Text.line(sign, 2) + ", " + Text.line(sign, 3) + "]";
                     } else {
                         detail = "no sign in front (" + front.getType() + " at " + front.getX() + "," + front.getY() + "," + front.getZ() + ")";
                     }
@@ -230,23 +231,23 @@ public class SignManip {
 
         if (line1 != null) {
             line1 = line1.toLowerCase().trim();
-            if (!sign.getLine(0).toLowerCase().contains(line1)) {
+            if (!Text.line(sign, 0).toLowerCase().contains(line1)) {
                 return false;
             }
         }
         if (line2 != null) {
             line2 = line2.toLowerCase().trim();
-            if (!sign.getLine(1).toLowerCase().contains(line2)) {
+            if (!Text.line(sign, 1).toLowerCase().contains(line2)) {
                 return false;
             }
         }
         if (line3 != null) {
             line3 = line3.toLowerCase().trim();
-            if (!sign.getLine(2).toLowerCase().contains(line3)) {
+            if (!Text.line(sign, 2).toLowerCase().contains(line3)) {
                 return false;
             }
         }
-        if ((line4 != null) && !owner_line_matches(sign.getLine(3), line4)) {
+        if ((line4 != null) && !owner_line_matches(Text.line(sign, 3), line4)) {
             return false;
         }
         return true;
@@ -265,7 +266,7 @@ public class SignManip {
         if (wanted.length() > OWNER_LINE_MAX) {
             wanted = wanted.substring(0, OWNER_LINE_MAX);
         }
-        String line = org.bukkit.ChatColor.stripColor(sign_line);
+        String line = Text.strip(sign_line);
         return line != null && line.toLowerCase().contains(wanted);
     }
 
@@ -285,10 +286,10 @@ public class SignManip {
         }
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
-            sign.setLine(0, line1);
-            sign.setLine(1, line2);
-            sign.setLine(2, line3);
-            sign.setLine(3, line4);
+            Text.line(sign, 0, line1);
+            Text.line(sign, 1, line2);
+            Text.line(sign, 2, line3);
+            Text.line(sign, 3, line4);
             sign.update();
         }
     }
@@ -304,19 +305,19 @@ public class SignManip {
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
             if (line1 != null) {
-                sign.setLine(0, line1);
+                Text.line(sign, 0, line1);
             }
             if (line2 != null) {
-                sign.setLine(1, line2);
+                Text.line(sign, 1, line2);
             }
             if (line3 != null) {
-                sign.setLine(2, line3);
+                Text.line(sign, 2, line3);
             }
             if (line4 != null) {
                 if (line4.length() > 15) {
                     line4 = line4.substring(0, 15);
                 }
-                sign.setLine(3, line4);
+                Text.line(sign, 3, line4);
             }
             sign.update();
         }
@@ -358,22 +359,22 @@ public class SignManip {
         if ((block_sign.getState() instanceof Sign)) {
             Sign sign = (Sign) block_sign.getState();
             if (((global) || (line == 1)) &&
-                    (sign.getLine(0).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 0).toLowerCase().contains(stext))) {
                 return true;
             }
 
             if (((global) || (line == 2)) &&
-                    (sign.getLine(1).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 1).toLowerCase().contains(stext))) {
                 return true;
             }
 
             if (((global) || (line == 3)) &&
-                    (sign.getLine(2).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 2).toLowerCase().contains(stext))) {
                 return true;
             }
 
             if (((global) || (line == 4)) &&
-                    (sign.getLine(3).toLowerCase().contains(stext))) {
+                    (Text.line(sign, 3).toLowerCase().contains(stext))) {
                 return true;
             }
         }

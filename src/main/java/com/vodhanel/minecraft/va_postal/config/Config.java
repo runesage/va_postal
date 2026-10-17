@@ -79,7 +79,10 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path2, "300");
         VA_postal.plugin.getConfig().addDefault(path3, "false");
         VA_postal.plugin.getConfig().addDefault(path4, "false");
-        VA_postal.plugin.getConfig().addDefault(path5, "1.0");
+        // How close Citizens gets him to each step of its path before turning for the next. At a whole block he
+        // turned early, still against one side of a one-wide alley or tunnel, and caught on its mouth; much under
+        // half a block and he can't settle on stairs.
+        VA_postal.plugin.getConfig().addDefault(path5, "0.5");
         VA_postal.plugin.getConfig().addDefault(path6, "true");
         VA_postal.plugin.getConfig().addDefault(path7, "20");
         VA_postal.plugin.getConfig().addDefault(path8, "100");
@@ -141,6 +144,50 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.local.signature"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.texture"), "");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.central.signature"), "");
+
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.type"), "sqlite");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.host"), "localhost");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.port"), 3306);
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.database"), "postal");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.user"), "postal");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.password"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.pool_size"), 6);
+        VA_postal.plugin.getConfig().addDefault(path_format("storage.mysql.properties"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.server_id"), "main");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.poll_seconds"), 10);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.departure_minutes"), 10);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.transit_minutes"), 5);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.vehicle"), "the mail ship");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.broadcast"), true);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.sound"), "block.bell.use");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.enabled"), true);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.name"), "&3Central Dispatcher");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.distance"), 24);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.uniform"), true);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.always"), false);
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.lines.departure"), "All aboard for %servers%! %count% for the voyage.");
+        VA_postal.plugin.getConfig().addDefault(path_format("network.dispatcher.lines.arrival"), "Mail from %servers%! %count% off the ship.");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.dispatcher"), "bundled");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.dispatcher.texture"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.skin.custom.dispatcher.signature"), "");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.dispatcher.helmet"), "LEATHER_HELMET #2E5E4E");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.dispatcher.chestplate"), "LEATHER_CHESTPLATE #2E5E4E");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.dispatcher.leggings"), "LEATHER_LEGGINGS #24345C");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.dispatcher.boots"), "LEATHER_BOOTS #2B2B2B");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.letter.network"), "10");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.day_seconds"), "86400");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.office_floor"), "500");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.central_buffer"), "5000");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.central_account"), "postal");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.base"), "50");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.per_address"), "5");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.per_waypoint"), "0");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.upkeep.revenue_rate"), "0");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.basis"), "revenue");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.release_rate"), "0.5");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.cap"), "0.4");
 
         VA_postal.plugin.getConfig().addDefault(lossy, true);
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);

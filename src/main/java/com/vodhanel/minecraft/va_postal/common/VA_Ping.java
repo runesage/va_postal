@@ -213,7 +213,6 @@ public class VA_Ping {
         if (VA_postal.wtr_count - 1 == id) {
             RouteMngr.initialize_npc(1000);
             VA_postal.central_po_log_book_check = false;
-            P_Economy.ping_economy_schedule();
         }
 
 
