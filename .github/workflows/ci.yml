@@ -41,7 +41,7 @@ jobs:
     name: Smoke test on Paper ${{ matrix.paper }} (${{ matrix.storage }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30  # 14 phases take about 20 minutes; MySQL a little longer
     strategy:
       fail-fast: false
       matrix:
