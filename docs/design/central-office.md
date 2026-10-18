@@ -3,7 +3,8 @@
 **Status:** being built. Done: the clerk (the Postmaster General) and Central's protection (§2), with a first
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
 and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
-player through Central (§3). Next: rates (§4) and the network map (§6). Address deeds
+player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4). Next: the
+network map (§6). Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
@@ -170,15 +171,26 @@ An offer expires after `Charter.Offer_days` (default 3), and the owner can withd
 
 ## 4. Rates
 
+*Built.*
+
 - **Base postage is Central's.** Central sets the base rates as economy policy, using the same policy store
-  as the rest of the economy settings.
-- **Branches may only discount.** An owner sets one discount from 0 up to `Rates.Max_discount` (default
-  25%) with `/postal office <office> discount <percent>`. No surcharges for now.
-- **The discount comes only out of the office's own share.** Central's cut is worked out from the base
-  rate, so a price war between branches can't drain Central or its reserves.
-- **Rate-change notices.** When base rates change, Central sends a notice book to every office chest,
-  carried by a courier NPC on the existing Central-to-office routes. The notices use the same delivery
-  path as `/dist`.
+  as the rest of the economy settings: `/postal bank policy rates.letter_local | rates.letter_out_town |
+  rates.letter_network | rates.parcel_local | rates.parcel_out_town | rates.cod_surcharge <amount>` (they are the
+  `Economy.Postage` settings).
+- **Branches may only discount.** An owner sets one discount from 0 up to `Economy.Rates.Max_discount` (default
+  25%, *policy* `rates.max_discount`) with `/postal office <office> discount <percent|none>`. No surcharges for now.
+  Lowering the maximum lowers every discount above it.
+- **The discount comes only out of the office's own share.** The sending office's discount is taken off its share
+  of the postage when the mail is settled (never more than that share), and goes back to the sender with any other
+  refund. Central's and the delivering office's shares are worked out from the base rate, so a price war between
+  branches can't drain Central or its reserves. Senders still pay the full price when they address the mail. A COD
+  surcharge isn't discounted.
+- **Rate-change notices.** When a base rate changes, every office is owed a notice. Central's postman leaves it in
+  the office chest on his next visit, as a sheet of paper (*Notice of postage rates*): what changed, the rates now,
+  and that office's discount. Several changes before a visit make one notice; a full chest keeps it for the next
+  visit. The owner is told in chat if online. (A sheet rather than a book: books in office chests are mail.)
+- **The counters** show the rates: Central's *Postage rates* card with the maximum discount, each office's counter
+  with its own discount.
 
 ## 5. Inspections (reports only)
 

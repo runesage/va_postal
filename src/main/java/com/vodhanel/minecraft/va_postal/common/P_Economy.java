@@ -432,14 +432,19 @@ public class P_Economy {
         String origin = hold.origin == null ? dest_office : hold.origin;
         boolean local = origin.equalsIgnoreCase(dest_office);
         double price = hold.parcel ? C_Economy.ship_price(local) : C_Economy.postage_price(local);
-        Postage.Split split = Postage.settle(hold.base, hold.cod, price, local);
+        double discount = com.vodhanel.minecraft.va_postal.economy.Rates.discount(origin);
+        Postage.Split split = Postage.settle(hold.base, hold.cod, price, local, discount);
         pay_office_from_central(origin, split.origin);
         if (!local) {
             pay_office_from_central(dest_office, split.dest);
         }
         if (split.refund > 0.005D) {
-            refund_postage(hold.payer, split.refund, "&6Postal refunded " + ef(split.refund)
-                    + " of your postage: your mail was delivered by its local office.");
+            boolean cheaper = price < hold.base - 0.005D;
+            boolean discounted = split.refund > Math.max(0.0D, hold.base - price) + 0.005D;
+            refund_postage(hold.payer, split.refund, "&6Postal refunded " + ef(split.refund) + " of your postage: "
+                    + (cheaper ? "your mail was delivered by its local office" : "")
+                    + (cheaper && discounted ? ", and " : "")
+                    + (discounted ? "the " + Util.df(origin) + " post office's discount" : "") + ".");
         }
     }
 
@@ -456,9 +461,14 @@ public class P_Economy {
             return;
         }
         String origin = hold.origin != null ? hold.origin : origin_office;
-        Postage.Split split = Postage.settle(hold.base, hold.cod, hold.base, true);
+        Postage.Split split = Postage.settle(hold.base, hold.cod, hold.base, true,
+                com.vodhanel.minecraft.va_postal.economy.Rates.discount(origin));
         if (origin != null) {
             pay_office_from_central(origin, split.origin);
+        }
+        if (split.refund > 0.005D) {
+            refund_postage(hold.payer, split.refund, "&6Postal refunded " + ef(split.refund)
+                    + " of your postage: the " + Util.df(origin) + " post office's discount.");
         }
     }
 

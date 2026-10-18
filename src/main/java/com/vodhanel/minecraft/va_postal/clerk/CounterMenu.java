@@ -130,7 +130,8 @@ public final class CounterMenu implements Menu {
         return item(Material.MAP, "&6" + DeedDocument.display(office) + " Post Office",
                 "&7Postmaster: &f" + (owner == null || owner.isBlank() || "null".equals(owner) ? "the server" : owner),
                 "&7Addresses: &f" + (addresses == null ? 0 : addresses.length),
-                "&7A new address: &f" + Clerks.price_text(office));
+                "&7A new address: &f" + Clerks.price_text(office),
+                "&7Postage discount: &f" + com.vodhanel.minecraft.va_postal.economy.Rates.discount_text(office));
     }
 
     private List<Deed> open_deeds(Player player) {

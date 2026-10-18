@@ -10,6 +10,9 @@ package com.vodhanel.minecraft.va_postal.economy;
  *   <li>a COD surcharge: half to Central, half to the sending office;</li>
  *   <li>whatever was held beyond the price goes back to the sender.</li>
  * </ul>
+ * A sending office may offer a discount (a percentage of the postage, up to {@code economy.rates.max_discount}):
+ * it comes only out of that office's own share, never Central's or the delivering office's, and goes back to the
+ * sender with the refund.
  * Pure functions, so the policy can be unit tested without a server.
  */
 public final class Postage {
@@ -38,6 +41,15 @@ public final class Postage {
      * @param local     true if it was picked up and delivered by the same office
      */
     public static Split settle(double base_held, double cod_held, double price, boolean local) {
+        return settle(base_held, cod_held, price, local, 0.0D);
+    }
+
+    /**
+     * As {@link #settle(double, double, double, boolean)}, with the sending office's {@code discount} (a percentage
+     * of the postage). The discount is capped at the sending office's share of the postage, so Central's and the
+     * delivering office's shares never change.
+     */
+    public static Split settle(double base_held, double cod_held, double price, boolean local, double discount) {
         double held = Math.max(0.0D, base_held);
         double base = Math.min(Math.max(0.0D, price), held); // never charge more than was held
         double cod = Math.max(0.0D, cod_held);
@@ -52,9 +64,19 @@ public final class Postage {
             dest = origin;
             central = base - 2.0D * origin;
         }
+        double off = discount_amount(base, origin, discount);
+        origin -= off;
         double cod_office = cod / 2.0D;
         origin += cod_office;
         central += cod - cod_office;
-        return new Split(central, origin, dest, held - base);
+        return new Split(central, origin, dest, held - base + off);
+    }
+
+    /** What a {@code percent} discount on {@code price} comes to, capped at the sending office's {@code share}. */
+    public static double discount_amount(double price, double share, double percent) {
+        if (!(percent > 0.0D) || !(price > 0.0D)) {
+            return 0.0D;
+        }
+        return Math.min(Math.max(0.0D, share), price * Math.min(percent, 100.0D) / 100.0D);
     }
 }

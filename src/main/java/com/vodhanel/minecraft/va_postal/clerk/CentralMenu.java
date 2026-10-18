@@ -160,14 +160,11 @@ final class CentralMenu implements Menu {
         if (!VA_postal.economy_configured) {
             return CounterMenu.item(Material.PAPER, "&6Postage rates", "&7Postage is free on this server.");
         }
-        return CounterMenu.item(Material.PAPER, "&6Postage rates",
-                "&7A letter, within an office: &f" + P_Economy.ef(C_Economy.postage_price(true)),
-                "&7A letter, to another office: &f" + P_Economy.ef(C_Economy.postage_price(false)),
-                "&7A letter, to another server: &f" + P_Economy.ef(C_Economy.network_postage_price()),
-                "&7A parcel, within an office: &f" + P_Economy.ef(C_Economy.ship_price(true)),
-                "&7A parcel, to another office: &f" + P_Economy.ef(C_Economy.ship_price(false)),
-                "&7Cash on delivery: &f+" + P_Economy.ef(C_Economy.cod_surchg()),
-                "&7A new address: &ffrom " + P_Economy.ef(C_Economy.addr_purchase_price()) + " &8(offices set their own)");
+        List<String> lines = new java.util.ArrayList<>(com.vodhanel.minecraft.va_postal.economy.Rates.table());
+        lines.add("&7A new address: &ffrom " + P_Economy.ef(C_Economy.addr_purchase_price()) + " &8(offices set their own)");
+        lines.add("&8Offices may take up to " + com.vodhanel.minecraft.va_postal.economy.Rates.discount_text_max()
+                + " off the postage of mail they send.");
+        return CounterMenu.item(Material.PAPER, "&6Postage rates", lines.toArray(new String[0]));
     }
 
     private static org.bukkit.inventory.ItemStack network() {
