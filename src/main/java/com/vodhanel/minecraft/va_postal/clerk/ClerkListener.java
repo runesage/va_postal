@@ -26,7 +26,11 @@ public final class ClerkListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        CounterMenu.open(event.getClicker(), office);
+        if (Clerks.CENTRAL.equals(office)) {
+            CentralMenu.open(event.getClicker());
+        } else {
+            CounterMenu.open(event.getClicker(), office);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH)

@@ -42,7 +42,7 @@ public final class ClerkCommand {
     }
 
     private static void usage(CommandSender sender) {
-        send(sender, "&7/postal clerk here [office]  &8- station your office's clerk where you stand");
+        send(sender, "&7/postal clerk here [office | central]  &8- station your office's clerk where you stand (Central's: admins)");
         send(sender, "&7/postal clerk reset <office>  &8- back beside the office chest");
         send(sender, "&7/postal clerk place <office> <x> <y> <z> [world]  &8- station a clerk there (admin)");
         send(sender, "&7/postal clerk list  &8- every office's clerk (admin)");
@@ -59,13 +59,13 @@ public final class ClerkCommand {
             return;
         }
         if (!CounterMenu.manages(player, office)) {
-            send(sender, "&7Only the owner of " + DeedDocument.display(office) + " can station its clerk.");
+            send(sender, "&7Only the owner of " + Clerks.label(office) + " can station its clerk.");
             return;
         }
-        Location chest = Util.str2location(C_Postoffice.get_local_po_location_by_name(office));
+        Location chest = Util.str2location(Clerks.spot(office));
         int reach = reach();
         if (chest == null || chest.getWorld() != player.getWorld() || chest.distance(player.getLocation()) > reach) {
-            send(sender, "&7Stand in " + DeedDocument.display(office) + "'s post office (within " + reach + " blocks of its chest).");
+            send(sender, "&7Stand in " + Clerks.label(office) + "'s post office (within " + reach + " blocks of its chest).");
             return;
         }
         Clerks.place(office, player.getLocation());
@@ -93,7 +93,7 @@ public final class ClerkCommand {
             }
             Location at = new Location(world, Double.parseDouble(args[3]), Double.parseDouble(args[4]), Double.parseDouble(args[5]));
             Clerks.place(office, at);
-            send(sender, "&7The clerk of " + DeedDocument.display(office) + " will stand at " + at.getBlockX() + " " + at.getBlockY() + " " + at.getBlockZ() + ".");
+            send(sender, "&7The clerk of " + Clerks.label(office) + " will stand at " + at.getBlockX() + " " + at.getBlockY() + " " + at.getBlockZ() + ".");
         } catch (NumberFormatException e) {
             send(sender, "&7Bad place: " + String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length)));
         }
@@ -106,11 +106,11 @@ public final class ClerkCommand {
             return;
         }
         if (!admin(sender) && !(sender instanceof Player p && CounterMenu.manages(p, office))) {
-            send(sender, "&7Only the owner of " + DeedDocument.display(office) + " can station its clerk.");
+            send(sender, "&7Only the owner of " + Clerks.label(office) + " can station its clerk.");
             return;
         }
         Clerks.place(office, null);
-        send(sender, "&7The clerk of " + DeedDocument.display(office) + " will stand beside the office chest.");
+        send(sender, "&7The clerk of " + Clerks.label(office) + " will stand beside the office chest.");
     }
 
     /** {@code /postal office <office> price [amount|default]}: shows or sets what a new address there costs. */
@@ -157,6 +157,9 @@ public final class ClerkCommand {
     }
 
     private static String office(String input) {
+        if ("central".equalsIgnoreCase(input)) {
+            return Clerks.CENTRAL; // the Postmaster General: admins only (Central has no owner)
+        }
         String office = C_Postoffice.town_complete(input);
         return "null".equals(office) || !Clerks.offices().contains(office) ? null : office;
     }

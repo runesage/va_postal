@@ -206,6 +206,13 @@ public class Config {
                 "Good day, {player}! Welcome to the {office} Post Office. Right-click me for the counter.");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.dialogs"), "true");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.reach"), 24);
+        // Central's clerk, the Postmaster General (docs/design/central-office.md §2), and Central's protection.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.central"), "true");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.central_name"), "&6Postmaster General");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.central_greeting"),
+                "Good day, {player}. Central Post Office, how may I help?");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.farewell"), "Good day to you, {player}.");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.central.report_grief"), "true");
         VA_postal.plugin.getConfig().options().copyDefaults(true);
         VA_postal.plugin.saveConfig();
     }

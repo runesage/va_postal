@@ -193,7 +193,8 @@ public class BukkitListener implements Listener {
                     event.setCancelled(true);
                 }
 
-                if ((action == Action.LEFT_CLICK_BLOCK) && (MailSecurity.allowed_to_break_shipment(event.getClickedBlock(), player))) {
+                if ((action == Action.LEFT_CLICK_BLOCK) && !com.vodhanel.minecraft.va_postal.clerk.CentralGuard.refuse(player, event.getClickedBlock())
+                        && (MailSecurity.allowed_to_break_shipment(event.getClickedBlock(), player))) {
                     Block block = SignManip.sign2chest_block(event.getClickedBlock());
                     event.getClickedBlock().setType(Material.AIR);
                     if (block != null) {
@@ -210,7 +211,8 @@ public class BukkitListener implements Listener {
                     event.setCancelled(true);
                 }
 
-                if ((action == Action.LEFT_CLICK_BLOCK) && (MailSecurity.allowed_to_break_shipment(sign_block, player))) {
+                if ((action == Action.LEFT_CLICK_BLOCK) && !com.vodhanel.minecraft.va_postal.clerk.CentralGuard.refuse(player, event.getClickedBlock())
+                        && (MailSecurity.allowed_to_break_shipment(sign_block, player))) {
                     event.getClickedBlock().setType(Material.AIR);
                     sign_block.setType(Material.AIR);
                     player.setItemOnCursor(null);
@@ -254,7 +256,7 @@ public class BukkitListener implements Listener {
         }
 
 
-        if ((action == Action.LEFT_CLICK_BLOCK) &&
+        if ((action == Action.LEFT_CLICK_BLOCK) && !com.vodhanel.minecraft.va_postal.clerk.CentralGuard.refuse(player, block) &&
                 (MailSecurity.is_authorized_to_break_chest_event(block, player))) {
             sign_block.setType(Material.AIR);
             block.setType(Material.AIR);
