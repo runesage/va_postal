@@ -188,6 +188,7 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.basis"), "revenue");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.release_rate"), "0.5");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.dividend.cap"), "0.4");
+        VA_postal.plugin.getConfig().addDefault(path_format("economy.rates.max_discount"), "25");
 
         VA_postal.plugin.getConfig().addDefault(lossy, true);
         VA_postal.plugin.getConfig().addDefault(src, Color.WHITE);

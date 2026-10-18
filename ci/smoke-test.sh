@@ -331,6 +331,16 @@ run_server "$WORK_DIR/phase17.log" \
     "setblock 30 -60 -6 minecraft:chest[facing=south]" "postal charter test Ashford 30 -60 -6" \
     "postal charter autoapprove off" "data get block 80 -60 41 front_text" "postal clerk list" "sleep:2"
 
+# Phase 18: rates (docs/design/central-office.md §2). The out-of-town letter rate is changed by policy; Testville sets a
+# postage discount (refused above the server's maximum, then accepted); with the mail running, Central's postman
+# leaves the notice of the new rate in Testville's chest on his next visit, once.
+echo "== Phase 18: rates"
+run_server "$WORK_DIR/phase18.log" \
+    "postal bank policy rates.letter_out_town 9" "postal bank policy rates.max_discount 30" \
+    "postal office testville discount 40" "postal office testville discount 20" "postal office testville discount" \
+    "postal start" "sleep:60" "postal stop" "sleep:12" "data get block 20 -60 0 Items" \
+    "postal office testville discount none" "postal bank policy" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -560,6 +570,19 @@ check "phase17: Brookfield is in the config, two blocks in front of its chest" g
 check "phase17: Brookfield is one of the offices, with its clerk" grep -q "Brookfield: Postmaster of Brookfield" <(plain phase17)
 check "phase17: a chest too near another office is refused" grep -qE "too near (Central|the Testville Post Office)" <(plain phase17)
 
+check "phase18: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase18.log"
+check "phase18: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase18.log"
+check "phase18: the rate is set by policy" grep -q "rates.letter_out_town set to 9" <(plain phase18)
+check "phase18: and a notice is promised" grep -q "Central's postman will take a notice of the new rate to each office" <(plain phase18)
+check "phase18: a discount above the maximum is refused" grep -q "allows a discount of at most 30%" <(plain phase18)
+check "phase18: Testville gives 20% off" grep -q "Testville's postage discount is now 20%" <(plain phase18)
+check "phase18: and shows it" grep -q "Testville's postage discount: 20% (up to 30%)" <(plain phase18)
+check "phase18: Central's postman leaves the notice at Testville, once" \
+    test "$(grep -c "Central's postman left a rate notice at testville" <(plain phase18))" -eq 1
+check "phase18: the notice is in Testville's chest" \
+    grep -qE "20, -60, 0 has the following block data: .*Notice of postage rates" <(plain phase18)
+check "phase18: the discount is cleared" grep -q "Testville's postage discount is now none" <(plain phase18)
+check "phase18: the policy lists the rates" grep -q "rates.letter_out_town: 9 " <(plain phase18)
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true

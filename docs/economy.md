@@ -72,7 +72,11 @@ actually handled the mail:
    (`Postage.Letter.Network`, default 10) instead, and it's settled when the letter leaves this server's Central,
    ½ Central and ½ the sending office. No money crosses servers, so the destination is paid nothing and there's
    no refund. Re-addressing a letter to another server tops its hold up to the network price.
-5. **Never posted:** postage held for mail no postman picks up within `Postage.Hold_expiry_days` Postal days
+5. **Discounts:** an office may give a discount on the postage of mail it sends (`/postal office <office>
+   discount <percent>`, up to `Rates.Max_discount`, default 25%). It's taken off the sending office's share when
+   the mail is settled, never more than that share, and refunded to the sender; Central's and the delivering
+   office's shares don't change. The COD surcharge isn't discounted.
+6. **Never posted:** postage held for mail no postman picks up within `Postage.Hold_expiry_days` Postal days
    (default 7) is refunded. That mail stays where it is until it's re-addressed (and paid for again).
 
 Held postage counts toward what **Central owes**, so it's never swept, paid out as a dividend or used to
@@ -134,6 +138,7 @@ downtime a single catch-up day runs.
 | `/postal office <office> deposit <amount>` | owner | move money from you into the office |
 | `/postal office <office> withdraw <amount\|all>` | owner | take money out, down to the reserve (not while in arrears) |
 | `/postal office <office> price [amount\|default]` | owner (admins: any) | what a new address at the office costs (the server's `Address.Purchase_price` unless set); also at the clerk's counter |
+| `/postal office <office> discount [percent\|none]` | owner (admins: any) | the office's discount on the postage of mail it sends, out of its own share |
 | `/postal office <office> approval \| applications \| approve \| deny` | owner (admins: any) | address applications, where the office requires approval (`docs/commands.md`) |
 
 Transfers check both sides and undo the first if the second fails, so money is never lost or created.
@@ -147,6 +152,9 @@ All under `Economy:` in `config.yml`; the ones marked *policy* can be changed li
 |---|---|---|
 | `Use` | false | turn the economy on |
 | `Central_account` | postal | `postal` or `towny` (shared treasury) |
+| `Postage.Letter.Local` / `Out_town` / `Network` | | letter postage (*policy*: `rates.letter_local`, `rates.letter_out_town`, `rates.letter_network`); a change sends every office a notice |
+| `Postage.Shipment.Local` / `Out_town` / `Cod_surchg` | | parcel shipping and the COD surcharge (*policy*: `rates.parcel_local`, `rates.parcel_out_town`, `rates.cod_surcharge`) |
+| `Rates.Max_discount` | 25 | the most, in percent, an office may take off its postage (*policy*: `rates.max_discount`) |
 | `Day_seconds` | 86400 | length of a Postal day (*policy*: `day_seconds`) |
 | `Office_floor` | 500 | the seed/working floor every office keeps (*policy*: `office_floor`) |
 | `Central_buffer` | 5000 | Central keeps what it owes plus this before releasing a dividend (*policy*: `central_buffer`) |

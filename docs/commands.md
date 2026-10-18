@@ -83,9 +83,9 @@ Central's balance, what it owes and its target, and every office's owner, balanc
 withdrawable amount and arrears. `newday` runs a Postal economy day now; `report` shows the daily flow
 log; `policy` shows or changes the economy settings at runtime. See `docs/economy.md`.
 <br>
-#### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default] | approval [on|off|default] | applications | approve <id|name|all> | deny <id|name> [reason]]`
+#### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default] | discount [percent|none] | approval [on|off|default] | applications | approve <id|name|all> | deny <id|name> [reason]]`
 Permissions: owner of the post office (admins may view any)
-An office owner's account: see the balance, deposit, or withdraw down to the reserve. `price` shows what a new address at the office costs; with an amount the owner (or an admin) sets the office's own price, and `default` goes back to the server's `Address.Purchase_price`. `approval` shows or sets whether new addresses need the owner's approval (`default`: the server's `Settings.Deeds.Require_approval`); `applications` lists the ones waiting, and `approve` / `deny` decide them (by the id shown, or the house name; a reason given with `deny` goes to the applicant).
+An office owner's account: see the balance, deposit, or withdraw down to the reserve. `price` shows what a new address at the office costs; with an amount the owner (or an admin) sets the office's own price, and `default` goes back to the server's `Address.Purchase_price`. `discount` shows or sets the office's discount on the postage of mail it sends, up to the server's `Economy.Rates.Max_discount` (default 25%); it comes out of the office's own share (`docs/economy.md`). `approval` shows or sets whether new addresses need the owner's approval (`default`: the server's `Settings.Deeds.Require_approval`); `applications` lists the ones waiting, and `approve` / `deny` decide them (by the id shown, or the house name; a reason given with `deny` goes to the applicant).
 <br>
 #### `/go [PostOffice] [Address]` _`(No address defaults to central)`_
 Permissions: `postal.gotocentral, postal.gotolocal, postal.gotoaddr`

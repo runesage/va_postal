@@ -191,7 +191,7 @@ public final class P_Bank {
 
     // ---- /postal office --------------------------------------------------------------------
 
-    private static final String OFFICE_USAGE = "&7Usage: /postal office [office] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default]\n  | approval [on|off|default] | applications | approve <id|all> | deny <id> [reason]]";
+    private static final String OFFICE_USAGE = "&7Usage: /postal office [office] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default] | discount [percent|none]\n  | approval [on|off|default] | applications | approve <id|all> | deny <id> [reason]]";
 
     /**
      * {@code /postal office ...}: owners see and move their offices' money; {@code admin} (or the console)
@@ -199,12 +199,14 @@ public final class P_Bank {
      */
     public static void office_command(CommandSender sender, String[] args, boolean admin) {
         // Prices and applications work with or without the economy.
-        if (args.length > 2 && java.util.List.of("price", "approval", "applications", "approve", "deny").contains(args[2].toLowerCase())) {
+        if (args.length > 2 && java.util.List.of("price", "discount", "approval", "applications", "approve", "deny").contains(args[2].toLowerCase())) {
             String office = com.vodhanel.minecraft.va_postal.config.C_Postoffice.town_complete(args[1]);
             if ("null".equals(office)) {
                 send(sender, "&7No post office matches '" + args[1] + "'. See /tlist.");
             } else if ("price".equalsIgnoreCase(args[2])) {
                 com.vodhanel.minecraft.va_postal.clerk.ClerkCommand.price(sender, office, args);
+            } else if ("discount".equalsIgnoreCase(args[2])) {
+                com.vodhanel.minecraft.va_postal.clerk.ClerkCommand.discount(sender, office, args);
             } else {
                 com.vodhanel.minecraft.va_postal.deed.Applications.command(sender, office, args);
             }
@@ -488,6 +490,10 @@ public final class P_Bank {
         SETTINGS.put("office_floor", new Setting("economy.office_floor", 0, Double.MAX_VALUE));
         SETTINGS.put("central_buffer", new Setting("economy.central_buffer", 0, Double.MAX_VALUE));
         SETTINGS.put("day_seconds", new Setting("economy.day_seconds", 60, 7 * 86400));
+        for (String[] r : com.vodhanel.minecraft.va_postal.economy.Rates.RATES) {
+            SETTINGS.put(r[0], new Setting(r[1], 0, Double.MAX_VALUE));
+        }
+        SETTINGS.put("rates.max_discount", new Setting("economy.rates.max_discount", 0, 100));
     }
 
     /** {@code /postal bank policy [<setting> <value>]}: show or change the economy dials, saved to config. */
@@ -537,9 +543,14 @@ public final class P_Bank {
             }
             value = trim(v);
         }
+        String before = VA_postal.plugin.getConfig().getString(GetConfig.path_format(st.path));
         VA_postal.plugin.getConfig().set(GetConfig.path_format(st.path), value);
         VA_postal.plugin.saveConfig();
         send(sender, "&6" + key + " set to " + value + ".");
+        if (com.vodhanel.minecraft.va_postal.economy.Rates.label(key) != null && !value.equals(before)) {
+            com.vodhanel.minecraft.va_postal.economy.Rates.changed(key, before, value);
+            send(sender, "&7Central's postman will take a notice of the new rate to each office.");
+        }
         Util.cinform("[Postal] Economy policy: " + key + " = " + value + " (by " + sender.getName() + ")");
     }
 

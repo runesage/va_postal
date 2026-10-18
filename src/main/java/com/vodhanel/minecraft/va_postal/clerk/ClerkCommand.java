@@ -5,6 +5,7 @@ import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.config.C_Postoffice;
 import com.vodhanel.minecraft.va_postal.config.GetConfig;
 import com.vodhanel.minecraft.va_postal.deed.DeedDocument;
+import com.vodhanel.minecraft.va_postal.economy.Rates;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -135,6 +136,35 @@ public final class ClerkCommand {
             Clerks.set_price(office, price);
         }
         send(sender, "&7A new address at " + DeedDocument.display(office) + " now costs " + Clerks.price_text(office) + ".");
+    }
+
+    /** {@code /postal office <office> discount [percent|none]}: the office's discount on the postage of mail it sends. */
+    public static void discount(CommandSender sender, String office, String[] args) {
+        String max = Rates.discount_text_max();
+        if (args.length < 4) {
+            send(sender, "&7" + DeedDocument.display(office) + "'s postage discount: " + Rates.discount_text(office) + " &8(up to " + max + ")");
+            return;
+        }
+        if (!admin(sender) && !(sender instanceof Player p && CounterMenu.manages(p, office))) {
+            send(sender, "&7Only the owner of " + DeedDocument.display(office) + " can set its discount.");
+            return;
+        }
+        if ("none".equalsIgnoreCase(args[3]) || "default".equalsIgnoreCase(args[3])) {
+            Rates.set_discount(office, null);
+        } else {
+            Double percent = Rates.parse_percent(args[3]);
+            if (percent == null) {
+                send(sender, "&7'" + args[3] + "' isn't a percentage. Use a number from 0 to " + max + ", or 'none'.");
+                return;
+            }
+            if (percent > Rates.max_discount()) {
+                send(sender, "&7The Postmaster General allows a discount of at most " + max + ".");
+                return;
+            }
+            Rates.set_discount(office, percent);
+        }
+        send(sender, "&7" + DeedDocument.display(office) + "'s postage discount is now " + Rates.discount_text(office)
+                + ". &8It comes out of the office's own share of the postage.");
     }
 
     private static String nearest(Location at) {
