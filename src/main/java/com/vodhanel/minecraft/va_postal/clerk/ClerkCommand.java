@@ -163,8 +163,8 @@ public final class ClerkCommand {
             }
             Rates.set_discount(office, percent);
         }
-        send(sender, "&7" + DeedDocument.display(office) + "'s postage discount is now " + Rates.discount_text(office)
-                + ". &8It comes out of the office's own share of the postage.");
+        send(sender, "&7" + DeedDocument.display(office) + "'s postage discount is now " + Rates.discount_text(office) + "."
+                + (Rates.discount(office) > 0.0D ? " &8It comes out of the office's own share of the postage." : ""));
     }
 
     private static String nearest(Location at) {
