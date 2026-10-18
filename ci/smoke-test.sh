@@ -306,7 +306,8 @@ run_server "$WORK_DIR/phase15.log" \
 # Phase 16: Central's clerk and protection (docs/design/central-office.md §2). With the mail running the Postmaster
 # General stands at the west side of Central's chest (0 -60 0, facing south): -0.5 -60 0.5. A hopper under the chest
 # takes nothing from it; TNT beside the chest leaves the chest and its sign (0 -60 1) standing but takes the planks
-# next to them. With the mail stopped the clerk is gone.
+# next to them. With the mail stopped the clerk is gone. Then the crater and the hopper are filled in: the later phases
+# need Central's ground (Postal finds its chest from the spot in front of it).
 CENTRAL_CLERK="x=-0.5,y=-60,z=0.5,distance=..1"
 echo "== Phase 16: Central's clerk and protection"
 run_server "$WORK_DIR/phase16.log" \
@@ -316,7 +317,9 @@ run_server "$WORK_DIR/phase16.log" \
     "setblock 1 -60 1 minecraft:oak_planks" "summon minecraft:tnt 1 -60 0 {fuse:0}" "sleep:3" \
     "execute if block 0 -60 0 minecraft:chest" "execute if block 0 -60 1 #minecraft:signs" \
     "execute if block 1 -60 1 minecraft:oak_planks" \
-    "postal stop" "sleep:12" "execute if entity @e[$CENTRAL_CLERK]" "sleep:2"
+    "postal stop" "sleep:12" "execute if entity @e[$CENTRAL_CLERK]" \
+    "fill -5 -63 -5 6 -62 6 minecraft:dirt replace minecraft:air" \
+    "fill -5 -61 -5 6 -61 6 minecraft:grass_block replace minecraft:air" "setblock 0 -61 0 minecraft:grass_block" "sleep:2"
 
 # Phase 17: charters (docs/design/central-office.md §3), from the console with server-held charters. Approval is on by
 # default: an application waits; its name is reserved; an existing office's name is refused; the application is
