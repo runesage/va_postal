@@ -355,6 +355,7 @@ public class VA_postal extends JavaPlugin {
         plugin.getServer().getPluginManager().registerEvents(new RouteEditor(plugin), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.deed.DeedListener(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.ClerkListener(), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.CentralGuard(), plugin);
         // Unused deeds lapse when their time is up, with or without an economy (docs/design/deeds.md §4).
         plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
             try {

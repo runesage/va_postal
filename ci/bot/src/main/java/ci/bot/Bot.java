@@ -20,6 +20,7 @@ import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.GlobalPos;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.object.Direction;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerAction;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ClickItemAction;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerActionType;
 import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
@@ -44,6 +45,7 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.inventory.S
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.inventory.ServerboundContainerClosePacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.level.ServerboundAcceptTeleportationPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundInteractPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundPlayerActionPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundUseItemOnPacket;
 
 import java.io.BufferedReader;
@@ -74,6 +76,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   input <key> <text>    sets a text field of the open dialog (otherwise its initial value is sent)
  *   press <label>         presses the dialog button with that label (its custom action, with the fields)
  *   use <x> <y> <z> [face] uses the held item on that block (face: up by default)
+ *   dig <x> <y> <z>       starts breaking that block (in creative that breaks it at once)
  *   quit                  disconnects and exits
  *
  * Stdout (each line is "<epoch-millis> <EVENT> <detail>"):
@@ -415,6 +418,11 @@ public final class Bot {
                 Direction face = w.length > 4 ? Direction.valueOf(w[4].toUpperCase(Locale.ROOT)) : Direction.UP;
                 event("SENT", "use " + at.getX() + " " + at.getY() + " " + at.getZ() + " " + face);
                 session.send(new ServerboundUseItemOnPacket(at, face, Hand.MAIN_HAND, 0.5F, 0.5F, 0.5F, false, false, ++sequence));
+            }
+            case "dig" -> {
+                Vector3i at = Vector3i.from(Integer.parseInt(w[1]), Integer.parseInt(w[2]), Integer.parseInt(w[3]));
+                event("SENT", "dig " + at.getX() + " " + at.getY() + " " + at.getZ());
+                session.send(new ServerboundPlayerActionPacket(PlayerAction.START_DIGGING, at, Direction.UP, ++sequence));
             }
             default -> event("ERROR", "unknown instruction: " + line);
         }

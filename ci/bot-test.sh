@@ -415,6 +415,27 @@ check "left-clicking approves it" bot_cmd "click 0" 'CHAT .*has approved your ap
 check "the approved deed comes to the inventory" wait_log "$BOT_LOG" 'ITEM 0/[0-9]+ Deed of Address: Ivy Lodge' 10
 bot "close"
 console "postal office testville approval default"
+
+# Central: the Postmaster General greets the bot and opens Central's counter; a player (the bot, deopped, in creative,
+# where a dig breaks at once) can't break Central's chest, and the attempt is logged.
+console "minecraft:tp $BOT_NAME 0.5 -60 3"
+check "the Postmaster General greets the bot at Central" wait_log "$BOT_LOG" 'CHAT <Postmaster General> Good day, PostalBot. Central Post Office' 15
+check "right-clicking him opens Central's counter" bot_cmd "interact -0.5 -60 0.5" 'SCREEN [0-9]+ Central Post Office'
+sleep 1
+check "Central's counter shows the postage rates" grep -qE 'ITEM [0-9]+/11 Postage rates' "$BOT_LOG"
+check "and the network" grep -qE 'ITEM [0-9]+/13 The network' "$BOT_LOG"
+bot "close"
+console "deop $BOT_NAME"
+console "gamemode creative $BOT_NAME"
+sleep 2
+check "a player can't break Central's chest" bot_cmd "dig 0 -60 0" "CHAT .*Central's chest and sign belong to the Post Office"
+sleep 1
+check "the attempt is logged" grep -q "PostalBot tried to break Central's chest" "$SERVER_LOG"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "execute if block 0 -60 0 minecraft:chest"
+check "Central's chest still stands" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+console "gamemode survival $BOT_NAME"
+console "op $BOT_NAME"
 console "postal stop"
 sleep 2
 

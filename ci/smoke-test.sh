@@ -303,6 +303,21 @@ run_server "$WORK_DIR/phase15.log" \
     "postal office testville applications" "postal deed list server" \
     "postal deed apply server testville holly_lodge" "postal office testville approval default" "sleep:2"
 
+# Phase 16: Central's clerk and protection (docs/design/central-office.md §2). With the mail running the Postmaster
+# General stands at the west side of Central's chest (0 -60 0, facing south): -0.5 -60 0.5. A hopper under the chest
+# takes nothing from it; TNT beside the chest leaves the chest and its sign (0 -60 1) standing but takes the planks
+# next to them. With the mail stopped the clerk is gone.
+CENTRAL_CLERK="x=-0.5,y=-60,z=0.5,distance=..1"
+echo "== Phase 16: Central's clerk and protection"
+run_server "$WORK_DIR/phase16.log" \
+    "postal start" "sleep:15" "postal clerk list" "execute if entity @e[$CENTRAL_CLERK]" \
+    "minecraft:item replace block 0 -60 0 container.5 with minecraft:paper" \
+    "setblock 0 -61 0 minecraft:hopper" "sleep:4" "data get block 0 -61 0 Items" "data get block 0 -60 0 Items" \
+    "setblock 1 -60 1 minecraft:oak_planks" "summon minecraft:tnt 1 -60 0 {fuse:0}" "sleep:3" \
+    "execute if block 0 -60 0 minecraft:chest" "execute if block 0 -60 1 #minecraft:signs" \
+    "execute if block 1 -60 1 minecraft:oak_planks" \
+    "postal stop" "sleep:12" "execute if entity @e[$CENTRAL_CLERK]" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -503,6 +518,17 @@ check "phase15: the declined one is denied" grep -qE "Holly Lodge, Testville den
 check "phase15: a declined name can be applied for again" \
     test "$(grep -c "for Holly Lodge, Testville by Server, waits for the postmaster" <(plain phase15))" -eq 2
 check "phase15: approval back to the server's default" test "$(grep -c "are sold straight away (the server's default)" <(plain phase15))" -eq 2
+check "phase16: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase16.log"
+check "phase16: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase16.log"
+check "phase16: the Postmaster General is on duty at Central" \
+    grep -q "Central: Postmaster General, at -1 -60 0 (beside the office chest), on duty" <(plain phase16)
+# In order: the clerk at his post; the chest and the sign survive the TNT; the planks beside them don't; the clerk
+# is gone with the mail stopped.
+check "phase16: TNT leaves Central's chest and sign, takes the planks; the clerk leaves with the mail" \
+    test "$(grep -oE "Test (passed|failed)" "$WORK_DIR/phase16.log" | tr '\n' ' ')" \
+    = "Test passed Test passed Test passed Test failed Test failed "
+check "phase16: a hopper under Central's chest takes nothing" grep -qE -e "-61, 0 has the following block data: \[\]" <(plain phase16)
+check "phase16: the chest keeps its paper" grep -qE "0, -60, 0 has the following block data: .*minecraft:paper" <(plain phase16)
 
 echo
 echo "---- Postal output (phase 2) ----"

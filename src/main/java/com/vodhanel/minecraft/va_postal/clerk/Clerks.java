@@ -49,8 +49,16 @@ public final class Clerks {
     /** Spoken lines carry this far. */
     static final double EARSHOT = 12.0D;
 
+    /** The key of Central's clerk, the Postmaster General (no local office can be called this). */
+    public static final String CENTRAL = "*central";
+    /** A visitor who walks this far off is said goodbye to. */
+    static final double LEAVE_RANGE = GREET_RANGE + 3.0D;
+
     private static final Map<String, NPC> clerks = new LinkedHashMap<>();
-    private static final Map<UUID, Long> greeted = new HashMap<>();
+    /** When each clerk last greeted each player: {@code office + " " + player}. */
+    private static final Map<String, Long> greeted = new HashMap<>();
+    /** Per clerk, the players at its counter now (true: greeted on this visit, so they're said goodbye to). */
+    private static final Map<String, Map<UUID, Boolean>> visiting = new HashMap<>();
     private static BukkitTask task;
 
     private Clerks() {
@@ -61,10 +69,15 @@ public final class Clerks {
         return GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("settings.clerks.local"), true);
     }
 
-    /** Staffs every office (the dispatcher has started). */
+    /** {@code Settings.Clerks.Central}: false leaves Central unstaffed. */
+    public static boolean central_enabled() {
+        return GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("settings.clerks.central"), true);
+    }
+
+    /** Staffs Central and every office (the dispatcher has started). */
     public static synchronized void start() {
         stop();
-        if (!enabled() || !citizens()) {
+        if ((!enabled() && !central_enabled()) || !citizens()) {
             return;
         }
         task = VA_postal.plugin.getServer().getScheduler().runTaskTimer(VA_postal.plugin, (Runnable) Clerks::tend, 20L, TEND_TICKS);
@@ -84,11 +97,12 @@ public final class Clerks {
         }
         clerks.clear();
         greeted.clear();
+        visiting.clear();
     }
 
     /** Spawns missing clerks, puts strays back, dismisses clerks of offices that are gone, and greets visitors. */
     static synchronized void tend() {
-        List<String> offices = offices();
+        List<String> offices = posts();
         clerks.entrySet().removeIf(e -> {
             if (offices.contains(e.getKey())) {
                 return false;
@@ -122,7 +136,7 @@ public final class Clerks {
         }
         if (!npc.isSpawned()) {
             if (npc.spawn(post)) {
-                dress(npc);
+                dress(npc, office);
             }
             return;
         }
@@ -131,6 +145,34 @@ public final class Clerks {
             npc.teleport(post, PlayerTeleportEvent.TeleportCause.PLUGIN);
         }
         greet(office, npc);
+    }
+
+    /** The clerks' posts: Central's (if defined and staffed) and every local office's (if local clerks are on). */
+    static List<String> posts() {
+        List<String> out = new ArrayList<>();
+        String central = C_Postoffice.get_central_po_location();
+        if (central_enabled() && central != null && !"null".equals(central)) {
+            out.add(CENTRAL);
+        }
+        if (enabled()) {
+            out.addAll(offices());
+        }
+        return out;
+    }
+
+    /** The office's config section: {@code postoffice.central} or {@code postoffice.local.<office>}. */
+    private static String section(String key) {
+        return CENTRAL.equals(key) ? "postoffice.central" : "postoffice.local." + key;
+    }
+
+    /** Where the office's postman stands (its Location), as a config string. */
+    static String spot(String key) {
+        return CENTRAL.equals(key) ? C_Postoffice.get_central_po_location() : C_Postoffice.get_local_po_location_by_name(key);
+    }
+
+    /** The office as players read it: "Central", or its name. */
+    public static String label(String key) {
+        return CENTRAL.equals(key) ? "Central" : DeedDocument.display(key);
     }
 
     private static NPC create(String office) {
@@ -150,20 +192,39 @@ public final class Clerks {
     }
 
     /** Puts on the uniform once spawned (Citizens keeps equipment on the NPC). */
-    static void dress(NPC npc) {
+    static void dress(NPC npc, String key) {
         NpcLook.uniform(npc, "central", "true".equalsIgnoreCase(config("settings.uniform.enabled", "false").trim()));
+        if (CENTRAL.equals(key)) {
+            NpcLook.hold(npc, org.bukkit.Material.WRITABLE_BOOK); // the Postmaster General's book and quill
+        }
     }
 
+    /** Greets players who come up to the counter (not again within a while), and says goodbye when they walk off. */
     private static void greet(String office, NPC npc) {
         Location at = npc.getEntity().getLocation();
         long now = System.currentTimeMillis();
+        Map<UUID, Boolean> here = visiting.computeIfAbsent(office, k -> new HashMap<>());
         for (Player p : at.getWorld().getPlayers()) {
-            if (p.getLocation().distanceSquared(at) <= GREET_RANGE * GREET_RANGE && !greeted.containsKey(p.getUniqueId())) {
-                greeted.put(p.getUniqueId(), now);
-                say(office, p, fill(config("settings.clerks.greeting",
-                        "Good day, {player}! Welcome to the {office} Post Office. Right-click me for the counter."), office, p));
+            if (p.getLocation().distanceSquared(at) <= GREET_RANGE * GREET_RANGE && !here.containsKey(p.getUniqueId())) {
+                boolean greet = !greeted.containsKey(office + " " + p.getUniqueId());
+                here.put(p.getUniqueId(), greet);
+                if (greet) {
+                    greeted.put(office + " " + p.getUniqueId(), now);
+                    say(office, p, fill(CENTRAL.equals(office)
+                            ? config("settings.clerks.central_greeting", "Good day, {player}. Central Post Office, how may I help?")
+                            : config("settings.clerks.greeting",
+                            "Good day, {player}! Welcome to the {office} Post Office. Right-click me for the counter."), office, p));
+                }
             }
         }
+        here.entrySet().removeIf(e -> {
+            Player p = org.bukkit.Bukkit.getPlayer(e.getKey());
+            boolean gone = p == null || p.getWorld() != at.getWorld() || p.getLocation().distanceSquared(at) > LEAVE_RANGE * LEAVE_RANGE;
+            if (gone && e.getValue() && p != null) {
+                say(office, p, fill(config("settings.clerks.farewell", "Good day to you, {player}."), office, p));
+            }
+            return gone;
+        });
     }
 
     /** The clerk of {@code office} says {@code line} to {@code player}. */
@@ -208,7 +269,7 @@ public final class Clerks {
             return placed;
         }
         // An office's Location is where the postman stands, two blocks in front of its chest.
-        Location spot = Util.str2location(C_Postoffice.get_local_po_location_by_name(office));
+        Location spot = Util.str2location(spot(office));
         if (spot == null) {
             return null;
         }
@@ -234,8 +295,8 @@ public final class Clerks {
     }
 
     /** The office's chest: the chest nearest the spot its Location names. */
-    static Block office_chest(String office) {
-        Location spot = Util.str2location(C_Postoffice.get_local_po_location_by_name(office));
+    public static Block office_chest(String office) {
+        Location spot = Util.str2location(spot(office));
         return spot == null ? null : ChestManip.getNearestGenericChest(spot.getBlock(), 3);
     }
 
@@ -269,7 +330,7 @@ public final class Clerks {
 
     /** The post set with /postal clerk: {@code world,x,y,z,yaw}. */
     private static Location placed(String office) {
-        String s = VA_postal.plugin.getConfig().getString(GetConfig.path_format("postoffice.local." + office + ".clerk"));
+        String s = VA_postal.plugin.getConfig().getString(GetConfig.path_format(section(office) + ".clerk"));
         Location at = s == null ? null : Util.str2location(s);
         if (at == null) {
             return null;
@@ -287,7 +348,7 @@ public final class Clerks {
 
     /** Stations the clerk of {@code office} at {@code at} (null: back beside the office chest). */
     public static synchronized void place(String office, Location at) {
-        String path = GetConfig.path_format("postoffice.local." + office + ".clerk");
+        String path = GetConfig.path_format(section(office) + ".clerk");
         VA_postal.plugin.getConfig().set(path, at == null ? null : Util.location2str(at) + "," + Math.round(at.getYaw()));
         VA_postal.plugin.saveConfig();
         NPC npc = clerks.get(office);
@@ -300,26 +361,36 @@ public final class Clerks {
     /** One line per office for /postal clerk list. */
     public static synchronized List<String> describe() {
         List<String> out = new ArrayList<>();
-        for (String office : offices()) {
+        List<String> keys = new ArrayList<>();
+        String central = C_Postoffice.get_central_po_location();
+        if (central != null && !"null".equals(central)) {
+            keys.add(CENTRAL);
+        }
+        keys.addAll(offices());
+        for (String office : keys) {
             Location post = post(office);
             NPC npc = clerks.get(office);
-            String state = !enabled() ? "clerks are off" : task == null ? "off duty (the mail isn't running)"
+            boolean on = CENTRAL.equals(office) ? central_enabled() : enabled();
+            String state = !on ? "clerks are off" : task == null ? "off duty (the mail isn't running)"
                     : npc != null && npc.isSpawned() ? "on duty" : "not here yet";
-            out.add("&f" + DeedDocument.display(office) + "&7: " + Text.strip(Text.color(name(office))) + ", "
+            out.add("&f" + label(office) + "&7: " + Text.strip(Text.color(name(office))) + ", "
                     + (post == null ? "no place to stand" : "at " + post.getBlockX() + " " + post.getBlockY() + " " + post.getBlockZ())
                     + (placed(office) == null ? " (beside the office chest)" : "") + ", " + state
-                    + "; addresses " + price_text(office) + (has_price(office) ? " (office price)" : ""));
+                    + (CENTRAL.equals(office) ? "" : "; addresses " + price_text(office) + (has_price(office) ? " (office price)" : "")));
         }
         return out;
     }
 
     /** The clerk's name: {@code Settings.Clerks.Name}, "{office}" filled in. */
     public static String name(String office) {
+        if (CENTRAL.equals(office)) {
+            return config("settings.clerks.central_name", "&6Postmaster General");
+        }
         return config("settings.clerks.name", "&6Postmaster of {office}").replace("{office}", DeedDocument.display(office));
     }
 
     static String fill(String line, String office, Player player) {
-        return line.replace("{office}", DeedDocument.display(office)).replace("{player}", player.getName());
+        return line.replace("{office}", label(office)).replace("{player}", player.getName());
     }
 
     /** What a new address at {@code office} costs: the office's own price, else the server's. */
