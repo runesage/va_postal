@@ -125,6 +125,9 @@ permissions:
     default: op
   postal.addr:
     default: true
+  postal.charter.buy:
+    description: Buy (or apply for) a charter at Central's counter.
+    default: true
   postal.deed.buy:
     description: Buy an address deed at a post office's counter.
     default: true

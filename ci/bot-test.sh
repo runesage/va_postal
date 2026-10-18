@@ -424,7 +424,33 @@ check "right-clicking him opens Central's counter" bot_cmd "interact -0.5 -60 0.
 sleep 1
 check "Central's counter shows the postage rates" grep -qE 'ITEM [0-9]+/11 Postage rates' "$BOT_LOG"
 check "and the network" grep -qE 'ITEM [0-9]+/13 The network' "$BOT_LOG"
+check "and a charter, which needs approval" grep -qE 'ITEM [0-9]+/22 Apply for a charter' "$BOT_LOG"
 bot "close"
+
+# Charters at Central's counter (docs/design/central-office.md §3): apply for Ashby, an admin grants it, the charter
+# comes to the bot's hand (the inventory cleared first, so it lands there), and the bot opens Ashby on a chest 90
+# blocks from the other offices.
+console "minecraft:setblock 90 -60 60 minecraft:chest[facing=south]"
+console "minecraft:clear $BOT_NAME"
+bot_cmd "interact -0.5 -60 0.5" 'SCREEN [0-9]+ Central Post Office' || true
+sleep 1
+check "Apply for a charter opens the form" bot_cmd "click 22" 'DIALOG Charter a post office \| value= \| Apply'
+bot "input value Ashby"
+check "applying puts it before the Postmaster General" bot_cmd "press Apply" 'CHAT .*application for the Ashby Post Office is with the Postmaster General'
+check "the counter shows the application" bot_cmd "interact -0.5 -60 0.5" 'ITEM [0-9]+/22 Your charter application'
+bot "close"
+console "postal charter approve ashby"
+check "the grant reaches the bot" wait_log "$BOT_LOG" 'CHAT .*The Postmaster General has approved your application for the Ashby Post Office' 10
+check "the charter is in its hand" wait_log "$BOT_LOG" 'ITEM 0/36 Charter of Ashby Post Office' 10
+console "minecraft:tp $BOT_NAME 90 -60 63"
+sleep 2
+check "using the charter on a chest opens Ashby" bot_cmd "use 90 -60 60 south" 'CHAT .*The Ashby Post Office is open'
+check "everyone hears of it" wait_log "$BOT_LOG" 'CHAT A new post office has opened in Ashby! Chartered to PostalBot' 5
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal clerk list"
+check "Ashby is one of the offices" wait_log "$SERVER_LOG" 'Ashby.*Postmaster of Ashby' 5 "$from"
+console "minecraft:tp $BOT_NAME 0.5 -60 3"
+sleep 2
 console "deop $BOT_NAME"
 console "gamemode creative $BOT_NAME"
 sleep 2
