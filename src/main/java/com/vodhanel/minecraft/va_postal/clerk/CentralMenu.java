@@ -9,6 +9,7 @@ import com.vodhanel.minecraft.va_postal.config.C_Owner;
 import com.vodhanel.minecraft.va_postal.deed.Charters;
 import com.vodhanel.minecraft.va_postal.deed.DeedDocument;
 import com.vodhanel.minecraft.va_postal.deed.Deeds;
+import com.vodhanel.minecraft.va_postal.deed.OfficeSales;
 import com.vodhanel.minecraft.va_postal.store.Deed;
 import com.vodhanel.minecraft.va_postal.store.MailStore;
 import com.vodhanel.minecraft.va_postal.store.MailStores;
@@ -32,17 +33,20 @@ final class CentralMenu implements Menu {
     static final int NETWORK = 13;
     static final int OFFICES = 15;
     static final int CHARTERS = 22;
+    static final int OFFERS = 24;
 
     private final Inventory inventory;
     /** The player's charters: issued ones waiting to be used, and applications waiting for a decision. */
     private final List<Deed> issued;
     private final List<Deed> waiting;
+    private final List<String> owned;
+    private final List<com.vodhanel.minecraft.va_postal.store.Offer> offers;
 
     private CentralMenu(Player player) {
         this.inventory = Bukkit.createInventory(this, 27, Text.component(Text.color("&8Central Post Office")));
         inventory.setItem(RATES, rates());
         inventory.setItem(NETWORK, network());
-        List<String> owned = owned(player.getUniqueId());
+        owned = owned(player.getUniqueId());
         if (!owned.isEmpty()) {
             List<String> lore = new ArrayList<>();
             for (String office : owned) {
@@ -50,12 +54,23 @@ final class CentralMenu implements Menu {
             }
             lore.add("");
             lore.add("&7Their accounts: /postal office");
+            lore.add("&7Click to sell one back to Central.");
             inventory.setItem(OFFICES, CounterMenu.item(Material.CHEST, "&6Your post offices", lore.toArray(new String[0])));
         }
         issued = new ArrayList<>();
         waiting = new ArrayList<>();
         charters(player.getUniqueId());
         inventory.setItem(CHARTERS, charter_card());
+        offers = OfficeSales.offers_to(player.getUniqueId());
+        if (!offers.isEmpty()) {
+            List<String> lore = new ArrayList<>();
+            for (com.vodhanel.minecraft.va_postal.store.Offer o : offers) {
+                lore.add("&f" + DeedDocument.display(o.office()) + " &7from " + o.seller_name());
+            }
+            lore.add("");
+            lore.add("&7Click to accept or decline.");
+            inventory.setItem(OFFERS, CounterMenu.item(Material.PAPER, "&6Offers to you", lore.toArray(new String[0])));
+        }
     }
 
     private void charters(UUID player) {
@@ -116,6 +131,14 @@ final class CentralMenu implements Menu {
 
     @Override
     public void click(Player player, int slot, boolean right) {
+        if (slot == OFFICES && !owned.isEmpty()) {
+            player.openInventory(new SalesMenus.Owned(owned).getInventory());
+            return;
+        }
+        if (slot == OFFERS && !offers.isEmpty()) {
+            player.openInventory(new SalesMenus.Offers(offers).getInventory());
+            return;
+        }
         if (slot != CHARTERS) {
             return; // the other cards are for reading
         }
