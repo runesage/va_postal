@@ -318,6 +318,19 @@ run_server "$WORK_DIR/phase16.log" \
     "execute if block 1 -60 1 minecraft:oak_planks" \
     "postal stop" "sleep:12" "execute if entity @e[$CENTRAL_CLERK]" "sleep:2"
 
+# Phase 17: charters (docs/design/central-office.md §3), from the console with server-held charters. Approval is on by
+# default: an application waits; its name is reserved; an existing office's name is refused; the application is
+# declined. With autoapprove on, a charter opens Brookfield on a chest 70 blocks out (its sign, its config, the
+# announcement); one too near Testville and Central is refused.
+echo "== Phase 17: charters"
+run_server "$WORK_DIR/phase17.log" \
+    "postal charter autoapprove" "postal charter apply server Brookfield" "postal charter apply server brookfield" \
+    "postal charter apply server Testville" "postal charter pending" "postal charter deny brookfield Too near the river" \
+    "postal charter pending" "postal charter autoapprove on" \
+    "setblock 80 -60 40 minecraft:chest[facing=south]" "postal charter test Brookfield 80 -60 40" "sleep:2" \
+    "setblock 30 -60 -6 minecraft:chest[facing=south]" "postal charter test Ashford 30 -60 -6" \
+    "postal charter autoapprove off" "data get block 80 -60 41 front_text" "postal clerk list" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -529,6 +542,23 @@ check "phase16: TNT leaves Central's chest and sign, takes the planks; the clerk
     = "Test passed Test passed Test passed Test failed Test failed "
 check "phase16: a hopper under Central's chest takes nothing" grep -qE -e "-61, 0 has the following block data: \[\]" <(plain phase16)
 check "phase16: the chest keeps its paper" grep -qE "0, -60, 0 has the following block data: .*minecraft:paper" <(plain phase16)
+check "phase17: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase17.log"
+check "phase17: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase17.log"
+check "phase17: charters need approval by default" grep -q "Charter applications wait for an admin's approval" <(plain phase17)
+check "phase17: an application waits" grep -q "Charter application [0-9a-f]* for Brookfield by Server, waits for a decision" <(plain phase17)
+check "phase17: its name is reserved" grep -q "No charter: someone already holds a charter for Brookfield" <(plain phase17)
+check "phase17: an existing office's name is refused" grep -q "No charter: there's already a post office called Testville" <(plain phase17)
+check "phase17: the application is listed" grep -q "Charter applications: 1" <(plain phase17)
+check "phase17: and declined" grep -q "Declined the charter for Brookfield (Server)" <(plain phase17)
+check "phase17: then none wait" grep -q "Charter applications: 0" <(plain phase17)
+check "phase17: autoapprove sells charters straight away" grep -q "Charters are sold straight away" <(plain phase17)
+check "phase17: a charter opens Brookfield" grep -q "The Brookfield Post Office is open" <(plain phase17)
+check "phase17: the opening is announced" grep -q "A new post office has opened in Brookfield" <(plain phase17)
+check "phase17: Brookfield has its sign" grep -qi "brookfield" <(plain phase17 | grep "80, -60, 41 has the following block data")
+check "phase17: Brookfield is in the config, two blocks in front of its chest" grep -qiE "location: '?world,80\.0,-60\.0,42\.0" "$CONFIG"
+# (/tlist lists only offices with addresses; a new office has none yet.)
+check "phase17: Brookfield is one of the offices, with its clerk" grep -q "Brookfield: Postmaster of Brookfield" <(plain phase17)
+check "phase17: a chest too near another office is refused" grep -qE "too near (Central|the Testville Post Office)" <(plain phase17)
 
 echo
 echo "---- Postal output (phase 2) ----"

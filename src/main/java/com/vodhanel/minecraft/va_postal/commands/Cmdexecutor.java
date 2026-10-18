@@ -169,6 +169,14 @@ public class Cmdexecutor implements CommandExecutor {
             com.vodhanel.minecraft.va_postal.clerk.ClerkCommand.command(player, args);
             return true;
         }
+        if ("charter".equals(sub)) {
+            if (!hasPermission(player, "postal.admin")) {
+                Util.pinform(player, "Required permission not present.");
+                return true;
+            }
+            com.vodhanel.minecraft.va_postal.deed.CharterCommand.command(player, args);
+            return true;
+        }
         if ("deed".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
@@ -395,6 +403,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("clerk".equals(args[0].toLowerCase().trim())) {
             com.vodhanel.minecraft.va_postal.clerk.ClerkCommand.command(sender, args);
+            return true;
+        }
+        if ("charter".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.deed.CharterCommand.command(sender, args);
             return true;
         }
         if ("deed".equals(args[0].toLowerCase().trim())) {

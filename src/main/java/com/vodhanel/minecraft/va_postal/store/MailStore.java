@@ -149,6 +149,9 @@ public interface MailStore extends AutoCloseable {
     /** This server's deeds at {@code office} waiting for approval, oldest first. */
     List<Deed> deeds_pending(String office);
 
+    /** This server's deeds of {@code kind} waiting for approval, oldest first (charters: they have no office yet). */
+    List<Deed> deeds_pending(Deed.Kind kind);
+
     /** A new issue of an open deed's document; the older copies stop working. Empty if the deed isn't open. */
     java.util.Optional<Deed> reissue_deed(UUID id, long now);
 

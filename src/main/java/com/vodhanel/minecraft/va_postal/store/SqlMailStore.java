@@ -657,6 +657,11 @@ public final class SqlMailStore implements MailStore {
     }
 
     @Override
+    public List<Deed> deeds_pending(Deed.Kind kind) {
+        return deeds("WHERE server_id = ? AND kind = ? AND state = 'PENDING' ORDER BY created_at", server_id, kind.name());
+    }
+
+    @Override
     public Optional<Deed> reissue_deed(UUID id, long now) {
         try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
                 "UPDATE deed SET issue_no = issue_no + 1, updated_at = ? WHERE deed_id = ? AND state IN ('PENDING', 'ISSUED')")) {

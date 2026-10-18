@@ -1,7 +1,8 @@
 # Design: Central Office
 
 **Status:** being built. Done: the clerk (the Postmaster General) and Central's protection (§2), with a first
-counter (postage rates, the network, the player's offices). Next: charters (§3), then office sales. Address deeds
+counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
+and its ceremony, from the admin commands (§3). Next: charters at Central's counter, then office sales. Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals

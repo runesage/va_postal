@@ -174,7 +174,7 @@ public final class DeedCommand {
         Deeds.use_as_admin(r.deed(), chest, outcome -> Deeds.inform(sender, "[Postal] Deed " + short_id(r.deed().id()) + ": " + outcome));
     }
 
-    private static OfflinePlayer player(String name) {
+    static OfflinePlayer player(String name) {
         if ("server".equalsIgnoreCase(name)) {
             return VA_postal.SERVER; // a deed held by the server, for tests
         }
@@ -186,7 +186,7 @@ public final class DeedCommand {
         return id.toString().substring(0, 8);
     }
 
-    private static Integer parse(String s) {
+    static Integer parse(String s) {
         try {
             return Integer.parseInt(s.trim());
         } catch (NumberFormatException e) {

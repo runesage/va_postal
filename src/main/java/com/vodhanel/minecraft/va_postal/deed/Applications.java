@@ -82,9 +82,11 @@ public final class Applications {
 
     /** A new application at its office: the owner hears of it (admins, for an office the server owns). */
     public static void applied(Deed d) {
-        String line = d.holder_name() + " has applied for " + DeedDocument.display(d.name()) + " at "
+        boolean charter = d.kind() == Deed.Kind.CHARTER;
+        String line = charter ? d.holder_name() + " has applied for a charter for " + subject(d) + ". See /postal charter pending."
+                : d.holder_name() + " has applied for " + DeedDocument.display(d.name()) + " at "
                 + DeedDocument.display(d.office()) + ". See /postal office " + d.office() + " applications, or the counter.";
-        UUID owner = C_Owner.get_owner_local_po_id(d.office());
+        UUID owner = charter ? null : C_Owner.get_owner_local_po_id(d.office()); // charters are the admins' to decide
         if (owner == null) {
             for (Player p : Bukkit.getOnlinePlayers()) {
                 if (p.hasPermission("postal.admin")) {
@@ -115,10 +117,12 @@ public final class Applications {
         }
         Deed issued = store.deed(id).orElse(d);
         boolean handed = Deeds.give(issued);
-        tell(issued, "The postmaster of " + DeedDocument.display(d.office()) + " has approved your application for "
-                + DeedDocument.display(d.name()) + ". " + (handed ? "Your deed is in your inventory; use it"
-                : "Collect your deed at the counter and use it") + " on your mailbox chest before "
-                + new SimpleDateFormat("d MMM yyyy").format(new Date(issued.expires_at())) + ".");
+        boolean charter = d.kind() == Deed.Kind.CHARTER;
+        String noun = Deeds.noun(d.kind());
+        tell(issued, capital(decider(d)) + " has approved your application for " + subject(d) + ". "
+                + (handed ? "Your " + noun + " is in your inventory; use it" : "Collect your " + noun + " at "
+                + (charter ? "Central's" : "the") + " counter and use it") + " on " + (charter ? "the chest that will be the office's"
+                : "your mailbox chest") + " before " + new SimpleDateFormat("d MMM yyyy").format(new Date(issued.expires_at())) + ".");
         Util.cinform("[Postal] Application " + DeedCommand.short_id(id) + " (" + d.name() + ", " + d.office() + ") approved by " + by);
         return new Deeds.Result(issued, null);
     }
@@ -145,8 +149,8 @@ public final class Applications {
                 Util.cinform(AnsiColor.RED + "[Postal] Central couldn't refund application " + id);
             }
         }
-        tell(d, "The postmaster of " + DeedDocument.display(d.office()) + " has declined your application for "
-                + DeedDocument.display(d.name()) + (reason == null || reason.isBlank() ? "." : ": " + reason.trim()
+        tell(d, capital(decider(d)) + " has declined your application for "
+                + subject(d) + (reason == null || reason.isBlank() ? "." : ": " + reason.trim()
                 + (reason.trim().endsWith(".") ? "" : ".")) + refunded);
         Util.cinform("[Postal] Application " + DeedCommand.short_id(id) + " (" + d.name() + ", " + d.office() + ") denied by " + by);
         return new Deeds.Result(d.with_state(Deed.State.DENIED, now), null);
@@ -160,9 +164,13 @@ public final class Applications {
         String[] home = home_of(d.holder());
         boolean lettered = false;
         if (home != null) {
-            String[] posted = P_MailAdmin.post_letter(d.office(), null, home[0], home[1], d.holder_name(), d.holder(),
-                    "Postmaster of " + DeedDocument.display(d.office()), "Your address application",
-                    "Dear " + d.holder_name() + ",\n\n" + message + "\n\nThe " + DeedDocument.display(d.office()) + " Post Office",
+            boolean charter = d.kind() == Deed.Kind.CHARTER;
+            // A charter's office doesn't exist yet: the Postmaster General's letter is handed in at the applicant's own office.
+            String[] posted = P_MailAdmin.post_letter(charter ? home[0] : d.office(), null, home[0], home[1], d.holder_name(), d.holder(),
+                    charter ? "Postmaster General" : "Postmaster of " + DeedDocument.display(d.office()),
+                    charter ? "Your charter application" : "Your address application",
+                    "Dear " + d.holder_name() + ",\n\n" + message + "\n\nThe " + (charter ? "Central" : DeedDocument.display(d.office()))
+                            + " Post Office",
                     Actor.system("deeds"));
             lettered = posted[0] != null;
             if (!lettered) {
@@ -175,6 +183,20 @@ public final class Applications {
         } else if (!lettered) {
             Notices.add(d.holder(), message);
         }
+    }
+
+    /** What an application was for: an address's name, or "the Brookfield Post Office" for a charter. */
+    public static String subject(Deed d) {
+        return d.kind() == Deed.Kind.CHARTER ? "the " + DeedDocument.display(d.name()) + " Post Office" : DeedDocument.display(d.name());
+    }
+
+    /** Who decides an application: the office's postmaster, or the Postmaster General for a charter. */
+    public static String decider(Deed d) {
+        return d.kind() == Deed.Kind.CHARTER ? "the Postmaster General" : "the postmaster of " + DeedDocument.display(d.office());
+    }
+
+    static String capital(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     /** One of {@code player}'s addresses on this server: {office, address}, or null. */
