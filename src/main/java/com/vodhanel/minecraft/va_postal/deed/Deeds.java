@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  * the office); when it expires it's refunded less the expiry fee, which Central keeps.
  */
 public final class Deeds {
-    private static final long DAY = 24L * 60L * 60L * 1000L;
+    static final long DAY = 24L * 60L * 60L * 1000L;
     /** Deeds being used right now (their survey is running), so a second click doesn't use one twice. */
     private static final Set<UUID> in_use = new HashSet<>();
 
@@ -101,6 +101,15 @@ public final class Deeds {
      * (0: a gift). The document goes into their inventory if they're online.
      */
     public static Result issue_address(OfflinePlayer holder, String holder_name, String office_input, String input, double price) {
+        return issue_address(holder, holder_name, office_input, input, price, false);
+    }
+
+    /**
+     * As {@link #issue_address(OfflinePlayer, String, String, String, double)}; with {@code pending} it's an application
+     * instead: recorded and paid for (the name is reserved) but issued only once the office approves it (Applications).
+     */
+    public static Result issue_address(OfflinePlayer holder, String holder_name, String office_input, String input, double price,
+                                       boolean pending) {
         MailStore store = store();
         if (store == null) {
             return Result.failed("the mail store isn't open");
@@ -123,7 +132,7 @@ public final class Deeds {
             }
         }
         long now = System.currentTimeMillis();
-        Deed deed = new Deed(UUID.randomUUID(), Deed.Kind.ADDRESS, Deed.State.ISSUED, holder.getUniqueId(), holder_name,
+        Deed deed = new Deed(UUID.randomUUID(), Deed.Kind.ADDRESS, pending ? Deed.State.PENDING : Deed.State.ISSUED, holder.getUniqueId(), holder_name,
                 store.server_id(), office, name, price, 1, now, now + GetConfig.deed_expiry_days() * DAY, now);
         try {
             store.create_deed(deed);
@@ -137,7 +146,9 @@ public final class Deeds {
             P_Economy.deposit_to_central(price); // held for the deed
             EconomyState.record(EconomyState.Flow.ADDRESS_PURCHASE, price);
         }
-        give(deed);
+        if (!pending) {
+            give(deed);
+        }
         return new Result(deed, null);
     }
 
@@ -358,6 +369,11 @@ public final class Deeds {
     // ---- Expiry -----------------------------------------------------------------------------
 
     /** Expires this server's deeds whose time is up: refunded less the fee, their names released. On the Postal day. */
+    /** What a lapsing deed gives back: an application nobody answered, all of it; an unused deed, less the expiry fee. */
+    static double lapse_refund(Deed d, double fee) {
+        return d.state() == Deed.State.PENDING ? d.price() : d.price() * (1.0D - fee);
+    }
+
     public static int expire_due() {
         MailStore store = store();
         if (store == null) {
@@ -370,7 +386,8 @@ public final class Deeds {
                 continue;
             }
             n++;
-            double refund = d.price() * (1.0D - GetConfig.deed_expiry_fee());
+            boolean unanswered = d.state() == Deed.State.PENDING;
+            double refund = lapse_refund(d, GetConfig.deed_expiry_fee());
             OfflinePlayer holder = Bukkit.getOfflinePlayer(d.holder());
             if (refund > 0.0D && VA_postal.economy_configured) {
                 if (P_Economy.withdraw_from_central(refund)) {
@@ -380,10 +397,16 @@ public final class Deeds {
                     Util.cinform(AnsiColor.RED + "[Postal] Central couldn't refund deed " + d.id());
                 }
             }
-            Player online = holder.getPlayer();
-            if (online != null) {
-                Util.pinform(online, "&7&oYour deed for " + DeedDocument.display(d.name()) + ", " + DeedDocument.display(d.office())
-                        + " has lapsed" + (refund > 0.0D && VA_postal.economy_configured ? "; " + P_Economy.ef(refund) + " was refunded." : "."));
+            String refunded = refund > 0.0D && VA_postal.economy_configured ? " " + P_Economy.ef(refund) + " was refunded." : "";
+            if (unanswered) {
+                Applications.tell(d, "Your application for " + DeedDocument.display(d.name()) + " lapsed before the postmaster of "
+                        + DeedDocument.display(d.office()) + " answered it." + refunded);
+            } else {
+                Player online = holder.getPlayer();
+                if (online != null) {
+                    Util.pinform(online, "&7&oYour deed for " + DeedDocument.display(d.name()) + ", " + DeedDocument.display(d.office())
+                            + " has lapsed." + refunded);
+                }
             }
         }
         return n;
@@ -401,7 +424,7 @@ public final class Deeds {
 
     // ---- Helpers ----------------------------------------------------------------------------
 
-    private static String office_world(String office) {
+    static String office_world(String office) {
         Location l = Util.str2location(C_Postoffice.get_local_po_location_by_name(office));
         return l == null ? null : l.getWorld().getName();
     }

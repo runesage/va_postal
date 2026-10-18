@@ -639,6 +639,24 @@ public final class SqlMailStore implements MailStore {
     }
 
     @Override
+    public boolean issue_deed(UUID id, long now, long expires_at) {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "UPDATE deed SET state = 'ISSUED', expires_at = ?, updated_at = ? WHERE deed_id = ? AND state = 'PENDING'")) {
+            ps.setLong(1, expires_at);
+            ps.setLong(2, now);
+            ps.setString(3, id.toString());
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new StoreException("Could not issue deed " + id, e);
+        }
+    }
+
+    @Override
+    public List<Deed> deeds_pending(String office) {
+        return deeds("WHERE server_id = ? AND office = ? AND state = 'PENDING' ORDER BY created_at", server_id, office);
+    }
+
+    @Override
     public Optional<Deed> reissue_deed(UUID id, long now) {
         try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
                 "UPDATE deed SET issue_no = issue_no + 1, updated_at = ? WHERE deed_id = ? AND state IN ('PENDING', 'ISSUED')")) {
@@ -692,11 +710,13 @@ public final class SqlMailStore implements MailStore {
         }
     }
 
-    private List<Deed> deeds(String where, String arg) {
+    private List<Deed> deeds(String where, String... args) {
         List<Deed> out = new ArrayList<>();
         try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
                 "SELECT " + DEED_COLUMNS + " FROM deed " + where)) {
-            ps.setString(1, arg);
+            for (int i = 0; i < args.length; i++) {
+                ps.setString(i + 1, args[i]);
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     out.add(new Deed(UUID.fromString(rs.getString(1)), Deed.Kind.valueOf(rs.getString(2)),

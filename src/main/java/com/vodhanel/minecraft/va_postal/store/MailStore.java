@@ -143,6 +143,12 @@ public interface MailStore extends AutoCloseable {
     /** Moves a deed from {@code from} to {@code to}; false if it wasn't in {@code from} (someone got there first). */
     boolean deed_state(UUID id, Deed.State from, Deed.State to, long now);
 
+    /** Issues a pending deed (its application was approved), now good until {@code expires_at}; false if it wasn't pending. */
+    boolean issue_deed(UUID id, long now, long expires_at);
+
+    /** This server's deeds at {@code office} waiting for approval, oldest first. */
+    List<Deed> deeds_pending(String office);
+
     /** A new issue of an open deed's document; the older copies stop working. Empty if the deed isn't open. */
     java.util.Optional<Deed> reissue_deed(UUID id, long now);
 
