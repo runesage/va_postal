@@ -35,10 +35,20 @@ is not shaded into the plugin jar.
 
 - `ci/bot/src/main/java/ci/bot/Bot.java`: `Bot <host> <port> <name>` logs in offline-mode and stays connected.
   - Stdin, one instruction per line: `/cmd args` sends that chat command (a lone `/` sends the empty command, which
-    Postal reads as "confirm"), `quit` disconnects.
+    Postal reads as "confirm"), `quit` disconnects. For the office counter (docs/design/deeds.md):
+    - `interact <x> <y> <z>`: right-clicks the entity nearest that point (an NPC such as an office clerk);
+    - `click <slot> [right]`, `close`: clicks a slot of the open container, or closes it;
+    - `input <key> <text>`, `press <label>`: sets a dialog's text field, then presses a button, sending its custom
+      action with the fixed payload plus every field (as the client does);
+    - `use <x> <y> <z> [face]`: uses the held item on a block (e.g. a deed on a chest).
   - Stdout, one event per line, `<epoch-millis> <EVENT> <detail>`: `JOINED`, `COMPASS <dim> <x> <y> <z>` (the
     "set default spawn position" packet, i.e. `Player#setCompassTarget`), `CHAT <text>` (system/player/disguised
-    chat flattened to plain text; translatable messages show their key and arguments), `SENT`, `DISCONNECTED`, `ERROR`.
+    chat flattened to plain text; translatable messages show their key and arguments), `ENTITY <id> <type> <x> <y> <z>`
+    (an entity came into view), `SCREEN <id> <title>` (a container opened), `ITEM <container>/<slot> <name>` (a named
+    item; container 0 is the player's inventory), `CLOSED <id>`, `DIALOG <title> | <field>=<initial>, ... | <button>, ...`,
+    `SENT`, `DISCONNECTED`, `ERROR`.
+  - It confirms server teleports and sends "player loaded" with the first one: without that the server ignores a
+    player's clicks on entities and blocks.
 - `ci/bot-test.sh <postal.jar>`: reuses `ci/lib.sh` (Paper, Citizens, Vault, EssentialsX downloads, the seeded
   Testville network and its config). Boot 1 builds the seed world and lets Postal write its config; boot 2 keeps the
   server on a console fifo, starts the bot on a second fifo, and runs the scenario:
@@ -47,6 +57,11 @@ is not shaded into the plugin jar.
   3. `/` confirms; the compass target becomes Testville's post office (`minecraft:overworld 20 -60 2`, the seeded
      location)
   4. `/tlist` answers and the compass target does **not** change (the bug fixed in PR #37)
+  5. letters (`/addr`), parcels (`/package`, `/cod`, `/accept`, `/refuse`), the mail store
+  6. the office counter: right-click Testville's clerk; the counter menu shows *Buy an address* and, for an op, the
+     *Approval* switch; *Buy an address* opens the dialog with a suggested name; *Suggest another* draws again; buying
+     "Rose Cottage" gives the deed; using it on a chest opens the address; then *Approval* on, an application for
+     "Ivy Lodge", approved from the *Applications* menu, and its deed arrives
 
 Note the confirmation step: `/gps` registers the pending command and Postal's `PlayerCommandPreprocessEvent`
 handler rewrites the next command `/` into the registered one (`BukkitListener`).
