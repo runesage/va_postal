@@ -131,6 +131,7 @@ downtime a single catch-up day runs.
 | `/postal office <office> [balance]` | owner (admins: any) | one office |
 | `/postal office <office> deposit <amount>` | owner | move money from you into the office |
 | `/postal office <office> withdraw <amount\|all>` | owner | take money out, down to the reserve (not while in arrears) |
+| `/postal office <office> price [amount\|default]` | owner (admins: any) | what a new address at the office costs (the server's `Address.Purchase_price` unless set); also at the clerk's counter |
 
 Transfers check both sides and undo the first if the second fails, so money is never lost or created.
 

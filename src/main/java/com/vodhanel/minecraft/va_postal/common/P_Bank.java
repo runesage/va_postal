@@ -191,13 +191,22 @@ public final class P_Bank {
 
     // ---- /postal office --------------------------------------------------------------------
 
-    private static final String OFFICE_USAGE = "&7Usage: /postal office [office] [balance | deposit <amount> | withdraw <amount|all>]";
+    private static final String OFFICE_USAGE = "&7Usage: /postal office [office] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default]]";
 
     /**
      * {@code /postal office ...}: owners see and move their offices' money; {@code admin} (or the console)
      * may view any office.
      */
     public static void office_command(CommandSender sender, String[] args, boolean admin) {
+        if (args.length > 2 && "price".equalsIgnoreCase(args[2])) {
+            String office = com.vodhanel.minecraft.va_postal.config.C_Postoffice.town_complete(args[1]);
+            if ("null".equals(office)) {
+                send(sender, "&7No post office matches '" + args[1] + "'. See /tlist.");
+            } else {
+                com.vodhanel.minecraft.va_postal.clerk.ClerkCommand.price(sender, office, args);
+            }
+            return;
+        }
         if (!VA_postal.economy_configured) {
             send(sender, "&7Economy is not enabled (Economy.Use in config.yml).");
             return;

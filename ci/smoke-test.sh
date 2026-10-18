@@ -273,6 +273,24 @@ run_server "$WORK_DIR/phase13.log" \
     "postal deed test testville home 44 -60 6" \
     "alist testville" "data get block 44 -60 7 front_text" "sleep:2"
 
+# Phase 14: the office clerk (docs/design/deeds.md §2). With the mail running, Testville's clerk stands at the side
+# of its chest (20 -60 0, facing south: the west side, 19 -60 0); pushed away, it's back at its post within a few
+# seconds; placed elsewhere it stands there; with the mail stopped it's gone. The office's own address price is set.
+# The clerk's click, counter menu and dialog are player-only (bot test). The selectors name no type: type=player
+# only searches the player list, which Citizens keeps its NPCs off.
+CLERK_AT="x=19.5,y=-60,z=0.5,distance=..1"
+echo "== Phase 14: the office clerk"
+run_server "$WORK_DIR/phase14.log" \
+    "postal start" "sleep:15" "postal clerk list" \
+    "execute if entity @e[$CLERK_AT]" \
+    "postal office testville price 25" "postal office testville price" \
+    "minecraft:tp @e[$CLERK_AT] 26 -60 12" "sleep:8" \
+    "execute if entity @e[$CLERK_AT]" \
+    "postal clerk place testville 23 -60 4" "sleep:3" \
+    "execute if entity @e[x=23.5,y=-60,z=4.5,distance=..1]" \
+    "postal clerk reset testville" "postal stop" "sleep:12" \
+    "execute if entity @e[$CLERK_AT]" "postal clerk list" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -447,6 +465,17 @@ PY
 check "phase13: a chest the postman can't reach is refused" grep -q "couldn't reach this chest" <(plain phase13)
 check "phase13: no address is made for it" no_match "ivy_lodge" "$CONFIG"
 check "phase13: a name the office has can't be deeded" grep -q "already has an address called Home" <(plain phase13)
+check "phase14: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase14.log"
+check "phase14: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase14.log"
+check "phase14: Testville's clerk is on duty beside its chest" \
+    grep -q "Testville: Postmaster of Testville, at 19 -60 0 (beside the office chest), on duty" <(plain phase14)
+# In order: at its post; moved away; back at its post; at the place it was given; gone with the mail stopped.
+check "phase14: the clerk stands at its post, goes back when moved, stands where placed, and leaves with the mail" \
+    test "$(grep -oE "Test (passed|failed)|Teleported [0-9]+ entit" "$WORK_DIR/phase14.log" | cut -c1-11 | tr '\n' ' ')" \
+    = "Test passed Teleported  Test passed Test passed Test failed "
+check "phase14: the office sets its own address price" grep -q "now costs .*25" <(plain phase14)
+check "phase14: the price shows as the office's" grep -q "costs .*25.* (the office's price)" <(plain phase14)
+check "phase14: and listed off duty" grep -q "off duty (the mail isn't running)" <(plain phase14)
 
 echo
 echo "---- Postal output (phase 2) ----"

@@ -76,6 +76,7 @@ public class VA_Dispatcher {
             dispatcher_running = false;
             // Stop the heartbeat now: left for the clean-up, a start in between would run two of them.
             if (dispatcher_task != null) dispatcher_task.cancel();
+            com.vodhanel.minecraft.va_postal.clerk.Clerks.stop();
             if (VA_postal.dynmap_configured) P_Dynmap.dynmap_stop();
             if (!quiet) Util.cinform(AnsiColor.RED + "[Stopping VA_postal] \033[0;37mDispatcher stopped.");
             pending_stop = VA_postal.plugin.getServer().getScheduler().runTaskLater(VA_postal.plugin,
@@ -141,6 +142,7 @@ public class VA_Dispatcher {
             dispatcher_async = GetConfig.heart_beat_async();
             dispatcher_auto_cal = GetConfig.heart_beat_auto();
             dispatcher(100L, dispatcher_heartbeat, true);
+            com.vodhanel.minecraft.va_postal.clerk.Clerks.start();
             if (VA_postal.dynmap_configured) P_Dynmap.dynmap_start();
             if (!quiet)
                 Util.con_type("\033[0;32mVA_Postal started. \033[0;37m'postal talk'\033[0;32m to see activity.");

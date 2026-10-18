@@ -196,6 +196,14 @@ public class Config {
         // Deeds (docs/design/deeds.md): how long an unused deed lasts, and what its expiry keeps of the refund.
         VA_postal.plugin.getConfig().addDefault(path_format("settings.deeds.expiry_days"), 14);
         VA_postal.plugin.getConfig().addDefault(path_format("settings.deeds.expiry_fee"), 0.10D);
+        // The offices' clerks (docs/design/deeds.md §2). Local: false leaves offices unstaffed (the counter then opens
+        // from the office sign); Dialogs: false asks the counter's questions in chat instead of in a dialog.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.local"), "true");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.name"), "&6Postmaster of {office}");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.greeting"),
+                "Good day, {player}! Welcome to the {office} Post Office. Right-click me for the counter.");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.dialogs"), "true");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.reach"), 24);
         VA_postal.plugin.getConfig().options().copyDefaults(true);
         VA_postal.plugin.saveConfig();
     }
