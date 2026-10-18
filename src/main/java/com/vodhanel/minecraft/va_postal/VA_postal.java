@@ -363,6 +363,10 @@ public class VA_postal extends JavaPlugin {
                 if (lapsed > 0) {
                     Util.cinform("[Postal] " + lapsed + " unused deed(s) lapsed.");
                 }
+                int offers = com.vodhanel.minecraft.va_postal.deed.OfficeSales.expire_due();
+                if (offers > 0) {
+                    Util.cinform("[Postal] " + offers + " office offer(s) lapsed.");
+                }
             } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
                 Util.cinform("[Postal] Couldn't expire deeds: " + e.getMessage());
             }

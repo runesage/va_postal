@@ -39,12 +39,13 @@ SERVER_LOG="$WORK_DIR/server.log"
 CONSOLE="$WORK_DIR/console.fifo"
 BOT_IN="$WORK_DIR/bot.fifo"
 
-SERVER_PID="" BOT_PID=""
+SERVER_PID="" BOT_PID="" BUYER_PID=""
 cleanup() { # only ever our own processes
     [ -n "$BOT_PID" ] && kill "$BOT_PID" 2>/dev/null || true
+    [ -n "$BUYER_PID" ] && kill "$BUYER_PID" 2>/dev/null || true
     [ -n "$SERVER_PID" ] && kill -9 "$SERVER_PID" 2>/dev/null || true
-    exec 3>&- 4>&- 2>/dev/null || true
-    rm -f "$CONSOLE" "$BOT_IN"
+    exec 3>&- 4>&- 5>&- 2>/dev/null || true
+    rm -f "$CONSOLE" "$BOT_IN" "$WORK_DIR/buyer.fifo"
 }
 trap cleanup EXIT
 
@@ -449,6 +450,44 @@ check "everyone hears of it" wait_log "$BOT_LOG" 'CHAT A new post office has ope
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "postal clerk list"
 check "Ashby is one of the offices" wait_log "$SERVER_LOG" 'Ashby.*Postmaster of Ashby' 5 "$from"
+
+# Office sales (docs/design/central-office.md §3): a second player, PostalBuyer, joins. PostalBot, Ashby's owner, offers it
+# to them and withdraws the offer; offers it again for 100; PostalBuyer accepts at Central's counter (100 to the seller,
+# 5% to Central) and Ashby is theirs; then PostalBuyer sells it back to Central, confirming in the form.
+BUYER_LOG="$WORK_DIR/buyer.log"
+: > "$BUYER_LOG"
+mkfifo "$WORK_DIR/buyer.fifo"
+"$BOT_JAVA" -cp "$BOT_CP" ci.bot.Bot 127.0.0.1 "$PORT" PostalBuyer < "$WORK_DIR/buyer.fifo" > "$BUYER_LOG" 2>"$WORK_DIR/buyer.err" &
+BUYER_PID=$!
+exec 5>"$WORK_DIR/buyer.fifo"
+buyer() { echo "$*" >&5; }
+buyer_cmd() { # instruction regex: as bot_cmd, for the buyer
+    local from; from=$(( $(lines "$BUYER_LOG") + 1 ))
+    buyer "$1"
+    wait_log "$BUYER_LOG" "$2" 20 "$from"
+}
+check "a second player joins" wait_log "$BUYER_LOG" ' JOINED' 60
+console "eco give PostalBuyer 1000"
+console "minecraft:tp PostalBuyer 0.5 -60 3"
+sleep 2
+check "Ashby's owner offers it" bot_cmd "/postal office ashby sell PostalBuyer 50" 'CHAT .*Ashby is offered to PostalBuyer for'
+check "the buyer hears of the offer" wait_log "$BUYER_LOG" 'CHAT .*PostalBot offers you the Ashby Post Office' 10
+check "the owner withdraws it" bot_cmd "/postal office ashby sell cancel" 'CHAT .*offer of Ashby to PostalBuyer is withdrawn'
+check "the buyer hears it's withdrawn" wait_log "$BUYER_LOG" 'CHAT .*withdrawn the offer of the Ashby Post Office' 10
+bot_cmd "/postal office ashby sell PostalBuyer 100" 'CHAT .*Ashby is offered to PostalBuyer for' || true
+check "the offer shows at Central's counter" buyer_cmd "interact -0.5 -60 0.5" 'ITEM [0-9]+/24 Offers to you'
+check "it opens the offers" buyer_cmd "click 24" 'ITEM [0-9]+/0 Ashby Post Office'
+check "accepting makes Ashby the buyer's" buyer_cmd "click 0" 'CHAT .*the Ashby Post Office is yours'
+check "the seller hears and is paid" wait_log "$BOT_LOG" 'CHAT .*PostalBuyer has bought the Ashby Post Office; \$100.* has been paid to you' 10
+check "the sale is recorded" grep -q 'PostalBuyer bought ashby from PostalBot for 100' "$SERVER_LOG"
+check "the buyer's counter offers to sell Ashby back" buyer_cmd "interact -0.5 -60 0.5" 'ITEM [0-9]+/15 Your post offices'
+check "it lists Ashby" buyer_cmd "click 15" 'ITEM [0-9]+/0 Ashby Post Office'
+check "selling back asks to confirm" buyer_cmd "click 0" 'DIALOG Sell Ashby back to Central \| value= \| Sell'
+buyer "input value Ashby"
+check "confirmed, Ashby goes back to the server" buyer_cmd "press Sell" "CHAT .*the Ashby Post Office is the server's again"
+buyer "quit"
+wait "$BUYER_PID" 2>/dev/null || true
+BUYER_PID=""
 console "minecraft:tp $BOT_NAME 0.5 -60 3"
 sleep 2
 console "deop $BOT_NAME"

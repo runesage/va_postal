@@ -2,7 +2,9 @@
 
 **Status:** being built. Done: the clerk (the Postmaster General) and Central's protection (§2), with a first
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
-and its ceremony, at Central's counter and from the admin commands (§3). Next: office sales. Address deeds
+and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
+player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4). Next: the
+network map (§6). Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
