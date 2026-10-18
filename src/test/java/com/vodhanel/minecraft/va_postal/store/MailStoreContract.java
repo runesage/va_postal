@@ -605,4 +605,39 @@ abstract class MailStoreContract {
     private static void assert_ids(List<UUID> want, List<Deed> got) {
         assertEquals(want, got.stream().map(Deed::id).toList());
     }
+
+    // ---- Office offers ----------------------------------------------------------------------
+
+    private Offer offer(String server, String office, UUID buyer, double price, long created, long expires) {
+        return new Offer(UUID.randomUUID(), server, office, UUID.randomUUID(), "Alex", buyer, "Steve", price, Offer.State.OPEN,
+                created, expires, created);
+    }
+
+    @Test
+    void offersRoundTripAndOneOpenOfferPerOffice() {
+        UUID steve = UUID.randomUUID();
+        Offer o = store.create_offer(offer("main", "riverside", steve, 1234.5, 10L, 99L));
+        assertEquals(o, store.offer(o.id()).orElseThrow());
+        assertEquals(o.id(), store.open_offer("riverside").orElseThrow().id());
+        assertThrows(ConflictException.class, () -> store.create_offer(offer("main", "riverside", UUID.randomUUID(), 1, 11L, 99L)));
+        store.create_offer(offer("other", "riverside", steve, 1, 11L, 99L)); // another server's Riverside
+        assertTrue(store.offer_state(o.id(), Offer.State.OPEN, Offer.State.WITHDRAWN, 12L));
+        assertFalse(store.offer_state(o.id(), Offer.State.OPEN, Offer.State.ACCEPTED, 13L)); // withdrawn: can't be accepted
+        assertTrue(store.open_offer("riverside").isEmpty());
+        store.create_offer(offer("main", "riverside", steve, 2, 14L, 99L)); // a new one, once the old is closed
+    }
+
+    @Test
+    void aBuyersOffersAndTheOnesDue() {
+        UUID steve = UUID.randomUUID();
+        Offer second = store.create_offer(offer("main", "hillcrest", steve, 1, 20L, 500L));
+        Offer first = store.create_offer(offer("main", "riverside", steve, 1, 10L, 50L));
+        store.create_offer(offer("main", "brookfield", UUID.randomUUID(), 1, 5L, 40L));
+        store.create_offer(offer("other", "ashby", steve, 1, 5L, 40L));
+        assertEquals(List.of(first.id(), second.id()), store.offers_to(steve).stream().map(Offer::id).toList());
+        assertEquals(2, store.offers_due(100L).size()); // riverside and brookfield, this server's
+        store.offer_state(first.id(), Offer.State.OPEN, Offer.State.ACCEPTED, 30L);
+        assertEquals(List.of(second.id()), store.offers_to(steve).stream().map(Offer::id).toList());
+        assertEquals(1, store.offers_due(100L).size());
+    }
 }

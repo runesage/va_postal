@@ -167,6 +167,25 @@ public interface MailStore extends AutoCloseable {
     /** The money this server's open deeds hold in Central's account. */
     double deeds_held();
 
+    // ---- Office offers (docs/design/central-office.md §3) ----------------------------------------
+
+    /** Records a new offer. Raises {@link ConflictException} if the office already has an open offer. */
+    Offer create_offer(Offer offer);
+
+    java.util.Optional<Offer> offer(UUID id);
+
+    /** Moves an offer from {@code from} to {@code to}; false if it wasn't in {@code from} (someone got there first). */
+    boolean offer_state(UUID id, Offer.State from, Offer.State to, long now);
+
+    /** This server's open offer for {@code office}, if any. */
+    java.util.Optional<Offer> open_offer(String office);
+
+    /** This server's open offers to {@code buyer}, oldest first. */
+    List<Offer> offers_to(UUID buyer);
+
+    /** This server's open offers whose time ran out by {@code now}. */
+    List<Offer> offers_due(long now);
+
     @Override
     void close();
 }

@@ -23,7 +23,7 @@ import java.util.UUID;
 public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
     static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql",
-            "V5__network_player.sql", "V6__deed.sql"};
+            "V5__network_player.sql", "V6__deed.sql", "V7__office_offer.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -713,6 +713,117 @@ public final class SqlMailStore implements MailStore {
         } catch (SQLException e) {
             throw new StoreException("Could not read deeds", e);
         }
+    }
+
+    // ---- Office offers ----------------------------------------------------------------------
+
+    private static final String OFFER_COLUMNS = "offer_id, server_id, office, seller_uuid, seller_name, buyer_uuid, buyer_name, "
+            + "price, state, created_at, expires_at, updated_at";
+
+    @Override
+    public Offer create_offer(Offer o) {
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement(
+                        "SELECT COUNT(*) FROM office_offer WHERE server_id = ? AND office = ? AND state = 'OPEN'")) {
+                    ps.setString(1, o.server_id());
+                    ps.setString(2, o.office());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next() && rs.getInt(1) > 0) {
+                            c.rollback();
+                            throw new ConflictException(o.office() + " already has an open offer");
+                        }
+                    }
+                }
+                try (PreparedStatement ps = c.prepareStatement("INSERT INTO office_offer (" + OFFER_COLUMNS
+                        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    ps.setString(1, o.id().toString());
+                    ps.setString(2, o.server_id());
+                    ps.setString(3, o.office());
+                    ps.setString(4, o.seller().toString());
+                    ps.setString(5, o.seller_name());
+                    ps.setString(6, o.buyer().toString());
+                    ps.setString(7, o.buyer_name());
+                    ps.setBigDecimal(8, BigDecimal.valueOf(o.price()));
+                    ps.setString(9, o.state().name());
+                    ps.setLong(10, o.created_at());
+                    ps.setLong(11, o.expires_at());
+                    ps.setLong(12, o.updated_at());
+                    ps.executeUpdate();
+                }
+                c.commit();
+                return o;
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not record offer " + o.id(), e);
+        }
+    }
+
+    @Override
+    public Optional<Offer> offer(UUID id) {
+        return offers("WHERE offer_id = ?", id.toString()).stream().findFirst();
+    }
+
+    @Override
+    public boolean offer_state(UUID id, Offer.State from, Offer.State to, long now) {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "UPDATE office_offer SET state = ?, updated_at = ? WHERE offer_id = ? AND state = ?")) {
+            ps.setString(1, to.name());
+            ps.setLong(2, now);
+            ps.setString(3, id.toString());
+            ps.setString(4, from.name());
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new StoreException("Could not update offer " + id, e);
+        }
+    }
+
+    @Override
+    public Optional<Offer> open_offer(String office) {
+        return offers("WHERE server_id = ? AND office = ? AND state = 'OPEN'", server_id, office).stream().findFirst();
+    }
+
+    @Override
+    public List<Offer> offers_to(UUID buyer) {
+        return offers("WHERE server_id = ? AND buyer_uuid = ? AND state = 'OPEN' ORDER BY created_at", server_id, buyer.toString());
+    }
+
+    @Override
+    public List<Offer> offers_due(long now) {
+        List<Offer> out = new ArrayList<>();
+        for (Offer o : offers("WHERE server_id = ? AND state = 'OPEN' ORDER BY expires_at", server_id)) {
+            if (o.expires_at() <= now) {
+                out.add(o);
+            }
+        }
+        return out;
+    }
+
+    private List<Offer> offers(String where, String... args) {
+        List<Offer> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT " + OFFER_COLUMNS + " FROM office_offer " + where)) {
+            for (int i = 0; i < args.length; i++) {
+                ps.setString(i + 1, args[i]);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new Offer(UUID.fromString(rs.getString(1)), rs.getString(2), rs.getString(3),
+                            UUID.fromString(rs.getString(4)), rs.getString(5), UUID.fromString(rs.getString(6)), rs.getString(7),
+                            rs.getBigDecimal(8).doubleValue(), Offer.State.valueOf(rs.getString(9)), rs.getLong(10),
+                            rs.getLong(11), rs.getLong(12)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read offers", e);
+        }
+        return out;
     }
 
     private List<Deed> deeds(String where, String... args) {

@@ -218,6 +218,9 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.min_distance"), 64);
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.announce"), "true");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.effects"), "true");
+        // Office sales through Central: the fee on a sale between players, and how long an offer stands.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.transfer_rate"), "0.05");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.offer_days"), 3);
         VA_postal.plugin.getConfig().options().copyDefaults(true);
         VA_postal.plugin.saveConfig();
     }
