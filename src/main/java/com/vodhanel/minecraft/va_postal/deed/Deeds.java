@@ -123,6 +123,19 @@ public final class Deeds {
         if (name == null) {
             return Result.failed(why.toString());
         }
+        return issue(Deed.Kind.ADDRESS, holder, holder_name, office, name, price, pending);
+    }
+
+    /**
+     * Records a deed of {@code kind} for a name already checked, charging {@code price} (held in Central's account)
+     * and handing over the document unless it's {@code pending} approval.
+     */
+    static Result issue(Deed.Kind kind, OfflinePlayer holder, String holder_name, String office, String name, double price,
+                        boolean pending) {
+        MailStore store = store();
+        if (store == null) {
+            return Result.failed("the mail store isn't open");
+        }
         price = Math.max(0.0D, price);
         if (price > 0.0D) {
             if (!VA_postal.economy_configured) {
@@ -132,7 +145,7 @@ public final class Deeds {
             }
         }
         long now = System.currentTimeMillis();
-        Deed deed = new Deed(UUID.randomUUID(), Deed.Kind.ADDRESS, pending ? Deed.State.PENDING : Deed.State.ISSUED, holder.getUniqueId(), holder_name,
+        Deed deed = new Deed(UUID.randomUUID(), kind, pending ? Deed.State.PENDING : Deed.State.ISSUED, holder.getUniqueId(), holder_name,
                 store.server_id(), office, name, price, 1, now, now + GetConfig.deed_expiry_days() * DAY, now);
         try {
             store.create_deed(deed);
@@ -140,11 +153,12 @@ public final class Deeds {
             if (price > 0.0D) {
                 P_Economy.deposit_to_player(holder, price); // not recorded: give the money back
             }
-            return Result.failed(e instanceof ConflictException ? "someone already holds a deed for that name" : "the mail store couldn't record it");
+            return Result.failed(e instanceof ConflictException ? "someone already holds a " + noun(kind) + " for that name"
+                    : "the mail store couldn't record it");
         }
         if (price > 0.0D) {
             P_Economy.deposit_to_central(price); // held for the deed
-            EconomyState.record(EconomyState.Flow.ADDRESS_PURCHASE, price);
+            EconomyState.record(kind == Deed.Kind.CHARTER ? EconomyState.Flow.OFFICE_PURCHASE : EconomyState.Flow.ADDRESS_PURCHASE, price);
         }
         if (!pending) {
             give(deed);
@@ -190,6 +204,10 @@ public final class Deeds {
         }
         Deed deed = store.deed(ref.id()).orElse(null);
         String problem = usable(deed, ref, player.getUniqueId(), store.server_id());
+        if (problem == null && deed.kind() == Deed.Kind.CHARTER) {
+            Charters.use(player, chest, deed);
+            return;
+        }
         if (problem == null) {
             problem = place_problem(deed, chest);
         }
@@ -217,30 +235,33 @@ public final class Deeds {
     /** Why {@code deed}'s document {@code ref} can't be used by {@code user} here, or null. */
     static String usable(Deed deed, DeedDocument.Ref ref, UUID user, String server) {
         if (deed == null) {
-            return "This deed isn't on record.";
+            return "This document isn't on record.";
         }
-        if (deed.kind() != Deed.Kind.ADDRESS) {
-            return "This document isn't an address deed.";
-        }
+        String noun = noun(deed.kind());
         if (deed.state() == Deed.State.PENDING) {
-            return "This deed is still waiting for approval.";
+            return "This " + noun + " is still waiting for approval.";
         }
         if (deed.state() != Deed.State.ISSUED) {
-            return "This deed has been " + deed.state().name().toLowerCase(java.util.Locale.ROOT) + "; it can't be used.";
+            return "This " + noun + " has been " + deed.state().name().toLowerCase(java.util.Locale.ROOT) + "; it can't be used.";
         }
         if (ref.issue() != deed.issue()) {
-            return "This copy of the deed has been replaced; use the newer one.";
+            return "This copy of the " + noun + " has been replaced; use the newer one.";
         }
         if (!deed.holder().equals(user)) {
-            return "This deed belongs to " + deed.holder_name() + ".";
+            return "This " + noun + " belongs to " + deed.holder_name() + ".";
         }
         if (!deed.server_id().equals(server)) {
-            return "This deed is for a post office on " + deed.server_id() + ".";
+            return "This " + noun + " is for " + (deed.kind() == Deed.Kind.CHARTER ? "" : "a post office on ") + deed.server_id() + ".";
         }
         if (deed.expires_at() <= System.currentTimeMillis()) {
-            return "This deed has expired.";
+            return "This " + noun + " has expired.";
         }
         return null;
+    }
+
+    /** What players call a deed of {@code kind}: "deed" (an address's) or "charter". */
+    public static String noun(Deed.Kind kind) {
+        return kind == Deed.Kind.CHARTER ? "charter" : "deed";
     }
 
     /** Why {@code chest} can't become {@code deed}'s mailbox, or null. */
@@ -313,7 +334,7 @@ public final class Deeds {
      * Where the postman stands at a mailbox: two blocks out from the chest's front (the sign takes the block
      * against it), as addresses set up by hand are.
      */
-    private static Block front_of(Block chest) {
+    static Block front_of(Block chest) {
         BlockFace face = chest.getBlockData() instanceof Directional d ? d.getFacing() : BlockFace.SOUTH;
         return chest.getRelative(face, 2);
     }
@@ -332,6 +353,9 @@ public final class Deeds {
         BookManip.standard_addr_sign(Util.location2str(chest.getLocation()), 1, office, name, null);
         RouteSurvey.Outcome saved = RouteSurvey.save_probe(office, name, probe);
         C_Dispatcher.open_address(office, name, saved.saved());
+        if (saved.saved() && !C_Dispatcher.is_poffice_open(office)) {
+            C_Dispatcher.open_poffice(office, true); // an office closed for want of addresses (a new, chartered one) opens with its first
+        }
         if (deed.price() > 0.0D && VA_postal.economy_configured) {
             // Half of the held price goes to the office; Central keeps the other half (docs/economy.md).
             double half = deed.price() / 2.0D;
@@ -345,12 +369,12 @@ public final class Deeds {
     }
 
     /** The owner as C_Owner takes it: the online player, or an offline stand-in with their id and name. */
-    private static Player holder_player(OfflinePlayer holder) {
+    static Player holder_player(OfflinePlayer holder) {
         Player online = holder.getPlayer();
         return online != null ? online : com.vodhanel.minecraft.va_postal.common.ServerPlayer.create(holder.getUniqueId(), holder.getName());
     }
 
-    private static void take_documents(Player player, UUID id) {
+    static void take_documents(Player player, UUID id) {
         ItemStack[] contents = player.getInventory().getContents();
         for (int i = 0; i < contents.length; i++) {
             DeedDocument.Ref ref = DeedDocument.read(contents[i]);
@@ -399,13 +423,12 @@ public final class Deeds {
             }
             String refunded = refund > 0.0D && VA_postal.economy_configured ? " " + P_Economy.ef(refund) + " was refunded." : "";
             if (unanswered) {
-                Applications.tell(d, "Your application for " + DeedDocument.display(d.name()) + " lapsed before the postmaster of "
-                        + DeedDocument.display(d.office()) + " answered it." + refunded);
+                Applications.tell(d, "Your application for " + Applications.subject(d) + " lapsed before " + Applications.decider(d)
+                        + " answered it." + refunded);
             } else {
                 Player online = holder.getPlayer();
                 if (online != null) {
-                    Util.pinform(online, "&7&oYour deed for " + DeedDocument.display(d.name()) + ", " + DeedDocument.display(d.office())
-                            + " has lapsed." + refunded);
+                    Util.pinform(online, "&7&oYour " + noun(d.kind()) + " for " + Applications.subject(d) + " has lapsed." + refunded);
                 }
             }
         }

@@ -213,6 +213,11 @@ public class Config {
                 "Good day, {player}. Central Post Office, how may I help?");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.clerks.farewell"), "Good day to you, {player}.");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.central.report_grief"), "true");
+        // Charters (docs/design/central-office.md §3): post offices bought at Central.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.require_approval"), "true");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.min_distance"), 64);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.announce"), "true");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.effects"), "true");
         VA_postal.plugin.getConfig().options().copyDefaults(true);
         VA_postal.plugin.saveConfig();
     }

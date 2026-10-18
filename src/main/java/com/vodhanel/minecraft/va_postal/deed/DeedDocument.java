@@ -34,7 +34,7 @@ public final class DeedDocument {
 
     private static NamespacedKey id_key;
     private static NamespacedKey issue_key;
-    private static YamlConfiguration template;
+    private static final java.util.Map<Deed.Kind, YamlConfiguration> templates = new java.util.EnumMap<>(Deed.Kind.class);
 
     private DeedDocument() {
     }
@@ -67,7 +67,7 @@ public final class DeedDocument {
 
     /** The document for {@code deed}, worded from deeds.yml. */
     public static ItemStack create(Deed deed, String world, String server) {
-        ConfigurationSection t = template().getConfigurationSection(deed.kind().name().toLowerCase(java.util.Locale.ROOT));
+        ConfigurationSection t = template(deed.kind()).getConfigurationSection(deed.kind().name().toLowerCase(java.util.Locale.ROOT));
         Map<String, String> values = values(deed, world, server);
         ItemStack item = new ItemStack(Material.WRITTEN_BOOK);
         BookMeta meta = (BookMeta) item.getItemMeta();
@@ -93,18 +93,24 @@ public final class DeedDocument {
     static Map<String, String> values(Deed deed, String world, String server) {
         SimpleDateFormat date = new SimpleDateFormat("d MMM yyyy");
         String office = display(deed.office());
-        return Map.of(
-                "{address}", display(deed.name()),
-                "{office}", office,
-                "{world}", world == null ? "the realm" : world,
-                "{server}", server == null ? "this server" : server,
-                "{holder}", deed.holder_name(),
-                "{date}", date.format(new Date(deed.created_at())),
-                "{expires}", date.format(new Date(deed.expires_at())),
-                "{deed_id}", deed.id().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT),
-                "{postmaster}", "Postmaster of " + office,
-                "{price}", !VA_postal.economy_configured ? String.format("%.2f", deed.price())
-                        : com.vodhanel.minecraft.va_postal.common.P_Economy.ef(deed.price()));
+        String postmaster = deed.kind() == Deed.Kind.CHARTER
+                ? Text.strip(Text.color(com.vodhanel.minecraft.va_postal.clerk.Clerks.name(com.vodhanel.minecraft.va_postal.clerk.Clerks.CENTRAL)))
+                : "Postmaster of " + office;
+        String id = deed.id().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+        return Map.ofEntries(
+                Map.entry("{address}", display(deed.name())),
+                Map.entry("{office}", office),
+                Map.entry("{town}", office),
+                Map.entry("{charter_id}", id),
+                Map.entry("{world}", world == null ? "the realm" : world),
+                Map.entry("{server}", server == null ? "this server" : server),
+                Map.entry("{holder}", deed.holder_name()),
+                Map.entry("{date}", date.format(new Date(deed.created_at()))),
+                Map.entry("{expires}", date.format(new Date(deed.expires_at()))),
+                Map.entry("{deed_id}", id),
+                Map.entry("{postmaster}", postmaster),
+                Map.entry("{price}", !VA_postal.economy_configured ? String.format("%.2f", deed.price())
+                        : com.vodhanel.minecraft.va_postal.common.P_Economy.ef(deed.price())));
     }
 
     /** A stored name as people read it: "rose_cottage" -> "Rose Cottage". */
@@ -126,12 +132,12 @@ public final class DeedDocument {
         return out;
     }
 
-    /** deeds.yml from the plugin's folder (written there from the jar the first time), over the bundled one. */
-    static synchronized YamlConfiguration template() {
-        if (template == null) {
-            template = load("deeds.yml");
-        }
-        return template;
+    /**
+     * The wording for {@code kind}: deeds.yml (address deeds) or charter.yml (charters), from the plugin's folder
+     * (written there from the jar the first time), over the bundled one.
+     */
+    static synchronized YamlConfiguration template(Deed.Kind kind) {
+        return templates.computeIfAbsent(kind, k -> load(k == Deed.Kind.CHARTER ? "charter.yml" : "deeds.yml"));
     }
 
     /** {@code name} from the plugin's folder, written there from the jar if it isn't yet; the jar's copy fills gaps. */
@@ -150,6 +156,6 @@ public final class DeedDocument {
 
     /** Forgets the loaded templates, so edits are read again. */
     public static synchronized void reload() {
-        template = null;
+        templates.clear();
     }
 }

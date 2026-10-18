@@ -588,4 +588,21 @@ abstract class MailStoreContract {
         store.deed_state(first.id(), Deed.State.PENDING, Deed.State.DENIED, 30L);
         assertEquals(List.of(second.id()), store.deeds_pending("riverside").stream().map(Deed::id).toList());
     }
+
+    @Test
+    void pendingCharterApplicationsOldestFirst() {
+        Deed second = deed(Deed.Kind.CHARTER, "main", "brookfield", "brookfield", 1, 20L, 99L).with_state(Deed.State.PENDING, 20L);
+        Deed first = deed(Deed.Kind.CHARTER, "main", "ashford", "ashford", 1, 10L, 99L).with_state(Deed.State.PENDING, 10L);
+        store.create_deed(second);
+        store.create_deed(first);
+        store.create_deed(deed(Deed.Kind.CHARTER, "main", "issued", "issued", 1, 5L, 99L));
+        store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "an_address", 1, 5L, 99L).with_state(Deed.State.PENDING, 5L));
+        store.create_deed(deed(Deed.Kind.CHARTER, "other", "elsewhere", "elsewhere", 1, 5L, 99L).with_state(Deed.State.PENDING, 5L));
+        assert_ids(List.of(first.id(), second.id()), store.deeds_pending(Deed.Kind.CHARTER));
+        assertEquals(1, store.deeds_pending(Deed.Kind.ADDRESS).size());
+    }
+
+    private static void assert_ids(List<UUID> want, List<Deed> got) {
+        assertEquals(want, got.stream().map(Deed::id).toList());
+    }
 }

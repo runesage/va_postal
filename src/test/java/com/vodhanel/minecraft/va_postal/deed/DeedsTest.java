@@ -52,7 +52,7 @@ class DeedsTest {
         Deed late = deed(Deed.Kind.ADDRESS, Deed.State.ISSUED, 1, 1L);
         assertEquals("This deed has expired.", Deeds.usable(late, ref(late, 1), STEVE, "main"));
         Deed charter = deed(Deed.Kind.CHARTER, Deed.State.ISSUED, 1, LATER);
-        assertTrue(Deeds.usable(charter, ref(charter, 1), STEVE, "main").contains("isn't an address deed"));
+        assertNull(Deeds.usable(charter, ref(charter, 1), STEVE, "main")); // a charter goes on to Charters.use
         Deed d = deed(Deed.Kind.ADDRESS, Deed.State.ISSUED, 1, LATER);
         assertTrue(Deeds.usable(d, ref(d, 1), STEVE, "other").contains("on main"));
     }
@@ -61,6 +61,16 @@ class DeedsTest {
     void anUnansweredApplicationIsRefundedInFullAnUnusedDeedLessTheFee() {
         assertEquals(100.0D, Deeds.lapse_refund(deed(Deed.Kind.ADDRESS, Deed.State.PENDING, 1, 1L), 0.10D), 1e-9);
         assertEquals(90.0D, Deeds.lapse_refund(deed(Deed.Kind.ADDRESS, Deed.State.ISSUED, 1, 1L), 0.10D), 1e-9);
+    }
+
+    @Test
+    void chartersAreCalledCharters() {
+        Deed charter = deed(Deed.Kind.CHARTER, Deed.State.PENDING, 1, LATER);
+        assertEquals("This charter is still waiting for approval.", Deeds.usable(charter, ref(charter, 1), STEVE, "main"));
+        assertEquals("This charter belongs to Steve.", Deeds.usable(deed(Deed.Kind.CHARTER, Deed.State.ISSUED, 1, LATER),
+                ref(charter, 1), UUID.randomUUID(), "main"));
+        assertEquals("the Postmaster General", Applications.decider(charter));
+        assertEquals("the postmaster of Riverside", Applications.decider(deed(Deed.Kind.ADDRESS, Deed.State.PENDING, 1, LATER)));
     }
 
     @Test

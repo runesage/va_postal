@@ -1,0 +1,33 @@
+# The wording of a post office charter (docs/design/central-office.md §3). Edit freely; & colour codes work.
+#
+# Placeholders: {office} and {town} (the office's name), {world}, {server}, {holder}, {date}, {expires},
+# {charter_id}, {postmaster} (the Postmaster General's name), {price}. A book page holds about 14 short lines:
+# keep each page short, or it's cut off.
+
+charter:
+  # The item's name in the inventory.
+  name: "&6Charter of &f{office}&6 Post Office"
+  # The book's title (at most 32 characters, by Minecraft's rules) and author.
+  title: "Charter of {office}"
+  author: "{postmaster}"
+  pages:
+    - |-
+      &l Charter of {office}&r
+      &l   Post Office&r
+
+      By authority of the Central Post Office of {server}, a post office is hereby chartered in the name of &l{office}&r.
+
+      &8Charter No. {charter_id}
+      &8Granted {date}
+      &8to &0{holder}
+    - |-
+      The holder shall keep its counter, serve its residents, and carry the mail faithfully to and from Central.
+
+      They shall open this office by placing this charter upon its chest on or before {expires}; unused, it lapses.
+    - |-
+      This charter is not transferable. The office may be sold only through Central.
+
+
+      Sealed at Central, {date}.
+
+      &o{postmaster}

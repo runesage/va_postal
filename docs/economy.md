@@ -47,6 +47,7 @@ when the pool holds less than Postal owes in refunds.
 | Address purchase | new owner | ½ Central, ½ the address's office (each holds its half of the refund) |
 | Address deed | its buyer | held by Central until used (then as an address purchase) or lapsed (refunded less the expiry fee, which Central keeps); open deeds count in what Central owes |
 | Address application | its applicant | held by Central like a deed; declined or unanswered, refunded in full; approved, it becomes the deed |
+| Charter | its buyer | the post office purchase price, held by Central like a deed; when used, the new office is seeded with its floor and Central keeps the rest (as an office purchase); applications as for addresses |
 
 A player can buy an unowned office or address for themselves with `/setowner`. Only admins (or players with
 `postal.ownerlocal` / `postal.owneraddr`) can make someone else the owner, which charges that player.
