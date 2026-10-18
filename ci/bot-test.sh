@@ -4,7 +4,8 @@
 #
 # Scenarios: op the bot; /gps testville + "/" (Postal's confirmation) must point the compass at Testville's
 # post office, and a following /tlist must NOT move it (the bug fixed in PR #37). Then /addr a signed book in hand
-# (POSTED) and re-address it (old record RETURNED, a new one POSTED), as in the P1 test plan's 1a and 1c.
+# (POSTED) and re-address it (old record RETURNED, a new one POSTED), as in the P1 test plan's 1a and 1c. Parcels,
+# then the office counter: the clerk's menu, the buy dialog, a deed used on a chest, an application approved.
 #
 # Usage: ci/bot-test.sh <path-to-postal.jar>
 # Env:   JAVA      Java 25 runtime for the Paper server (default: java)
@@ -368,6 +369,54 @@ if [ "$delivered" = yes ]; then
     check "the retired-item parcel is ACCEPTED" test "$(track_state "${TP[3]}")" = ACCEPTED
     check "the player is told the retired item couldn't be delivered" bash -c "tail -n +$from '$BOT_LOG' | grep -q 'no longer exists'"
 fi
+
+# ---- The office counter: buying an address from the clerk (docs/design/deeds.md §2-3) ---------------------------------
+# Only a player can: right-click the clerk, click the counter menu, fill in the dialog, use the deed on a chest. The bot
+# is opped, so it also sees the owner's buttons (Approval, Applications). Testville's clerk stands at the west side of
+# its chest (20 -60 0): 19.5 -60 0.5.
+CLERK="19.5 -60 0.5"
+console "minecraft:clear $BOT_NAME"
+console "minecraft:setblock 14 -60 6 minecraft:chest[facing=south]"
+console "postal start"
+sleep 12
+console "minecraft:tp $BOT_NAME 18 -60 2.5"
+sleep 2
+check "the clerk is in view" bash -c "grep -qE ' ENTITY [0-9]+ player 19\.5 -60\.0 0\.5' '$BOT_LOG'"
+check "right-clicking the clerk opens the counter" bot_cmd "interact $CLERK" 'SCREEN [0-9]+ Testville Post Office'
+sleep 1
+check "the counter offers an address" grep -qE 'ITEM [0-9]+/11 Buy an address' "$BOT_LOG"
+check "an owner (op) sees the approval switch, off" grep -qE 'ITEM [0-9]+/24 Approval: off' "$BOT_LOG"
+check "Buy an address opens the dialog with a suggested name" \
+    bot_cmd "click 11" 'DIALOG Buy an address: Testville \| value=[A-Z][^|]+ \| Buy, Suggest another'
+check "Suggest another draws a name again" bot_cmd "press Suggest another" 'DIALOG Buy an address: Testville \| value=[A-Z]'
+bot "input value Rose Cottage"
+check "buying it gives the deed" bot_cmd "press Buy" 'CHAT .*Here is your deed for Rose Cottage'
+check "the deed is in the inventory" wait_log "$BOT_LOG" 'ITEM 0/[0-9]+ Deed of Address: Rose Cottage' 10
+console "minecraft:tp $BOT_NAME 14 -60 9"
+sleep 2
+check "using the deed on a chest opens Rose Cottage" bot_cmd "use 14 -60 6 south" 'CHAT .*Welcome to Rose Cottage, Testville'
+sleep 1
+check "Rose Cottage is one of Testville's addresses" bot_cmd "/alist testville" 'CHAT .*[Rr]ose.[Cc]ottage'
+
+# Approval from the counter: switch it on, apply, approve in the Applications menu; the deed comes to the bot.
+console "minecraft:tp $BOT_NAME 18 -60 2.5"
+sleep 2
+bot_cmd "interact $CLERK" 'SCREEN [0-9]+ Testville Post Office' || true
+sleep 1
+check "the approval switch turns on" bot_cmd "click 24" 'ITEM [0-9]+/24 Approval: on'
+sleep 1
+check "the form now asks to apply" bot_cmd "click 11" 'DIALOG Buy an address: Testville \| value=[^|]* \| Apply, Suggest another'
+bot "input value Ivy Lodge"
+check "applying puts it before the postmaster" bot_cmd "press Apply" 'CHAT .*put your application for Ivy Lodge'
+bot_cmd "interact $CLERK" 'SCREEN [0-9]+ Testville Post Office' || true
+sleep 1
+check "the Applications menu lists it" bot_cmd "click 20" 'ITEM [0-9]+/0 Ivy Lodge'
+check "left-clicking approves it" bot_cmd "click 0" 'CHAT .*has approved your application for Ivy Lodge'
+check "the approved deed comes to the inventory" wait_log "$BOT_LOG" 'ITEM 0/[0-9]+ Deed of Address: Ivy Lodge' 10
+bot "close"
+console "postal office testville approval default"
+console "postal stop"
+sleep 2
 
 # ---- The mail store as a player sees it: /postal store and /postal directory (P3 test plan 1, 2) --------------------
 store_text() {
