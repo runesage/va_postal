@@ -191,19 +191,22 @@ public final class P_Bank {
 
     // ---- /postal office --------------------------------------------------------------------
 
-    private static final String OFFICE_USAGE = "&7Usage: /postal office [office] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default]]";
+    private static final String OFFICE_USAGE = "&7Usage: /postal office [office] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default]\n  | approval [on|off|default] | applications | approve <id|all> | deny <id> [reason]]";
 
     /**
      * {@code /postal office ...}: owners see and move their offices' money; {@code admin} (or the console)
      * may view any office.
      */
     public static void office_command(CommandSender sender, String[] args, boolean admin) {
-        if (args.length > 2 && "price".equalsIgnoreCase(args[2])) {
+        // Prices and applications work with or without the economy.
+        if (args.length > 2 && java.util.List.of("price", "approval", "applications", "approve", "deny").contains(args[2].toLowerCase())) {
             String office = com.vodhanel.minecraft.va_postal.config.C_Postoffice.town_complete(args[1]);
             if ("null".equals(office)) {
                 send(sender, "&7No post office matches '" + args[1] + "'. See /tlist.");
-            } else {
+            } else if ("price".equalsIgnoreCase(args[2])) {
                 com.vodhanel.minecraft.va_postal.clerk.ClerkCommand.price(sender, office, args);
+            } else {
+                com.vodhanel.minecraft.va_postal.deed.Applications.command(sender, office, args);
             }
             return;
         }

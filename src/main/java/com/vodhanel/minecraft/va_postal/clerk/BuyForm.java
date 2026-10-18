@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.clerk;
 
+import com.vodhanel.minecraft.va_postal.deed.Applications;
 import com.vodhanel.minecraft.va_postal.deed.DeedDocument;
 import com.vodhanel.minecraft.va_postal.deed.Deeds;
 import org.bukkit.entity.Player;
@@ -30,10 +31,13 @@ public final class BuyForm {
         }
         body.add("Name your house, up to 15 letters, or take our suggestion.");
         body.add("A new address at " + DeedDocument.display(office) + " costs &f" + Clerks.price_text(office) + "&r.");
+        if (Applications.required(office)) {
+            body.add("&7The postmaster approves each new address here: you pay now, and have it back if they decline.");
+        }
         body.add("&7Then use the deed on the chest that will be your mailbox.");
         Forms.show(player, new Forms.Form("Buy an address: " + DeedDocument.display(office), body, "House name",
                 offered, 32, List.of(
-                new Forms.Choice("&aBuy", "buy", (p, value) -> buy(p, office, value)),
+                new Forms.Choice(Applications.required(office) ? "&aApply" : "&aBuy", "buy", (p, value) -> buy(p, office, value)),
                 new Forms.Choice("Suggest another", "suggest", (p, value) -> open(p, office, null, null)))));
     }
 
@@ -47,9 +51,16 @@ public final class BuyForm {
             open(player, office, null, "Your house needs a name.");
             return;
         }
-        Deeds.Result r = Deeds.issue_address(player, player.getName(), office, value, Clerks.price(office));
+        boolean application = Applications.required(office);
+        Deeds.Result r = Deeds.issue_address(player, player.getName(), office, value, Clerks.price(office), application);
         if (!r.ok()) {
             open(player, office, value, capital(r.problem()) + ".");
+            return;
+        }
+        if (application) {
+            Applications.applied(r.deed());
+            Clerks.say(office, player, "I've put your application for " + DeedDocument.display(r.deed().name())
+                    + " before the postmaster. You'll hear when they've decided; if they decline it, you'll have your money back.");
             return;
         }
         SimpleDateFormat date = new SimpleDateFormat("d MMM yyyy");

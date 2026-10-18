@@ -46,6 +46,7 @@ when the pool holds less than Postal owes in refunds.
 | Post office purchase | new owner | the office's floor seeds the office; the rest to Central (held for the refund) |
 | Address purchase | new owner | ½ Central, ½ the address's office (each holds its half of the refund) |
 | Address deed | its buyer | held by Central until used (then as an address purchase) or lapsed (refunded less the expiry fee, which Central keeps); open deeds count in what Central owes |
+| Address application | its applicant | held by Central like a deed; declined or unanswered, refunded in full; approved, it becomes the deed |
 
 A player can buy an unowned office or address for themselves with `/setowner`. Only admins (or players with
 `postal.ownerlocal` / `postal.owneraddr`) can make someone else the owner, which charges that player.
@@ -132,6 +133,7 @@ downtime a single catch-up day runs.
 | `/postal office <office> deposit <amount>` | owner | move money from you into the office |
 | `/postal office <office> withdraw <amount\|all>` | owner | take money out, down to the reserve (not while in arrears) |
 | `/postal office <office> price [amount\|default]` | owner (admins: any) | what a new address at the office costs (the server's `Address.Purchase_price` unless set); also at the clerk's counter |
+| `/postal office <office> approval \| applications \| approve \| deny` | owner (admins: any) | address applications, where the office requires approval (`docs/commands.md`) |
 
 Transfers check both sides and undo the first if the second fails, so money is never lost or created.
 

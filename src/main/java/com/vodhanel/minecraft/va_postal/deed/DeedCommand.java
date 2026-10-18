@@ -31,8 +31,9 @@ public final class DeedCommand {
     public static void command(CommandSender sender, String[] args) {
         String sub = args.length > 1 ? args[1].toLowerCase(java.util.Locale.ROOT) : "";
         switch (sub) {
-            case "give" -> give(sender, args, false);
-            case "sell" -> give(sender, args, true);
+            case "give" -> give(sender, args, false, false);
+            case "sell" -> give(sender, args, true, false);
+            case "apply" -> give(sender, args, true, true);
             case "list" -> list(sender, args);
             case "names" -> names(sender, args);
             case "reissue" -> reissue(sender, args);
@@ -45,6 +46,7 @@ public final class DeedCommand {
     private static void usage(CommandSender sender) {
         Deeds.inform(sender, "&7/postal deed give <player> <office> [name]  &8- a free address deed (no name: one is suggested)");
         Deeds.inform(sender, "&7/postal deed sell <player> <office> [name]  &8- the same, charged the address price");
+        Deeds.inform(sender, "&7/postal deed apply <player> <office> [name]  &8- an application at the office's price, as at its counter");
         Deeds.inform(sender, "&7/postal deed list [player]  &8- a player's deeds (yours, if you're a player)");
         Deeds.inform(sender, "&7/postal deed names <office> [count]  &8- house names the office would suggest");
         Deeds.inform(sender, "&7/postal deed reissue <player> <deed>  &8- a new copy of a lost deed (older copies stop working)");
@@ -52,7 +54,7 @@ public final class DeedCommand {
         Deeds.inform(sender, "&7/postal deed test <office> <name> <x> <y> <z> [world]  &8- use a server deed on that chest");
     }
 
-    private static void give(CommandSender sender, String[] args, boolean charge) {
+    private static void give(CommandSender sender, String[] args, boolean charge, boolean application) {
         if (args.length < 4) {
             usage(sender);
             return;
@@ -67,11 +69,19 @@ public final class DeedCommand {
         if (name == null && !"null".equals(office)) {
             name = Deeds.suggest_name(office, holder.getPlayer() == null ? null : holder.getPlayer().getLocation());
         }
-        double price = charge && VA_postal.economy_configured ? C_Economy.addr_purchase_price() : 0.0D;
+        double price = !charge || !VA_postal.economy_configured ? 0.0D
+                : application && !"null".equals(office) ? com.vodhanel.minecraft.va_postal.clerk.Clerks.price(office) : C_Economy.addr_purchase_price();
         Deeds.Result r = Deeds.issue_address(holder, holder.getName() == null ? args[2] : holder.getName(), args[3],
-                name == null ? "" : name, price);
+                name == null ? "" : name, price, application);
         if (!r.ok()) {
-            Deeds.inform(sender, "&7No deed: " + r.problem() + ".");
+            Deeds.inform(sender, "&7No " + (application ? "application" : "deed") + ": " + r.problem() + ".");
+            return;
+        }
+        if (application) {
+            Applications.applied(r.deed());
+            Deeds.inform(sender, "&7Application " + short_id(r.deed().id()) + " for &f" + DeedDocument.display(r.deed().name()) + ", "
+                    + DeedDocument.display(r.deed().office()) + " &7by " + r.deed().holder_name()
+                    + (price > 0.0D ? ", paid " + P_Economy.ef(price) : "") + ", waits for the postmaster.");
             return;
         }
         Deeds.inform(sender, "&7Deed " + short_id(r.deed().id()) + " for &f" + DeedDocument.display(r.deed().name()) + ", "
@@ -165,6 +175,9 @@ public final class DeedCommand {
     }
 
     private static OfflinePlayer player(String name) {
+        if ("server".equalsIgnoreCase(name)) {
+            return VA_postal.SERVER; // a deed held by the server, for tests
+        }
         Player online = Bukkit.getPlayerExact(name);
         return online != null ? online : Bukkit.getOfflinePlayerIfCached(name);
     }

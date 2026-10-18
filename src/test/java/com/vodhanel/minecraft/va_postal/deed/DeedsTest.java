@@ -58,6 +58,12 @@ class DeedsTest {
     }
 
     @Test
+    void anUnansweredApplicationIsRefundedInFullAnUnusedDeedLessTheFee() {
+        assertEquals(100.0D, Deeds.lapse_refund(deed(Deed.Kind.ADDRESS, Deed.State.PENDING, 1, 1L), 0.10D), 1e-9);
+        assertEquals(90.0D, Deeds.lapse_refund(deed(Deed.Kind.ADDRESS, Deed.State.ISSUED, 1, 1L), 0.10D), 1e-9);
+    }
+
+    @Test
     void storedNamesReadAsPeopleWriteThem() {
         assertEquals("Rose Cottage", DeedDocument.display("rose_cottage"));
         assertEquals("The Old Forge", DeedDocument.display("the_old_forge"));

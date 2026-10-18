@@ -49,9 +49,10 @@ Where the network last saw a player (server, online or when last seen), as `/add
 Writes a tracked test letter and hands it in at the from-office, as a player would; the destination can be another server's office.
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
-##### `deed <give | sell | list | names | reissue | expire | test> ...`
+##### `deed <give | sell | apply | list | names | reissue | expire | test> ...`
 Address deeds (`docs/design/deeds.md`): an address bought as a signed document and created where its holder right-clicks a chest with it. Postal first surveys a route from the office to the spot in front of the chest; if the postman can't get there, nothing is made, the deed stays in hand, and the holder is told where the route stopped. Players buy deeds from an office's clerk (see `clerk` below); staff can also issue them:
 - `give <player> <office> [name]`: a free deed (no name: the office suggests a house name). `sell` is the same, charged the address price, which Central holds until the deed is used (then half goes to the office) or lapses.
+- `apply <player> <office> [name]`: an application at the office's price, as if made at its counter (`server` for a server-held one, for tests).
 - `list [player]`: a player's deeds and their state. `names <office> [count]`: house names the office would suggest (Rose Cottage, The Old Forge, Ashdene...; the words are in `names.yml`, the deed's wording in `deeds.yml`).
 - `reissue <player> <deed>`: a new copy of a lost deed; older copies stop working.
 - `expire`: lapses the deeds whose time is up now (they're checked hourly); a lapsed deed is refunded less `Settings.Deeds.Expiry_fee` (default 10%). Deeds last `Settings.Deeds.Expiry_days` (default 14).
@@ -60,8 +61,11 @@ Address deeds (`docs/design/deeds.md`): an address bought as a signed document a
 Every local office has a clerk, "Postmaster of {office}", on duty while the mail runs: spawned with the dispatcher, put back at their post if anything moves or removes them, gone while it's stopped. They can't be hurt, pushed or leashed. Players nearby are greeted; right-clicking the clerk opens the office's **counter**:
 - *Buy an address*: a form to name the house (a suggested name is filled in, *Suggest another* draws a new one) and pay the office's price; the deed goes into the player's inventory (permission `postal.deed.buy`, default true).
 - *Office info*: the postmaster, how many addresses, what a new one costs.
-- *Replace a lost deed*: shown while the player has unused deeds of this office; older copies stop working.
+- *Collect or replace a deed*: shown while the player has unused deeds of this office (an approved application's, or a lost one); older copies stop working.
 - *Address price* (the owner and admins): set what a new address here costs, or go back to the server's price.
+- *Applications* and *Approval* (the owner and admins): see below.
+
+**Approval.** An office can require its owner's approval for new addresses (`Settings.Deeds.Require_approval`, default `'false'`, is the default for offices that haven't chosen). Buying then makes an **application**: paid for and its name reserved, but no deed yet. The owner hears of it (in chat, or when they next join; admins, for an office the server owns) and approves or declines it in the counter's *Applications* menu (left-click approves, right-click declines) or with `/postal office <office> applications | approve | deny`. An approved application becomes a deed, good for `Settings.Deeds.Expiry_days` from then, handed over at once if the player is online or collected at the counter; a declined one is refunded in full and its name is free again; one nobody answers lapses after `Expiry_days`, refunded in full. The applicant hears by letter from the office if they have an address, in chat if online, and otherwise when they next join.
 
 The forms are dialogs; with `Settings.Clerks.Dialogs: 'false'` (or where a dialog can't be shown) they're asked in chat. `Settings.Clerks.Local: 'false'` leaves offices unstaffed, and right-clicking the office sign opens the counter instead. `Settings.Clerks.Name` and `Settings.Clerks.Greeting` set the clerk's name and greeting (`{office}`, `{player}`).
 - `here [office]`: the owner (or an admin) stations their office's clerk where they stand, within `Settings.Clerks.Reach` (default 24) blocks of the office. `reset <office>` puts them back beside the office chest, where they stand by default.
@@ -72,9 +76,9 @@ Central's balance, what it owes and its target, and every office's owner, balanc
 withdrawable amount and arrears. `newday` runs a Postal economy day now; `report` shows the daily flow
 log; `policy` shows or changes the economy settings at runtime. See `docs/economy.md`.
 <br>
-#### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default]]`
+#### `/postal office [PostOffice] [balance | deposit <amount> | withdraw <amount|all> | price [amount|default] | approval [on|off|default] | applications | approve <id|name|all> | deny <id|name> [reason]]`
 Permissions: owner of the post office (admins may view any)
-An office owner's account: see the balance, deposit, or withdraw down to the reserve. `price` shows what a new address at the office costs; with an amount the owner (or an admin) sets the office's own price, and `default` goes back to the server's `Address.Purchase_price`.
+An office owner's account: see the balance, deposit, or withdraw down to the reserve. `price` shows what a new address at the office costs; with an amount the owner (or an admin) sets the office's own price, and `default` goes back to the server's `Address.Purchase_price`. `approval` shows or sets whether new addresses need the owner's approval (`default`: the server's `Settings.Deeds.Require_approval`); `applications` lists the ones waiting, and `approve` / `deny` decide them (by the id shown, or the house name; a reason given with `deny` goes to the applicant).
 <br>
 #### `/go [PostOffice] [Address]` _`(No address defaults to central)`_
 Permissions: `postal.gotocentral, postal.gotolocal, postal.gotoaddr`

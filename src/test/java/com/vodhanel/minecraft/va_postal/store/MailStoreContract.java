@@ -560,4 +560,32 @@ abstract class MailStoreContract {
         store.create_deed(second);
         assertEquals(List.of(second.id(), first.id()), store.deeds_of(steve).stream().map(Deed::id).toList());
     }
+
+    @Test
+    void anApprovedApplicationIsIssuedWithAFreshExpiry() {
+        Deed d = deed(Deed.Kind.ADDRESS, "main", "riverside", "foxgloves", 100, 1L, 50L).with_state(Deed.State.PENDING, 1L);
+        store.create_deed(d);
+        assertTrue(store.deed_name_reserved(Deed.Kind.ADDRESS, "riverside", "foxgloves")); // pending holds the name
+        assertTrue(store.issue_deed(d.id(), 5L, 900L));
+        Deed after = store.deed(d.id()).orElseThrow();
+        assertEquals(Deed.State.ISSUED, after.state());
+        assertEquals(900L, after.expires_at());
+        assertEquals(5L, after.updated_at());
+        assertFalse(store.issue_deed(d.id(), 6L, 1000L)); // only once, and only from pending
+        assertEquals(900L, store.deed(d.id()).orElseThrow().expires_at());
+    }
+
+    @Test
+    void anOfficesApplicationsOldestFirst() {
+        Deed second = deed(Deed.Kind.ADDRESS, "main", "riverside", "larks_nest", 1, 20L, 99L).with_state(Deed.State.PENDING, 20L);
+        Deed first = deed(Deed.Kind.ADDRESS, "main", "riverside", "wrens_rest", 1, 10L, 99L).with_state(Deed.State.PENDING, 10L);
+        store.create_deed(second);
+        store.create_deed(first);
+        store.create_deed(deed(Deed.Kind.ADDRESS, "main", "riverside", "issued_one", 1, 5L, 99L));
+        store.create_deed(deed(Deed.Kind.ADDRESS, "main", "hillcrest", "elsewhere", 1, 5L, 99L).with_state(Deed.State.PENDING, 5L));
+        store.create_deed(deed(Deed.Kind.ADDRESS, "other", "riverside", "not_here", 1, 5L, 99L).with_state(Deed.State.PENDING, 5L));
+        assertEquals(List.of(first.id(), second.id()), store.deeds_pending("riverside").stream().map(Deed::id).toList());
+        store.deed_state(first.id(), Deed.State.PENDING, Deed.State.DENIED, 30L);
+        assertEquals(List.of(second.id()), store.deeds_pending("riverside").stream().map(Deed::id).toList());
+    }
 }

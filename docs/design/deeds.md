@@ -1,8 +1,8 @@
 # Deeds: addresses bought in person (design draft)
 
 Status: **being built.** Done: deeds, house names and survey-first mailboxes (§1, §3.3-5, §4, §5); the local
-clerk, counter menu, buy form and per-office price (§2, §3.1, §6). Next: approval and applications (§3.2), then bot
-tests of the counter. Shares its machinery with the Central Office's charters
+clerk, counter menu, buy form and per-office price (§2, §3.1, §6); approval and applications (§3.2). Next: bot tests
+of the counter. Shares its machinery with the Central Office's charters
 (`docs/design/central-office.md`, branch `claude/clever-brahmagupta-goe25y`) and is planned to be built first.
 
 Today a player gets an address through commands: someone with permission stands at a chest and runs

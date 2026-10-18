@@ -291,6 +291,18 @@ run_server "$WORK_DIR/phase14.log" \
     "postal clerk reset testville" "postal stop" "sleep:12" \
     "execute if entity @e[$CLERK_AT]" "postal clerk list" "sleep:2"
 
+# Phase 15: address applications (docs/design/deeds.md §3.2). Testville switches approval on; two applications
+# (held by the server, at a free price) wait; a name under application can't be applied for twice; one is approved
+# (issued), the other declined (its name free again, so it can be applied for anew); approval goes back to the default.
+echo "== Phase 15: address applications"
+run_server "$WORK_DIR/phase15.log" \
+    "postal office testville approval" "postal office testville approval on" "postal office testville price 0" \
+    "postal deed apply server testville bramble_cottage" "postal deed apply server testville Bramble Cottage" \
+    "postal deed apply server testville holly_lodge" "postal office testville applications" \
+    "postal office testville approve bramble_cottage" "postal office testville deny holly_lodge Too near the mill" \
+    "postal office testville applications" "postal deed list server" \
+    "postal deed apply server testville holly_lodge" "postal office testville approval default" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -476,6 +488,21 @@ check "phase14: the clerk stands at its post, goes back when moved, stands where
 check "phase14: the office sets its own address price" grep -q "now costs .*25" <(plain phase14)
 check "phase14: the price shows as the office's" grep -q "costs .*25.* (the office's price)" <(plain phase14)
 check "phase14: and listed off duty" grep -q "off duty (the mail isn't running)" <(plain phase14)
+check "phase15: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase15.log"
+check "phase15: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase15.log"
+check "phase15: approval is off by default" grep -q "Testville are sold straight away (the server's default)" <(plain phase15)
+check "phase15: the office turns it on" grep -q "Testville need the postmaster's approval (the office's choice)" <(plain phase15)
+check "phase15: an application waits" grep -q "for Bramble Cottage, Testville by Server, waits for the postmaster" <(plain phase15)
+check "phase15: a name under application is reserved" grep -q "No application: someone already holds a deed for Bramble Cottage" <(plain phase15)
+check "phase15: the office lists both applications" grep -q "Applications at Testville: 2" <(plain phase15)
+check "phase15: one is approved" grep -q "Approved Bramble Cottage for Server" <(plain phase15)
+check "phase15: one is declined" grep -q "Declined Holly Lodge for Server" <(plain phase15)
+check "phase15: then none wait" grep -q "Applications at Testville: 0" <(plain phase15)
+check "phase15: the approved one is issued" grep -qE "Bramble Cottage, Testville issued" <(plain phase15)
+check "phase15: the declined one is denied" grep -qE "Holly Lodge, Testville denied" <(plain phase15)
+check "phase15: a declined name can be applied for again" \
+    test "$(grep -c "for Holly Lodge, Testville by Server, waits for the postmaster" <(plain phase15))" -eq 2
+check "phase15: approval back to the server's default" test "$(grep -c "are sold straight away (the server's default)" <(plain phase15))" -eq 2
 
 echo
 echo "---- Postal output (phase 2) ----"

@@ -31,18 +31,22 @@ public final class ClerkListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void on_menu_click(InventoryClickEvent event) {
-        if (!(event.getView().getTopInventory().getHolder(false) instanceof CounterMenu menu)) {
+        if (!(event.getView().getTopInventory().getHolder(false) instanceof Menu menu)) {
             return;
         }
         event.setCancelled(true); // nothing moves in or out of the counter
         if (event.getWhoClicked() instanceof Player player && event.getClickedInventory() == event.getView().getTopInventory()) {
-            menu.click(player, event.getRawSlot());
+            int slot = event.getRawSlot();
+            boolean right = event.isRightClick();
+            // Next tick: opening another inventory from inside a click event isn't safe.
+            com.vodhanel.minecraft.va_postal.VA_postal.plugin.getServer().getScheduler().runTask(
+                    com.vodhanel.minecraft.va_postal.VA_postal.plugin, () -> menu.click(player, slot, right));
         }
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void on_menu_drag(InventoryDragEvent event) {
-        if (event.getView().getTopInventory().getHolder(false) instanceof CounterMenu) {
+        if (event.getView().getTopInventory().getHolder(false) instanceof Menu) {
             event.setCancelled(true);
         }
     }
@@ -54,6 +58,18 @@ public final class ClerkListener implements Listener {
         if (Forms.answer(event.getPlayer(), typed)) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler
+    public void on_join(org.bukkit.event.player.PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        // A moment after joining, so the messages aren't lost among the join messages.
+        com.vodhanel.minecraft.va_postal.VA_postal.plugin.getServer().getScheduler().runTaskLater(
+                com.vodhanel.minecraft.va_postal.VA_postal.plugin, () -> {
+                    if (player.isOnline()) {
+                        com.vodhanel.minecraft.va_postal.deed.Notices.deliver(player);
+                    }
+                }, 60L);
     }
 
     @EventHandler

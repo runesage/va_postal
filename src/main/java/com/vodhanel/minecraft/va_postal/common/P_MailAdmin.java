@@ -121,28 +121,44 @@ public final class P_MailAdmin {
             attention = r.name();
             attention_id = r.id();
         }
-        Block chest = office_chest(from);
-        if (chest == null) {
-            send(sender, "&7Couldn't find " + from + "'s post office chest.");
+        String date = new SimpleDateFormat("MM/dd/yy HH:mm").format(new Date());
+        String[] posted = post_letter(from, dest.server(), to, address, attention, attention_id, "Server", "Test letter",
+                "A test letter from " + Util.df(from) + ", posted " + date + ".",
+                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()));
+        if (posted[0] == null) {
+            send(sender, "&7" + posted[1]);
             return;
         }
+        send(sender, "&6Test letter " + posted[0] + " handed in at " + Util.df(from)
+                + " for " + (dest.remote() ? dest.server() + ":" : "") + Util.df(to) + ", " + Util.df(address) + ".");
+    }
+
+    /**
+     * Writes a letter and hands it in at {@code from}'s office chest, as if over the counter, for {@code address} at
+     * {@code to} ({@code server}: another server's office, or null). Returns {mail id or "(untracked)", null} when
+     * posted, else {null, why not}.
+     */
+    public static String[] post_letter(String from, String server, String to, String address, String attention, UUID attention_id,
+                                       String author, String subject, String body, com.vodhanel.minecraft.va_postal.store.Actor actor) {
+        Block chest = office_chest(from);
+        if (chest == null) {
+            return new String[]{null, "Couldn't find " + from + "'s post office chest."};
+        }
         String date = new SimpleDateFormat("MM/dd/yy HH:mm").format(new Date());
-        String title = dest.remote() ? dest.server() + ":" + Util.df(to) : Util.df(to);
+        String title = server != null ? server + ":" + Util.df(to) : Util.df(to);
         String[] pages = {
-                Book.makeFirstMailPageById(title, Util.df(address), attention, null, null, "Server", "Test letter", date, null, attention_id),
-                "A test letter from " + Util.df(from) + ", posted " + date + "."};
+                Book.makeFirstMailPageById(title, Util.df(address), attention, null, null, author, subject, date, null, attention_id),
+                body};
         ItemStack letter = new Book(title, Util.df(address), pages).generateItemStack();
-        letter = Letters.posted(letter, null, from, dest.server(), to, address, attention_id);
+        letter = Letters.posted(letter, null, from, server, to, address, attention_id);
         if (!((Chest) chest.getState()).getInventory().addItem(letter).isEmpty()) {
-            send(sender, "&7" + from + "'s post office chest is full.");
-            return;
+            return new String[]{null, from + "'s post office chest is full."};
         }
         // Handed in over the counter: the office has it from now on (so reconciliation watches that chest).
         Letters.arrived(letter, com.vodhanel.minecraft.va_postal.common.Util.location2str(chest.getLocation()),
-                com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH, com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()));
+                com.vodhanel.minecraft.va_postal.store.MailState.AT_ORIGIN_BRANCH, actor);
         UUID id = com.vodhanel.minecraft.va_postal.mail.MailIds.read(letter);
-        send(sender, "&6Test letter " + (id == null ? "(untracked)" : id.toString()) + " handed in at " + Util.df(from)
-                + " for " + (dest.remote() ? dest.server() + ":" : "") + Util.df(to) + ", " + Util.df(address) + ".");
+        return new String[]{id == null ? "(untracked)" : id.toString(), null};
     }
 
     /**
