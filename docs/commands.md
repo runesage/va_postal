@@ -14,6 +14,10 @@ The post offices' leaderboards over the last `Settings.Stats.Period_days` (defau
 Permissions: `postal.admin`
 Central's notice board: wall signs within `Settings.Board.Max_distance` (default 32) blocks of Central's chest, each showing one panel: `postage` (letter rates), `parcels` (parcel rates and the COD surcharge), `busiest`, `on_time`, `fewest_lost` (the leaderboards of `/postal stats`) or `notices` (the latest three, dated: rate changes, offices opening). `add` puts the sign you look at (or the one at the coordinates) on the board, showing the panel named or else the next one the board doesn't show yet; `remove` takes it off. The signs are redrawn every hour with the stats and at once when the rates change or an office opens; they're waxed, and Central's protection covers them. Anyone can right-click a sign for its panel in full in chat: every rate, the leaderboards' top ten, the last ten notices written out (the sign has shorthand: `19/10 New rates`; chat says which rate, from what to what). See `docs/design/central-office.md` §6.
 <br>
+#### `/postal map network|<PostOffice> [player] | frame [x y z [world]] | list`
+Permissions: `postal.admin`
+Postal maps: map items Postal draws itself. The network map shows Central, every office in its world and Central's routes out to them; an office map shows one office, its routes and addresses, with their names. `network` or an office gives one to you (or the player named); `frame` hangs a network map, fixed, in the item frame you look at (or the one at the coordinates), for the notice board; `list` lists the maps Postal draws. Players buy them at the counters: the network map at Central's (*The network*), an office's own at its counter (the office card), for `Settings.Maps.Price` (default 10, free without an economy), paid to Central. Maps keep working after a restart, and are redrawn every few minutes so they keep up with the network. See `docs/design/central-office.md` §6.
+<br>
 #### `/postal <start/stop/admin/chests/talk/quiet/speed>`
 Permissions: `postal.admin`
 Administrator commands for postal:

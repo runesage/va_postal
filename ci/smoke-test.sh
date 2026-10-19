@@ -371,6 +371,15 @@ run_server "$WORK_DIR/phase20.log" \
     "data get block -5 -59 -3 front_text" "data get block -3 -59 -3 front_text" "data get block -3 -60 -3 front_text" \
     "data get block -3 -59 -3 is_waxed" "postal board remove -3 -60 -3" "postal board list" "sleep:2"
 
+# Phase 21: Postal maps (docs/design/central-office.md §6). The network map hangs in an item frame beside the notice
+# board; a map for nobody is refused from the console; the map is listed. After a restart its renderer is put back.
+echo "== Phase 21: Postal maps"
+run_server "$WORK_DIR/phase21.log" \
+    "setblock -2 -59 -4 minecraft:stone" "summon minecraft:item_frame -2 -59 -3 {Facing:3b}" "sleep:1" \
+    "postal map frame -2 -59 -3" "postal map network" "postal map nowhere x" "postal map list" \
+    "data get entity @e[type=minecraft:item_frame,limit=1,sort=nearest,x=-2,y=-59,z=-3] Item" "sleep:2"
+run_server "$WORK_DIR/phase21b.log" "sleep:3" "postal map list" "sleep:1"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -635,6 +644,15 @@ check "phase20: the notices show the rate change" grep -qE -e "-3, -60, -3 has t
 check "phase20: the signs show colours, not codes" no_match "messages: \\[\"&1" <(plain phase20)
 check "phase20: the signs are waxed" grep -qE -e "-3, -59, -3 has the following block data: 1b" <(plain phase20)
 check "phase20: a sign is taken off the board" grep -q "Notice board: 5 sign(s)" <(plain phase20)
+check "phase21: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase21.log"
+check "phase21: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase21.log"
+check "phase21: none after the restart" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase21b.log"
+check "phase21: the network map hangs in the frame" grep -q "The network map hangs at -2 -59 -3" <(plain phase21)
+check "phase21: the frame holds a filled map" grep -qE "has the following entity data: .*minecraft:filled_map" <(plain phase21)
+check "phase21: a map for nobody is refused" grep -q "Give it to whom" <(plain phase21)
+check "phase21: an unknown office is refused" grep -q "No post office matches 'nowhere'" <(plain phase21)
+check "phase21: the map is listed" grep -qE "map [0-9]+: the network" <(plain phase21)
+check "phase21: after a restart its renderer is back" grep -q "1 Postal map(s) ready" <(plain phase21b)
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true

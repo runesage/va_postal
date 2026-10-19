@@ -513,6 +513,14 @@ sleep 1
 check "right-clicking the notices sign gives the notice in full" bot_cmd "use -1 -59 5 north" 'CHAT .*[0-9]+/[0-9]+ A letter, within an office: was .*, now '
 sleep 1
 check "a player can't break a notice board sign" bot_cmd "dig -2 -59 5" "CHAT .*The notice board belongs to the Post Office"
+# Postal maps (docs/design/central-office.md §6): the network card at Central's counter sells a map; held in the bot's
+# hand, it arrives drawn, labelled with Central and the offices.
+console "minecraft:clear $BOT_NAME"
+sleep 1
+check "Central's counter offers a network map" bot_cmd "interact -0.5 -60 0.5" 'ITEM [0-9]+/13 The network'
+check "clicking it sells one" bot_cmd "click 13" 'CHAT .*Here is your map of the network'
+check "the map arrives drawn, with Central on it" wait_log "$BOT_LOG" 'MAP [0-9]+ pixels=16384 labels=.*Central' 15
+check "and Testville" grep -qE 'MAP [0-9]+ pixels=16384 labels=.*Testville' "$BOT_LOG"
 console "gamemode survival $BOT_NAME"
 console "op $BOT_NAME"
 console "postal stop"

@@ -102,6 +102,10 @@ public final class CounterMenu implements Menu {
                 player.closeInventory();
                 replace(player);
             }
+            case INFO -> {
+                player.closeInventory();
+                com.vodhanel.minecraft.va_postal.maps.PostalMaps.buy(player, office);
+            }
             case PRICE -> {
                 if (manager) {
                     player.closeInventory();
@@ -131,7 +135,9 @@ public final class CounterMenu implements Menu {
                 "&7Postmaster: &f" + (owner == null || owner.isBlank() || "null".equals(owner) ? "the server" : owner),
                 "&7Addresses: &f" + (addresses == null ? 0 : addresses.length),
                 "&7A new address: &f" + Clerks.price_text(office),
-                "&7Postage discount: &f" + com.vodhanel.minecraft.va_postal.economy.Rates.discount_text(office));
+                "&7Postage discount: &f" + com.vodhanel.minecraft.va_postal.economy.Rates.discount_text(office),
+                "",
+                "&7Click to buy a map of the office: &f" + com.vodhanel.minecraft.va_postal.maps.PostalMaps.price_text());
     }
 
     private List<Deed> open_deeds(Player player) {

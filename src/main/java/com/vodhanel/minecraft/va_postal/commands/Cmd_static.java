@@ -75,6 +75,7 @@ public class Cmd_static {
         Util.pinform(player, " &7&oPostal accounts: Central and every office; run a Postal day now");
         Util.pinform(player, " &f&r/postal bank [newday]");
         Util.pinform(player, " &f&r/postal board add [panel] | remove | list | refresh");
+        Util.pinform(player, " &f&r/postal map network|<PostOffice> [player] | frame | list");
         Util.pinform(player, " &7&oSet a local post office");
         Util.pinform(player, " &f&r/setlocal <PostOffice>");
         Util.pinform(player, " &7&oSet a town address");
