@@ -380,12 +380,12 @@ run_server "$WORK_DIR/phase21.log" \
     "data get entity @e[type=minecraft:item_frame,limit=1,sort=nearest,x=-2,y=-59,z=-3] Item" "sleep:2"
 run_server "$WORK_DIR/phase21b.log" "sleep:3" "postal map list" "sleep:1"
 
-# Phase 22: Branch of the Month (docs/design/central-office.md §6). Before any award, Testville leads; with a bonus set
-# but Central holding nothing above its target, the award is made and the bonus skipped; the sign taken off the board
+# Phase 22: Branch of the Month (docs/design/central-office.md §6). Before any award, Testville leads; with a bonus
+# bigger than anything Central holds above its target, the award is made and the bonus skipped; the sign taken off the board
 # in phase 20 goes back as the award panel; Testville is the holder.
 echo "== Phase 22: Branch of the Month"
 run_server "$WORK_DIR/phase22.log" \
-    "postal award" "postal bank policy awards.bonus 50" "postal award now" "postal board add award -3 -60 -3" \
+    "postal award" "postal bank policy awards.bonus 1000000000" "postal award now" "postal bank policy awards.bonus 0" "postal board add award -3 -60 -3" \
     "data get block -3 -60 -3 front_text" "postal award" "sleep:2"
 
 # ---- Assertions ---------------------------------------------------------------------------
@@ -666,7 +666,7 @@ check "phase22: no Postal stack traces" no_match "NullPointerException|at .*com\
 check "phase22: none named before the first award" grep -q "None named yet" <(plain phase22)
 check "phase22: Testville leads the period" grep -q "Leading this period: Testville" <(plain phase22)
 check "phase22: Testville is named Branch of the Month" grep -q "The Testville Post Office is the Branch of the Month" <(plain phase22)
-check "phase22: the bonus is skipped with nothing above Central's target" grep -q "Branch of the Month bonus skipped" <(plain phase22)
+check "phase22: a bonus Central can't spare is skipped" grep -q "Branch of the Month bonus skipped" <(plain phase22)
 check "phase22: the board's award panel shows Testville" \
     grep -qE -e "-3, -60, -3 has the following block data: .*BRANCH OF.*THE MONTH.*Testville" <(plain phase22)
 check "phase22: Testville is the holder" grep -q "Holder: Testville" <(plain phase22)
