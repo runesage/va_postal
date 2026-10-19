@@ -37,4 +37,10 @@ class ReturnsTest {
         assertTrue(Returns.page("there's no post office called Riverside on b").endsWith("there's no post office called Riverside on b"));
         assertTrue(Returns.page("x").contains("Returned to sender"));
     }
+
+    @Test
+    void theServerSendingItBackIsRecorded() {
+        String s = new String(Returns.stamped(json("{}"), "no such office", "beta"), StandardCharsets.UTF_8);
+        assertTrue(s.contains("\"returned_from\":\"beta\""), s);
+    }
 }

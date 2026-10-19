@@ -460,7 +460,8 @@ public final class Network {
             }
             MailRecord landing = Returns.on_arrival(store, r, transit_millis()); // null: for no office here, sent back
             if (landing != null && claim(store, chest, key, landing)) {
-                received.merge(r.origin_server, 1, Integer::sum);
+                String from = Returns.returned_from(r); // a return comes from the server that sent it back
+                received.merge(from != null ? from : r.origin_server, 1, Integer::sum);
             }
         }
         if (received.isEmpty()) {

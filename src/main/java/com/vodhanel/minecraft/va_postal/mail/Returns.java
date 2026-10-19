@@ -65,8 +65,26 @@ public final class Returns {
         return reason(r) != null;
     }
 
+    /** The server that sent {@code r} back (for the arrival's announcement), or null if it wasn't returned. */
+    static String returned_from(MailRecord r) {
+        if (reason(r) == null) {
+            return null;
+        }
+        try {
+            JsonObject o = GSON.fromJson(new String(r.payload, StandardCharsets.UTF_8), JsonObject.class);
+            return o.has("returned_from") ? o.get("returned_from").getAsString() : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /** {@code payload} with the return {@code reason} added. */
     static byte[] stamped(byte[] payload, String reason) {
+        return stamped(payload, reason, null);
+    }
+
+    /** {@code payload} with the return {@code reason} added, and the server sending it back ({@code from}, if known). */
+    static byte[] stamped(byte[] payload, String reason, String from) {
         JsonObject o;
         try {
             o = GSON.fromJson(new String(payload, StandardCharsets.UTF_8), JsonObject.class);
@@ -77,6 +95,9 @@ public final class Returns {
             o = new JsonObject();
         }
         o.addProperty("returned", reason);
+        if (from != null) {
+            o.addProperty("returned_from", from);
+        }
         return GSON.toJson(o).getBytes(StandardCharsets.UTF_8);
     }
 
@@ -133,7 +154,7 @@ public final class Returns {
     /** Readdresses {@code r} (in the network) to its sender's server, due at {@code due}; the new record, or null. */
     static MailRecord send_back(MailStore store, MailRecord r, String reason, long due) {
         try {
-            MailRecord back = store.readdress(r, r.origin_server, r.origin_office, null, stamped(r.payload, reason), due,
+            MailRecord back = store.readdress(r, r.origin_server, r.origin_office, null, stamped(r.payload, reason, store.server_id()), due,
                     Actor.central(), "returned to sender: " + reason);
             Util.cinform("[Postal] Letter " + r.id + " goes back to " + r.origin_server + ": " + reason);
             return back;
