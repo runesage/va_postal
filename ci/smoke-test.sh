@@ -344,6 +344,14 @@ run_server "$WORK_DIR/phase18.log" \
     "postal start" "sleep:60" "postal stop" "sleep:12" "data get block 20 -60 0 Items" \
     "postal office testville discount none" "postal bank policy" "sleep:2"
 
+# Phase 19: office stats (docs/design/central-office.md §7). The earlier phases delivered letters and parcels to Home and
+# lost one at Testville (phase 5); the roll-up summarises them into office_stats, and the leaderboards and Testville's
+# numbers show them.
+echo "== Phase 19: office stats"
+run_server "$WORK_DIR/phase19.log" \
+    "postal stats refresh" "sleep:5" "postal stats" "postal stats testville" "postal stats testville 1" \
+    "postal stats nowhere" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -586,6 +594,14 @@ check "phase18: the notice is in Testville's chest" \
     grep -qE "20, -60, 0 has the following block data: .*Notice of postage rates" <(plain phase18)
 check "phase18: the discount is cleared" grep -q "Testville's postage discount is now none" <(plain phase18)
 check "phase18: the policy lists the rates" grep -q "rates.letter_out_town: 9 " <(plain phase18)
+check "phase19: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase19.log"
+check "phase19: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase19.log"
+check "phase19: the roll-up writes rows" grep -qE "Stats updated: [1-9][0-9]* office-day" <(plain phase19)
+check "phase19: the leaderboards list Testville as busiest" grep -qE "Busiest:" <(plain phase19)
+check "phase19: Testville leads" grep -qE "1\. Testville [0-9]+ delivered" <(plain phase19)
+check "phase19: Testville's numbers show its deliveries" grep -qE "Delivered: [1-9][0-9]*" <(plain phase19)
+check "phase19: and the letter it lost" grep -qE "Lost: [1-9]" <(plain phase19)
+check "phase19: an unknown office is refused" grep -q "No post office matches 'nowhere'" <(plain phase19)
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true

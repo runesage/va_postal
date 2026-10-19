@@ -3,8 +3,8 @@
 **Status:** being built. Done: the clerk (the Postmaster General) and Central's protection (§2), with a first
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
 and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
-player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4). Next: the
-network map (§6). Address deeds
+player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4); office stats
+and the leaderboards, in chat and on Central's counter (§7). Next: the notice board, maps and Branch of the Month (§6). Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
@@ -238,13 +238,27 @@ board and an optional bonus from Central (`Awards.Bonus`, default 0).
 
 ## 7. Stats
 
-Inspections, leaderboards and Branch of the Month read the same per-office numbers: deliveries, the time
-from posting to delivery, and letters lost. They come from the mail store's event history (persistent-state
-P1), so no new tracking is needed in the world. A small stats module summarises them once per Postal day
-into a `office_stats` table.
+*Built.*
 
-**On time** needs an expected delivery time. To start with, it's the route's recorded round-trip time
-(already measured per address) plus Central's dispatch interval when the letter crosses between offices.
+Inspections, leaderboards and Branch of the Month read the same per-office numbers: deliveries, the time
+from pickup to delivery, and letters lost. They come from the mail store's event history (persistent-state
+P1), so no new tracking is needed in the world. The stats module (`stats/`) summarises them every hour into an
+`office_stats` table (schema 8): one row per office per UTC day, today's rewritten as the day goes on.
+
+- **Sent:** mail an office picked up (its `AT_ORIGIN_BRANCH` event), counted for the letter's origin office.
+- **Delivered:** mail an office delivered (`DELIVERED`), with the time since it was first picked up (its creation if
+  it never was). A letter that crossed the network counts for the office here that delivered it.
+- **Lost:** mail gone `MISSING`, counted for the office that held it: the sending office before it reached Central,
+  the delivering office after. Lost at Central counts for no office.
+- **On time** needs an expected delivery time. To start with it's worked out from the routes: an office's *round* is
+  the time its postman takes to serve every address once (the recorded route times plus `Postman_cool_sec` each).
+  Local mail may take two rounds (picked up on one, delivered on the next); mail between offices one round of the
+  delivering office plus two of Central's (`Central_cool_sec` times the number of offices: to Central, then out).
+  That's multiplied by `Settings.Stats.On_time_factor` (default 1.5) plus `On_time_grace` seconds (default 300).
+- **Leaderboards** cover the last `Settings.Stats.Period_days` (default 30): busiest (deliveries), most punctual
+  (on-time share) and fewest losses, the last two among offices with at least `Min_deliveries` (default 5).
+  `/postal stats [office] [days]` shows them in chat, Central's counter shows the top three of each
+  (*Leaderboards*), and `/postal stats refresh` summarises the history at once. The first summary goes back a period.
 
 ## 8. Phases
 

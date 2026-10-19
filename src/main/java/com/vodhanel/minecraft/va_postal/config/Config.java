@@ -219,6 +219,11 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.min_distance"), 64);
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.announce"), "true");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.effects"), "true");
+        // Office stats and leaderboards (docs/design/central-office.md §7).
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.stats.period_days"), 30);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.stats.min_deliveries"), 5);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.stats.on_time_factor"), 1.5D);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.stats.on_time_grace"), 300);
         // Office sales through Central: the fee on a sale between players, and how long an offer stands.
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.transfer_rate"), "0.05");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.offer_days"), 3);

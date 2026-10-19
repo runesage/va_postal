@@ -62,6 +62,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/tlist &7&o(alias: /tl)");
         Util.pinform(player, " &7&oList addresses in a town");
         Util.pinform(player, " &f&r/alist <PostOffice> &7&o(alias: /al)");
+        Util.pinform(player, " &7&oThe post offices' leaderboards, or one office's numbers");
+        Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");
@@ -118,6 +120,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/tlist &7&o(alias: /tl)");
         Util.pinform(player, " &7&oList addresses in a town");
         Util.pinform(player, " &f&r/alist <PostOffice> &7&o(alias: /al)");
+        Util.pinform(player, " &7&oThe post offices' leaderboards, or one office's numbers");
+        Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");
@@ -164,6 +168,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/tlist &7&o(alias: /tl)");
         Util.pinform(player, " &7&oList addresses in a town");
         Util.pinform(player, " &f&r/alist <PostOffice> &7&o(alias: /al)");
+        Util.pinform(player, " &7&oThe post offices' leaderboards, or one office's numbers");
+        Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");

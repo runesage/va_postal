@@ -370,6 +370,8 @@ public class VA_postal extends JavaPlugin {
             } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
                 Util.cinform("[Postal] Couldn't expire deeds: " + e.getMessage());
             }
+            // The leaderboards' numbers (docs/design/central-office.md §7), on the store's thread.
+            com.vodhanel.minecraft.va_postal.stats.Stats.roll_up(null);
         }, 1200L, 72000L);
 
         Cmdexecutor executor = new Cmdexecutor(this);
