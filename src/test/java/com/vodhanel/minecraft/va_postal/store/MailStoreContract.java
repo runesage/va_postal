@@ -640,4 +640,43 @@ abstract class MailStoreContract {
         assertEquals(List.of(second.id()), store.offers_to(steve).stream().map(Offer::id).toList());
         assertEquals(1, store.offers_due(100L).size());
     }
+
+    @Test
+    void mailFactsListPickupsDeliveriesAndLosses() {
+        long before = System.currentTimeMillis() - 1000L;
+        MailRecord r = letter();
+        MailRecord a = store.transition(r, MailState.AT_ORIGIN_BRANCH, Custody.chest("po"), Actor.system("t"), null);
+        MailRecord b = store.begin_move(a, MailState.AT_CENTRAL, Custody.chest("central"), Actor.system("t"), null);
+        MailRecord c = store.commit_move(b, Actor.system("t"), null);
+        store.transition(c, MailState.DELIVERED, Custody.chest("home"), Actor.system("t"), null);
+        store.transition(letter(), MailState.MISSING, Custody.NONE, Actor.system("t"), null);
+        List<MailFact> facts = store.mail_facts(before, System.currentTimeMillis() + 1000L);
+        assertEquals(List.of(MailState.AT_ORIGIN_BRANCH, MailState.DELIVERED, MailState.MISSING),
+                facts.stream().map(MailFact::to).toList());
+        MailFact delivered = facts.get(1);
+        assertEquals("testville", delivered.origin_office());
+        assertEquals("riverside", delivered.dest_office());
+        assertEquals(MailState.AT_CENTRAL, delivered.from());
+        assertEquals(facts.get(0).at(), delivered.picked_up_at()); // timed from the pickup
+        assertEquals(MailState.POSTED, facts.get(2).from());
+        assertEquals(1L, facts.get(2).picked_up_at()); // never picked up: from its creation
+        assertTrue(store.mail_facts(0L, before).isEmpty());
+    }
+
+    @Test
+    void officeStatsAreReplacedPerOfficeAndDay() {
+        assertEquals(-1, store.last_stats_day());
+        store.put_office_stats(List.of(new OfficeDay("main", "testville", 100, 1, 2, 1, 0, 500L),
+                new OfficeDay("main", "riverside", 100, 0, 1, 1, 1, 50L)));
+        store.put_office_stats(List.of(new OfficeDay("main", "testville", 100, 3, 4, 4, 0, 900L),
+                new OfficeDay("main", "testville", 101, 1, 0, 0, 0, 0L)));
+        assertEquals(101, store.last_stats_day());
+        List<OfficeDay> rows = store.office_stats(100, 100);
+        assertEquals(List.of(new OfficeDay("main", "riverside", 100, 0, 1, 1, 1, 50L),
+                new OfficeDay("main", "testville", 100, 3, 4, 4, 0, 900L)), rows);
+        assertEquals(3, store.office_stats(0, 200).size());
+        SqlMailStore other = new SqlMailStore(ds, "other", null, dialect());
+        assertEquals(-1, other.last_stats_day()); // another server's rows are its own
+        assertTrue(other.office_stats(0, 200).isEmpty());
+    }
 }

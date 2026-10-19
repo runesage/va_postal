@@ -186,6 +186,20 @@ public interface MailStore extends AutoCloseable {
     /** This server's open offers whose time ran out by {@code now}. */
     List<Offer> offers_due(long now);
 
+    // ---- Office stats (docs/design/central-office.md §7) ---------------------------------------------
+
+    /** This server's pickups, deliveries and losses in {@code [from, to)}, oldest first. */
+    List<MailFact> mail_facts(long from, long to);
+
+    /** Writes (replacing) these rows, all for this server. */
+    void put_office_stats(List<OfficeDay> rows);
+
+    /** This server's rows for days {@code from..to} inclusive. */
+    List<OfficeDay> office_stats(int from, int to);
+
+    /** The latest day this server has rows for, or -1. */
+    int last_stats_day();
+
     @Override
     void close();
 }

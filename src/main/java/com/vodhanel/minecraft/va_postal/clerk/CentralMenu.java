@@ -34,6 +34,7 @@ final class CentralMenu implements Menu {
     static final int OFFICES = 15;
     static final int CHARTERS = 22;
     static final int OFFERS = 24;
+    static final int LEADERS = 20;
 
     private final Inventory inventory;
     /** The player's charters: issued ones waiting to be used, and applications waiting for a decision. */
@@ -46,6 +47,7 @@ final class CentralMenu implements Menu {
         this.inventory = Bukkit.createInventory(this, 27, Text.component(Text.color("&8Central Post Office")));
         inventory.setItem(RATES, rates());
         inventory.setItem(NETWORK, network());
+        inventory.setItem(LEADERS, leaders());
         owned = owned(player.getUniqueId());
         if (!owned.isEmpty()) {
             List<String> lore = new ArrayList<>();
@@ -139,6 +141,11 @@ final class CentralMenu implements Menu {
             player.openInventory(new SalesMenus.Offers(offers).getInventory());
             return;
         }
+        if (slot == LEADERS) {
+            player.closeInventory();
+            com.vodhanel.minecraft.va_postal.stats.Stats.command(player, new String[]{"stats"});
+            return;
+        }
         if (slot != CHARTERS) {
             return; // the other cards are for reading
         }
@@ -154,6 +161,21 @@ final class CentralMenu implements Menu {
         } else {
             Clerks.say(Clerks.CENTRAL, player, "Your application is still with the Postmaster General.");
         }
+    }
+
+    /** The leaders of each board over the period (docs/design/central-office.md §6, §7). */
+    private static org.bukkit.inventory.ItemStack leaders() {
+        int days = com.vodhanel.minecraft.va_postal.stats.Stats.period_days();
+        List<String> lines = new java.util.ArrayList<>();
+        lines.add("&8The last " + days + " days");
+        try {
+            lines.addAll(com.vodhanel.minecraft.va_postal.stats.Stats.boards(com.vodhanel.minecraft.va_postal.stats.Stats.standings(days), 3));
+        } catch (StoreException e) {
+            lines.add("&7The records can't be read now.");
+        }
+        lines.add("");
+        lines.add("&7Click for the full boards.");
+        return CounterMenu.item(Material.BELL, "&6Leaderboards", lines.toArray(new String[0]));
     }
 
     private static org.bukkit.inventory.ItemStack rates() {

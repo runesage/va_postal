@@ -23,7 +23,8 @@ import java.util.UUID;
 public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
     static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql",
-            "V5__network_player.sql", "V6__deed.sql", "V7__office_offer.sql"};
+            "V5__network_player.sql", "V6__deed.sql", "V7__office_offer.sql",
+            "V8__office_stats.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -803,6 +804,110 @@ public final class SqlMailStore implements MailStore {
             }
         }
         return out;
+    }
+
+    // ---- Office stats -------------------------------------------------------------------------------
+
+    @Override
+    public List<MailFact> mail_facts(long from, long to) {
+        List<MailFact> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT m.mail_id, m.origin_server, m.origin_office, m.dest_office, m.dest_address, m.created_at, "
+                        + "(SELECT MIN(p.at) FROM mail_event p WHERE p.mail_id = m.mail_id AND p.to_state = 'AT_ORIGIN_BRANCH'), "
+                        + "e.at, e.from_state, e.to_state FROM mail_event e JOIN mail m ON m.mail_id = e.mail_id "
+                        + "WHERE e.server_id = ? AND e.at >= ? AND e.at < ? AND e.to_state IN ('AT_ORIGIN_BRANCH', 'DELIVERED', 'MISSING') "
+                        + "AND (e.from_state IS NULL OR e.from_state <> e.to_state) ORDER BY e.at")) {
+            ps.setString(1, server_id);
+            ps.setLong(2, from);
+            ps.setLong(3, to);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long picked = rs.getLong(7);
+                    if (rs.wasNull()) {
+                        picked = rs.getLong(6);
+                    }
+                    String f = rs.getString(9);
+                    out.add(new MailFact(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
+                            picked, rs.getLong(8), f == null ? null : MailState.valueOf(f), MailState.valueOf(rs.getString(10))));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read mail events", e);
+        }
+        return out;
+    }
+
+    @Override
+    public void put_office_stats(List<OfficeDay> rows) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement del = c.prepareStatement("DELETE FROM office_stats WHERE server_id = ? AND office = ? AND day = ?");
+                 PreparedStatement ins = c.prepareStatement("INSERT INTO office_stats (server_id, office, day, sent, delivered, "
+                         + "on_time, lost, transit_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                for (OfficeDay r : rows) {
+                    del.setString(1, server_id);
+                    del.setString(2, r.office());
+                    del.setInt(3, r.day());
+                    del.executeUpdate();
+                    ins.setString(1, server_id);
+                    ins.setString(2, r.office());
+                    ins.setInt(3, r.day());
+                    ins.setInt(4, r.sent());
+                    ins.setInt(5, r.delivered());
+                    ins.setInt(6, r.on_time());
+                    ins.setInt(7, r.lost());
+                    ins.setLong(8, r.transit_ms());
+                    ins.executeUpdate();
+                }
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not write office stats", e);
+        }
+    }
+
+    @Override
+    public List<OfficeDay> office_stats(int from, int to) {
+        List<OfficeDay> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT office, day, sent, delivered, on_time, lost, transit_ms FROM office_stats "
+                        + "WHERE server_id = ? AND day >= ? AND day <= ? ORDER BY day, office")) {
+            ps.setString(1, server_id);
+            ps.setInt(2, from);
+            ps.setInt(3, to);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new OfficeDay(server_id, rs.getString(1), rs.getInt(2), rs.getInt(3), rs.getInt(4), rs.getInt(5),
+                            rs.getInt(6), rs.getLong(7)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read office stats", e);
+        }
+        return out;
+    }
+
+    @Override
+    public int last_stats_day() {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT MAX(day) FROM office_stats WHERE server_id = ?")) {
+            ps.setString(1, server_id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int d = rs.getInt(1);
+                    return rs.wasNull() ? -1 : d;
+                }
+                return -1;
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read office stats", e);
+        }
     }
 
     private List<Offer> offers(String where, String... args) {
