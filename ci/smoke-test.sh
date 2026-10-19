@@ -380,6 +380,14 @@ run_server "$WORK_DIR/phase21.log" \
     "data get entity @e[type=minecraft:item_frame,limit=1,sort=nearest,x=-2,y=-59,z=-3] Item" "sleep:2"
 run_server "$WORK_DIR/phase21b.log" "sleep:3" "postal map list" "sleep:1"
 
+# Phase 22: Branch of the Month (docs/design/central-office.md §6). Before any award, Testville leads; with a bonus set
+# but Central holding nothing above its target, the award is made and the bonus skipped; the sign taken off the board
+# in phase 20 goes back as the award panel; Testville is the holder.
+echo "== Phase 22: Branch of the Month"
+run_server "$WORK_DIR/phase22.log" \
+    "postal award" "postal bank policy awards.bonus 50" "postal award now" "postal board add award -3 -60 -3" \
+    "data get block -3 -60 -3 front_text" "postal award" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -653,6 +661,15 @@ check "phase21: a map for nobody is refused" grep -q "Give it to whom" <(plain p
 check "phase21: an unknown office is refused" grep -q "No post office matches 'nowhere'" <(plain phase21)
 check "phase21: the map is listed" grep -qE "map [0-9]+: the network" <(plain phase21)
 check "phase21: after a restart its renderer is back" grep -q "1 Postal map(s) ready" <(plain phase21b)
+check "phase22: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase22.log"
+check "phase22: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase22.log"
+check "phase22: none named before the first award" grep -q "None named yet" <(plain phase22)
+check "phase22: Testville leads the period" grep -q "Leading this period: Testville" <(plain phase22)
+check "phase22: Testville is named Branch of the Month" grep -q "The Testville Post Office is the Branch of the Month" <(plain phase22)
+check "phase22: the bonus is skipped with nothing above Central's target" grep -q "Branch of the Month bonus skipped" <(plain phase22)
+check "phase22: the board's award panel shows Testville" \
+    grep -qE -e "-3, -60, -3 has the following block data: .*BRANCH OF.*THE MONTH.*Testville" <(plain phase22)
+check "phase22: Testville is the holder" grep -q "Holder: Testville" <(plain phase22)
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true

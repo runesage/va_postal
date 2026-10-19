@@ -181,6 +181,10 @@ public class Cmdexecutor implements CommandExecutor {
             com.vodhanel.minecraft.va_postal.maps.PostalMaps.command(player, args);
             return true;
         }
+        if ("award".equals(sub)) {
+            com.vodhanel.minecraft.va_postal.stats.Awards.command(player, args);
+            return true;
+        }
         if ("charter".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
@@ -371,7 +375,7 @@ public class Cmdexecutor implements CommandExecutor {
             Util.con_type("Usage: postal  <start/stop/restart/admin/conc/expedite>");
             Util.con_type(".............  <quiet/talk/debug/rtalk/ctalk/cstalk/chunks>");
             Util.con_type(".............  <mtalk/qtalk/wtalk/chests/speed/showroute/bank/office/survey>");
-            Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate/store/directory/stats/board/map>");
+            Util.con_type(".............  <track/testletter/testparcel/reconcile/recover/accept/refuse/setstate/store/directory/stats/board/map/award>");
             return true;
         }
 
@@ -427,6 +431,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("map".equals(args[0].toLowerCase().trim())) {
             com.vodhanel.minecraft.va_postal.maps.PostalMaps.command(sender, args);
+            return true;
+        }
+        if ("award".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.stats.Awards.command(sender, args);
             return true;
         }
         if ("charter".equals(args[0].toLowerCase().trim())) {
