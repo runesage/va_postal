@@ -89,6 +89,9 @@ public final class P_Day {
         }
         EconomyState.set_carry(pool - dividends);
 
+        // 4. P.O. box rent (docs/design/po-boxes.md): to the offices, arrears and lapses.
+        double[] boxes = com.vodhanel.minecraft.va_postal.boxes.PoBoxes.charge_day();
+
         double central_end = P_Economy.central_balance();
         double owes = P_Bank.central_liability();
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -102,13 +105,18 @@ public final class P_Day {
         if (holds_expired > 0) {
             summary.put("holds_expired", holds_expired);
         }
+        if (boxes[0] > 0.0D || boxes[1] > 0.0D) {
+            summary.put("box_rent", DailyMath.round2(boxes[0]));
+            summary.put("boxes_lapsed", (int) boxes[1]);
+        }
         EconomyState.close_day(summary);
 
         Util.cinform("[Postal] Postal day: Central " + P_Economy.ef(central_end) + " (owes " + P_Economy.ef(owes)
                 + ", target " + P_Economy.ef(target) + "); upkeep " + P_Economy.ef(upkeep_collected)
                 + ", swept " + P_Economy.ef(swept) + ", seeded " + P_Economy.ef(seeded)
                 + ", dividends " + P_Economy.ef(dividends) + " of " + P_Economy.ef(pool)
-                + ", arrears " + P_Economy.ef(arrears_total));
+                + ", arrears " + P_Economy.ef(arrears_total) + ", box rent " + P_Economy.ef(boxes[0])
+                + (boxes[1] > 0.0D ? " (" + (int) boxes[1] + " box(es) lapsed)" : ""));
         if (central_end < owes) {
             Util.cinform(AnsiColor.RED + "[Postal] Central holds less than it owes in refunds ("
                     + P_Economy.ef(central_end) + " < " + P_Economy.ef(owes) + ").");

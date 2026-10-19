@@ -679,4 +679,32 @@ abstract class MailStoreContract {
         assertEquals(-1, other.last_stats_day()); // another server's rows are its own
         assertTrue(other.office_stats(0, 200).isEmpty());
     }
+
+    @Test
+    void boxesTakeTheLowestFreeNumberPerOffice() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID(), c = UUID.randomUUID();
+        assertEquals(1, store.rent_box("Testville", a, "Alex", 10L).number());
+        assertEquals(2, store.rent_box("testville", b, "Blair", 11L).number());
+        assertEquals(1, store.rent_box("riverside", c, "Casey", 12L).number()); // numbered per office
+        assertTrue(store.release_box("testville", 1));
+        assertFalse(store.release_box("testville", 1));
+        assertEquals(1, store.rent_box("testville", c, "Casey", 13L).number()); // a freed number is reused
+        assertEquals(3, store.rent_box("testville", a, "Alex", 14L).number());
+        assertEquals(List.of("riverside#1", "testville#1"), store.boxes_of(c).stream().map(x -> x.office() + "#" + x.number()).toList());
+        assertEquals(List.of(1, 2, 3), store.boxes("testville").stream().map(PoBox::number).toList());
+        assertEquals(4, store.boxes(null).size());
+    }
+
+    @Test
+    void aBoxKeepsItsArrearsAndIsThisServersOwn() {
+        UUID a = UUID.randomUUID();
+        store.rent_box("testville", a, "Alex", 10L);
+        store.set_box_arrears("testville", 1, 12.5, 2);
+        PoBox box = store.box("testville", 1).orElseThrow();
+        assertEquals(new PoBox("main", "testville", 1, a, "Alex", 10L, 12.5, 2), box);
+        assertTrue(store.box("testville", 2).isEmpty());
+        SqlMailStore other = new SqlMailStore(ds, "other", null, dialect());
+        assertTrue(other.boxes(null).isEmpty());
+        assertEquals(1, other.rent_box("testville", a, "Alex", 20L).number()); // another server's Testville
+    }
 }

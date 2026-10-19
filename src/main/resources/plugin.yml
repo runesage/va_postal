@@ -15,6 +15,10 @@ commands:
   postal:
     description: Administration and general help.
     usage: /postal <start/stop/admin/chests/talk/quiet/speed>
+  pobox:
+    description: Rent and manage a P.O. box at a post office.
+    usage: /pobox [rent <office> | release [office] | price <office> [amount|default] | list <office> | evict <office> <n>]
+    permission: postal.pobox
   addr:
     description: Used to address a book you are holding.
     usage: /addr <town> <address> [player]
@@ -130,6 +134,9 @@ permissions:
     default: true
   postal.deed.buy:
     description: Buy an address deed at a post office's counter.
+    default: true
+  postal.pobox:
+    description: Rent a P.O. box at a post office (/pobox).
     default: true
   postal.att:
     default: true

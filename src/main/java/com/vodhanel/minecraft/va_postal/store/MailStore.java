@@ -186,6 +186,26 @@ public interface MailStore extends AutoCloseable {
     /** This server's open offers whose time ran out by {@code now}. */
     List<Offer> offers_due(long now);
 
+    // ---- P.O. boxes (docs/design/po-boxes.md) ----------------------------------------------------------
+
+    /** Rents the lowest free box number at {@code office} (this server) to {@code renter}; the new lease. */
+    PoBox rent_box(String office, UUID renter, String renter_name, long now);
+
+    /** This server's box {@code number} at {@code office}, if it's rented. */
+    java.util.Optional<PoBox> box(String office, int number);
+
+    /** This server's boxes rented by {@code renter}, by office and number. */
+    List<PoBox> boxes_of(UUID renter);
+
+    /** This server's boxes at {@code office} ({@code office} null: every office), by office and number. */
+    List<PoBox> boxes(String office);
+
+    /** Sets a lease's arrears and the days they've been owed. */
+    void set_box_arrears(String office, int number, double arrears, int arrears_days);
+
+    /** Ends a lease; false if the box wasn't rented. */
+    boolean release_box(String office, int number);
+
     // ---- Office stats (docs/design/central-office.md §7) ---------------------------------------------
 
     /** This server's pickups, deliveries and losses in {@code [from, to)}, oldest first. */

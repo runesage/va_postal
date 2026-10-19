@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfEnvironmentVariable(named = "POSTAL_TEST_MYSQL_URL", matches = ".+")
 class MariaDbMailStoreTest extends MailStoreContract {
     private static final String[] TABLES = {"mail_event", "mail", "route_run", "postal_server", "directory_office",
-            "directory_address", "network_player", "deed", "office_offer", "office_stats", "schema_version"};
+            "directory_address", "network_player", "deed", "office_offer", "office_stats", "po_box", "schema_version"};
 
     @Override
     protected DataSource fresh_database() throws Exception {
