@@ -388,6 +388,37 @@ run_server "$WORK_DIR/phase22.log" \
     "postal award" "postal bank policy awards.bonus 1000000000" "postal award now" "postal bank policy awards.bonus 0" "postal board add award -3 -60 -3" \
     "data get block -3 -60 -3 front_text" "postal award" "sleep:2"
 
+# Phase 23: return to sender (issue #19), on one server. A letter from Home's owner for a server that doesn't exist
+# ("!" skips the directory) leaves on a fast ship and is never collected; after Network.Return_after_days (here about
+# 26 s) its own server brings it back, and the postman delivers it to the sender's mailbox, Home, with a "Returned to
+# sender" page, and it ends RETURNED.
+echo "== Phase 23: return to sender"
+python3 - "$CONFIG" "$OWNER_UUID" <<'PY'
+import re, sys
+path, uuid = sys.argv[1], sys.argv[2]
+text = open(path).read()
+i = text.rindex("Uuid: ")  # Home's owner (the last owner in the file): the letter's sender
+j = text.index("\n", i)
+text = text[:i] + "Uuid: " + uuid + text[j:]
+want = {"Poll_seconds": "3", "Departure_minutes": "0.1", "Transit_minutes": "0.05", "Return_after_days": "0.0003"}
+head, rest = text.split("\nNetwork:\n", 1)
+lines = rest.split("\n")
+for k, (key, value) in enumerate(list(want.items())):
+    for n, line in enumerate(lines):
+        if not line.startswith(" "):
+            break
+        if line.startswith("  " + key + ":"):
+            lines[n] = "  " + key + ": " + value
+            want.pop(key)
+            break
+for key, value in want.items():
+    lines.insert(0, "  " + key + ": " + value)
+open(path, "w").write(head + "\nNetwork:\n" + "\n".join(lines))
+PY
+run_server "$WORK_DIR/phase23.log" \
+    "postal start" "sleep:10" "postal testletter testville elsewhere:nowhere! home from:$OWNER_UUID" "sleep:240" \
+    "postal track last" "data get block 40 -60 0 Items" "postal stop" "sleep:5"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -670,6 +701,14 @@ check "phase22: a bonus Central can't spare is skipped" grep -q "Branch of the M
 check "phase22: the board's award panel shows Testville" \
     grep -qE -e "-3, -60, -3 has the following block data: .*BRANCH OF.*THE MONTH.*Testville" <(plain phase22)
 check "phase22: Testville is the holder" grep -q "Holder: Testville" <(plain phase22)
+check "phase23: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase23.log"
+check "phase23: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase23.log"
+check "phase23: the letter for another server is handed in" grep -q "Test letter .* handed in at Testville for elsewhere:" <(plain phase23)
+check "phase23: uncollected, it comes back" grep -q "goes back to main: elsewhere didn't collect it in time" <(plain phase23)
+check "phase23: it's returned to its sender, RETURNED" grep -qE "home from main:testville: RETURNED|: RETURNED" <(plain phase23)
+check "phase23: its history says why" grep -q "returned to sender: elsewhere didn't collect it in time" <(plain phase23)
+check "phase23: it's in the sender's mailbox with a Returned to sender page" \
+    grep -qE "40, -60, 0 has the following block data: .*Returned to sender" <(plain phase23)
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true

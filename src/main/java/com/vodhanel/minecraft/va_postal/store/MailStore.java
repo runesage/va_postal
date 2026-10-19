@@ -107,6 +107,20 @@ public interface MailStore extends AutoCloseable {
     List<MailRecord> outbound(String chest);
 
     /**
+     * Letters this server sent that wait in the network for another server and were due there before {@code before}:
+     * nobody collected them (docs/design/central-office.md, "Return to sender").
+     */
+    List<MailRecord> stranded(long before);
+
+    /**
+     * Changes where a letter is going (its server, office and address), its payload and when it's due, in one
+     * version-checked update; its state and custody stay as they are. A letter sent back to its sender is readdressed
+     * this way: the same row, no copies.
+     */
+    MailRecord readdress(MailRecord current, String dest_server, String dest_office, String dest_address, byte[] payload,
+                         long due_at, Actor actor, String detail);
+
+    /**
      * Phase 3 of handing a letter to the network ({@link #begin_move} to {@code IN_NETWORK}, the book out of
      * Central, then this): it's in the network, and arrives at {@code arrives_at} (epoch millis).
      */

@@ -367,6 +367,7 @@ public final class Network {
         busy = true;
         Bukkit.getScheduler().runTaskAsynchronously(VA_postal.plugin, () -> {
             try {
+                Returns.bring_back_stranded(store, System.currentTimeMillis()); // uncollected: back to their senders
                 List<MailRecord> out = store.outbound(key);
                 List<MailRecord> in = store.in_network();
                 last_out = out;
@@ -457,7 +458,8 @@ public final class Network {
             if (chest.firstEmpty() < 0) {
                 break; // Central is full: the rest wait in the network
             }
-            if (claim(store, chest, key, r)) {
+            MailRecord landing = Returns.on_arrival(store, r, transit_millis()); // null: for no office here, sent back
+            if (landing != null && claim(store, chest, key, landing)) {
                 received.merge(r.origin_server, 1, Integer::sum);
             }
         }

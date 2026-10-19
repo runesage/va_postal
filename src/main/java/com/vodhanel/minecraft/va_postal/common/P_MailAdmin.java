@@ -93,18 +93,40 @@ public final class P_MailAdmin {
      * at the from-office's chest, as a player would, so letter flows can be tested without one.
      */
     public static void testletter(CommandSender sender, String[] args) {
+        // "from:<uuid>": the letter's sender (for testing return to sender, which needs a sender with a mailbox).
+        UUID from_id = null;
+        java.util.List<String> kept = new java.util.ArrayList<>();
+        for (String a : args) {
+            if (a.toLowerCase().startsWith("from:")) {
+                try {
+                    from_id = UUID.fromString(a.substring(5));
+                } catch (IllegalArgumentException e) {
+                    send(sender, "&7'" + a.substring(5) + "' isn't a player's UUID.");
+                    return;
+                }
+            } else {
+                kept.add(a);
+            }
+        }
+        args = kept.toArray(new String[0]);
         if (args.length < 4) {
-            send(sender, "&7Usage: /postal testletter <from office> <to office|server:office> <to address> [player]");
+            send(sender, "&7Usage: /postal testletter <from office> <to office|server:office[!]> <to address> [player] [from:<uuid>]");
             return;
         }
         String from = C_Postoffice.town_complete(args[1]);
-        com.vodhanel.minecraft.va_postal.mail.Network.Office dest = com.vodhanel.minecraft.va_postal.mail.Network.resolve_office(args[2]).office();
+        // "server:office!" skips the directory, for an office the other server doesn't have (testing return to sender).
+        boolean unchecked = args[2].endsWith("!") && args[2].indexOf(':') > 0;
+        com.vodhanel.minecraft.va_postal.mail.Network.Office dest = unchecked
+                ? new com.vodhanel.minecraft.va_postal.mail.Network.Office(args[2].substring(0, args[2].indexOf(':')).toLowerCase(),
+                args[2].substring(args[2].indexOf(':') + 1, args[2].length() - 1).toLowerCase())
+                : com.vodhanel.minecraft.va_postal.mail.Network.resolve_office(args[2]).office();
         if ("null".equals(from) || dest == null) {
             send(sender, "&7Unknown post office. See /tlist (and /postal directory for other servers').");
             return;
         }
         String to = dest.office();
-        String address = dest.remote() ? com.vodhanel.minecraft.va_postal.mail.Network.remote_address(dest, args[3])
+        String address = unchecked ? args[3].toLowerCase()
+                : dest.remote() ? com.vodhanel.minecraft.va_postal.mail.Network.remote_address(dest, args[3])
                 : C_Address.addresses_complete(to, args[3]);
         if (address == null || "null".equals(address)) {
             send(sender, "&7Unknown address in " + dest.label() + ".");
@@ -124,7 +146,7 @@ public final class P_MailAdmin {
         String date = new SimpleDateFormat("MM/dd/yy HH:mm").format(new Date());
         String[] posted = post_letter(from, dest.server(), to, address, attention, attention_id, "Server", "Test letter",
                 "A test letter from " + Util.df(from) + ", posted " + date + ".",
-                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()));
+                com.vodhanel.minecraft.va_postal.store.Actor.admin(sender.getName()), from_id);
         if (posted[0] == null) {
             send(sender, "&7" + posted[1]);
             return;
@@ -140,6 +162,13 @@ public final class P_MailAdmin {
      */
     public static String[] post_letter(String from, String server, String to, String address, String attention, UUID attention_id,
                                        String author, String subject, String body, com.vodhanel.minecraft.va_postal.store.Actor actor) {
+        return post_letter(from, server, to, address, attention, attention_id, author, subject, body, actor, null);
+    }
+
+    /** As above, from {@code sender} (null: from the server, with no sender to return it to). */
+    public static String[] post_letter(String from, String server, String to, String address, String attention, UUID attention_id,
+                                       String author, String subject, String body, com.vodhanel.minecraft.va_postal.store.Actor actor,
+                                       UUID sender) {
         Block chest = office_chest(from);
         if (chest == null) {
             return new String[]{null, "Couldn't find " + from + "'s post office chest."};
@@ -150,7 +179,7 @@ public final class P_MailAdmin {
                 Book.makeFirstMailPageById(title, Util.df(address), attention, null, null, author, subject, date, null, attention_id),
                 body};
         ItemStack letter = new Book(title, Util.df(address), pages).generateItemStack();
-        letter = Letters.posted(letter, null, from, server, to, address, attention_id);
+        letter = Letters.posted(letter, sender, from, server, to, address, attention_id);
         if (!((Chest) chest.getState()).getInventory().addItem(letter).isEmpty()) {
             return new String[]{null, from + "'s post office chest is full."};
         }

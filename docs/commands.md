@@ -61,8 +61,8 @@ The mail store's health: SQLite or MySQL, the schema version, this server's id, 
 The network directory: the offices each server has published, with their address counts, or one server's offices and addresses. Each server republishes its own every minute when they change.
 ##### `whois <player>`
 Where the network last saw a player (server, online or when last seen), as `/addr` finds them.
-##### `testletter <from PostOffice> <to PostOffice|server:office> <address> [player]`
-Writes a tracked test letter and hands it in at the from-office, as a player would; the destination can be another server's office.
+##### `testletter <from PostOffice> <to PostOffice|server:office[!]> <address> [player]`
+Writes a tracked test letter and hands it in at the from-office, as a player would; the destination can be another server's office. With `!` after it (`beta:nowhere!`) the office isn't checked against the directory, to test a letter for an office the other server doesn't have (it comes back: return to sender).
 ##### `testletter <from PostOffice> <to PostOffice> <address>`
 Writes a tracked test letter and hands it in at the from-office's chest, as a player would. For testing routes without a player.
 ##### `deed <give | sell | apply | list | names | reissue | expire | test> ...`

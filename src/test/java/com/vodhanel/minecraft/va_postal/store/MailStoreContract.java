@@ -679,4 +679,41 @@ abstract class MailStoreContract {
         assertEquals(-1, other.last_stats_day()); // another server's rows are its own
         assertTrue(other.office_stats(0, 200).isEmpty());
     }
+
+    /** A letter from this server ("main") to {@code dest_server}, waiting in the network, due there at {@code due}. */
+    private MailRecord in_network_to(String dest_server, long due) {
+        MailRecord r = store.create(MailRecord.new_letter(UUID.randomUUID(), "main", dest_server, "Testville", "Riverside", "Mill",
+                UUID.randomUUID(), null, "{}".getBytes(StandardCharsets.UTF_8), 4440, 1L, null), Actor.system("test"), "posted");
+        MailRecord c = store.transition(r, MailState.AT_CENTRAL, Custody.chest("central"), Actor.system("t"), null);
+        MailRecord moving = store.begin_move(c, MailState.IN_NETWORK, Custody.NONE, Actor.central(), null);
+        return store.depart(moving, due, Actor.central(), "left");
+    }
+
+    @Test
+    void lettersNobodyCollectedAreStranded() {
+        MailRecord r = in_network_to("other", 1000L);
+        assertEquals(List.of(r.id), store.stranded(1001L).stream().map(m -> m.id).toList());
+        assertTrue(store.stranded(1000L).isEmpty()); // not yet overdue
+        SqlMailStore other = new SqlMailStore(ds, "other", null, dialect());
+        assertTrue(other.stranded(Long.MAX_VALUE).isEmpty()); // only the sender's server sees it as stranded
+    }
+
+    @Test
+    void readdressSendsALetterBackAsTheSameRow() {
+        MailRecord r = in_network_to("other", 1000L);
+        byte[] payload = "{\"returned\":\"no such office\"}".getBytes(StandardCharsets.UTF_8);
+        MailRecord back = store.readdress(r, "main", "Testville", "Home", payload, 2000L, Actor.central(), "returned");
+        assertEquals(r.version + 1, back.version);
+        assertEquals("main", back.dest_server);
+        assertEquals("testville", back.dest_office);
+        assertEquals("home", back.dest_address);
+        assertEquals(MailState.IN_NETWORK, back.state);
+        assertEquals(2000L, back.due_at);
+        assertArrayEquals(payload, back.payload);
+        assertEquals(List.of(back.id), store.in_network().stream().map(m -> m.id).toList()); // now for this server to claim
+        assertTrue(store.stranded(Long.MAX_VALUE).isEmpty());
+        assertThrows(ConflictException.class,
+                () -> store.readdress(r, "main", "x", null, payload, 0L, Actor.central(), "stale")); // the old version
+        assertEquals("returned", store.history(r.id).get(store.history(r.id).size() - 1).detail);
+    }
 }
