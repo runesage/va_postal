@@ -222,6 +222,8 @@ is a title and three short lines:
 - the Branch of the Month and inspection results will be panels of their own when they're built.
 
 The board is redrawn every hour after the stats roll-up, and at once when the rates change or an office opens.
+Right-clicking a sign puts its panel in full in the player's chat, since a sign has room for so little: every rate
+(with the address price and the maximum discount), the leaderboards' top ten, the notices untruncated.
 Its signs are waxed so nobody edits them, and Central's protection covers them like its chest and sign. A sign that's
 gone is dropped from the board, with a line in the console.
 

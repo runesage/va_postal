@@ -6,6 +6,14 @@ Displays a menu with commands available to the player.
 Permissions: `none`
 On a network of servers: when the mail ship (or whatever `Network.Vehicle` calls it) next leaves for the other servers, how many letters are waiting at Central for it, what's on its way here, and the other servers.
 <br>
+#### `/postal stats [PostOffice] [days] | refresh`
+Permissions: `none` (`refresh`: `postal.admin`)
+The post offices' leaderboards over the last `Settings.Stats.Period_days` (default 30) or the days given: the busiest (most deliveries), the most punctual (share delivered on time) and the fewest losses (letters gone missing while the office held them); offices need `Settings.Stats.Min_deliveries` (default 5) deliveries to rank on the last two. With an office, its own numbers: picked up, delivered, lost, on time and the average time from pickup to delivery. The numbers come from the mail store's history, summarised every hour; `refresh` summarises it now. Also on Central's counter (*Leaderboards*). See `docs/design/central-office.md` §7.
+<br>
+#### `/postal board add [panel] [x y z [world]] | remove [x y z [world]] | list | refresh`
+Permissions: `postal.admin`
+Central's notice board: wall signs within `Settings.Board.Max_distance` (default 32) blocks of Central's chest, each showing one panel: `postage` (letter rates), `parcels` (parcel rates and the COD surcharge), `busiest`, `on_time`, `fewest_lost` (the leaderboards of `/postal stats`) or `notices` (the latest three, dated: rate changes, offices opening). `add` puts the sign you look at (or the one at the coordinates) on the board, showing the panel named or else the next one the board doesn't show yet; `remove` takes it off. The signs are redrawn every hour with the stats and at once when the rates change or an office opens; they're waxed, and Central's protection covers them. Anyone can right-click a sign for its panel in full in chat: every rate, the leaderboards' top ten, the notices in full. See `docs/design/central-office.md` §6.
+<br>
 #### `/postal <start/stop/admin/chests/talk/quiet/speed>`
 Permissions: `postal.admin`
 Administrator commands for postal:
