@@ -4,8 +4,8 @@
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
 and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
 player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4); office stats
-and the leaderboards, in chat and on Central's counter (§7); the notice board and Postal maps (§6). Next: Branch of the
-Month (§6). Address deeds
+and the leaderboards, in chat and on Central's counter (§7); the notice board, Postal maps and Branch of the Month (§6).
+Next: inspections (§5). Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
@@ -249,12 +249,20 @@ Postal draws its own maps into ordinary map items (`maps/`), in place of the van
 
 ### Branch of the Month
 
-Each period (`Awards.Period_days`, default 30), the office with the best score gets a plaque on the notice
-board and an optional bonus from Central (`Awards.Bonus`, default 0).
+*Built.*
 
-- The score combines deliveries, on-time rate and losses, with configurable weights.
-- The economy is closed, so the bonus is paid only from Central's money **above its target**, the same
-  money the dividend comes from. It is skipped when there isn't enough.
+Each period (`Settings.Awards.Period_days`, default 30, counted from the first time the server runs with it), the
+office with the best score over the period is named Branch of the Month: announced to the server, posted as a notice,
+and shown on the notice board's `award` panel. `/postal award` shows the holder and who leads this period; an admin
+can name one at once with `/postal award now`.
+
+- The score adds three parts, each weighted (`Settings.Awards.Weights.Deliveries`, `On_time`, `Losses`, 1 each): the
+  office's deliveries as a share of the busiest office's, its on-time share, and its kept share (one less lost of
+  delivered and lost). Offices need `Settings.Stats.Min_deliveries` deliveries in the period. Ties go to the busier
+  office.
+- The economy is closed, so the bonus (`Settings.Awards.Bonus`, default 0, *policy* `awards.bonus`) is paid only from
+  Central's money **above its target**, the same money the dividend comes from (`AWARD` in the flow report). With too
+  little there it's skipped, with a line in the console.
 
 ## 7. Stats
 

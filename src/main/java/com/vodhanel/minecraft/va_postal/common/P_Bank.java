@@ -496,6 +496,7 @@ public final class P_Bank {
             SETTINGS.put(r[0], new Setting(r[1], 0, Double.MAX_VALUE));
         }
         SETTINGS.put("rates.max_discount", new Setting("economy.rates.max_discount", 0, 100));
+        SETTINGS.put("awards.bonus", new Setting("settings.awards.bonus", 0, Double.MAX_VALUE));
     }
 
     /** {@code /postal bank policy [<setting> <value>]}: show or change the economy dials, saved to config. */

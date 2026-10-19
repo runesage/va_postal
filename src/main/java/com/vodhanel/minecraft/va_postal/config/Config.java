@@ -228,6 +228,12 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.board.max_distance"), 32);
         // Postal maps (docs/design/central-office.md §6): what one costs at a counter.
         VA_postal.plugin.getConfig().addDefault(path_format("settings.maps.price"), "10");
+        // Branch of the Month (docs/design/central-office.md §6): how often, the bonus from Central's surplus, the weights.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.awards.period_days"), 30);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.awards.bonus"), "0");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.awards.weights.deliveries"), 1.0D);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.awards.weights.on_time"), 1.0D);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.awards.weights.losses"), 1.0D);
         // Office sales through Central: the fee on a sale between players, and how long an offer stands.
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.transfer_rate"), "0.05");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.offer_days"), 3);

@@ -36,7 +36,7 @@ public final class NoticeBoard {
 
     /** What a sign shows. */
     public enum Panel {
-        POSTAGE, PARCELS, BUSIEST, ON_TIME, FEWEST_LOST, NOTICES;
+        POSTAGE, PARCELS, BUSIEST, ON_TIME, FEWEST_LOST, NOTICES, AWARD;
 
         static Panel parse(String s) {
             for (Panel p : values()) {
@@ -197,7 +197,7 @@ public final class NoticeBoard {
                 continue;
             }
             kept.add(e);
-            if (standings == null && e.panel().ordinal() >= Panel.BUSIEST.ordinal() && e.panel() != Panel.NOTICES) {
+            if (standings == null && (e.panel() == Panel.BUSIEST || e.panel() == Panel.ON_TIME || e.panel() == Panel.FEWEST_LOST)) {
                 try {
                     standings = Stats.standings(Stats.period_days());
                 } catch (StoreException ex) {
@@ -234,6 +234,11 @@ public final class NoticeBoard {
                     s -> Math.round(s.on_time_rate() * 100.0D) + "%");
             case FEWEST_LOST -> board("&1&lFEWEST LOST", OfficeStats.fewest_losses(standings, Stats.min_deliveries(), 3),
                     s -> Integer.toString(s.lost()));
+            case AWARD -> {
+                String[] h = com.vodhanel.minecraft.va_postal.stats.Awards.holder();
+                yield h == null ? new String[]{"&6&lBRANCH OF", "&6&lTHE MONTH", "", "&8none yet"}
+                        : new String[]{"&6&lBRANCH OF", "&6&lTHE MONTH", fit(DeedDocument.display(h[0])), fit(h[1])};
+            }
             case NOTICES -> {
                 List<String> n = VA_postal.plugin.getConfig().getStringList(path("notices"));
                 String[] out = {"&1&lNOTICES", "", "", ""};
@@ -308,6 +313,7 @@ public final class NoticeBoard {
                 }
                 send(sender, "&8One office's numbers: /postal stats <office>");
             }
+            case AWARD -> com.vodhanel.minecraft.va_postal.stats.Awards.command(sender, new String[]{"award"});
             case NOTICES -> {
                 List<String> n = VA_postal.plugin.getConfig().getStringList(path("notices"));
                 send(sender, "&6[Postal] Notices");

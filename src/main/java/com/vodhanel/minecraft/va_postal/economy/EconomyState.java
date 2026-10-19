@@ -35,7 +35,7 @@ public final class EconomyState {
         POSTAGE("in"), SHIPPING("in"), COD_SURCHARGE("in"), DISTRIBUTION("in"), OFFICE_PURCHASE("in"),
         ADDRESS_PURCHASE("in"), DEPOSIT("in"), TRANSFER_FEE("in"), MAP_SALE("in"),
         REFUND("out"), WITHDRAWAL("out"), POSTAGE_REFUND("out"),
-        UPKEEP("internal"), SWEEP("internal"), SEED("internal"), DIVIDEND("internal");
+        UPKEEP("internal"), SWEEP("internal"), SEED("internal"), DIVIDEND("internal"), AWARD("internal");
 
         public final String direction;
 
