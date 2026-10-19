@@ -4,7 +4,8 @@
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
 and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
 player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4); office stats
-and the leaderboards, in chat and on Central's counter (§7). Next: the notice board, maps and Branch of the Month (§6). Address deeds
+and the leaderboards, in chat and on Central's counter (§7); the notice board (§6). Next: maps and Branch of the Month
+(§6). Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
@@ -208,13 +209,26 @@ Central watches the branches and sends an inspector to any that are flagged.
 
 ### Notice board
 
-Signs, and item frames with maps, on a wall at Central. They're registered by looking at the wall and
-running `/postal board add`, and refreshed every Postal day:
+*Built (signs; the map frames come with the maps).*
 
-- current base rates;
-- the leaderboards (busiest office, best on-time rate, fewest losses);
-- the Branch of the Month (§6);
-- recent notices and inspection results.
+Signs on a wall at Central, each showing one panel. An admin puts them on the board by looking at each and running
+`/postal board add [panel]` (or giving its coordinates from the console); the sign must be within
+`Settings.Board.Max_distance` blocks (default 32) of Central's chest. A sign line holds 15 characters, so each panel
+is a title and three short lines:
+
+- `postage` and `parcels`: the current base rates;
+- `busiest`, `on_time` and `fewest_lost`: the top three of each leaderboard (§7);
+- `notices`: the latest three, dated, in shorthand (a change of rates, an office opening);
+- the Branch of the Month and inspection results will be panels of their own when they're built.
+
+The board is redrawn every hour after the stats roll-up, and at once when the rates change or an office opens.
+Right-clicking a sign puts its panel in full in the player's chat, since a sign has room for so little: every rate
+(with the address price and the maximum discount), the leaderboards' top ten, the notices written out. Each notice
+has two forms: shorthand for the sign (`19/10 New rates`, `19/10 Open Brookfield`) and the full text for chat
+(`A letter, to another office: was $5.00, now $9.00`, `The Brookfield Post Office opened, chartered to Alex`); the
+sign shows the latest three, chat the last ten.
+Its signs are waxed so nobody edits them, and Central's protection covers them like its chest and sign. A sign that's
+gone is dropped from the board, with a line in the console.
 
 ### Maps
 

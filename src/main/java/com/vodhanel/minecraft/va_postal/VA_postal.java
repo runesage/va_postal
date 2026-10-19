@@ -356,6 +356,7 @@ public class VA_postal extends JavaPlugin {
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.deed.DeedListener(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.ClerkListener(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.CentralGuard(), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.board.BoardListener(), plugin);
         // Unused deeds lapse when their time is up, with or without an economy (docs/design/deeds.md §4).
         plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
             try {
@@ -370,8 +371,8 @@ public class VA_postal extends JavaPlugin {
             } catch (com.vodhanel.minecraft.va_postal.store.StoreException e) {
                 Util.cinform("[Postal] Couldn't expire deeds: " + e.getMessage());
             }
-            // The leaderboards' numbers (docs/design/central-office.md §7), on the store's thread.
-            com.vodhanel.minecraft.va_postal.stats.Stats.roll_up(null);
+            // The leaderboards' numbers (docs/design/central-office.md §7), on the store's thread; then the notice board.
+            com.vodhanel.minecraft.va_postal.stats.Stats.roll_up(n -> com.vodhanel.minecraft.va_postal.board.NoticeBoard.refresh());
         }, 1200L, 72000L);
 
         Cmdexecutor executor = new Cmdexecutor(this);

@@ -352,6 +352,25 @@ run_server "$WORK_DIR/phase19.log" \
     "postal stats refresh" "sleep:5" "postal stats" "postal stats testville" "postal stats testville 1" \
     "postal stats nowhere" "sleep:2"
 
+# Phase 20: Central's notice board (docs/design/central-office.md §6). Six wall signs on a stone wall north-west of
+# Central's chest: the first two take the next panels (postage, parcels), the rest are named. A sign far from Central
+# and a block that isn't a sign are refused. A rate change posts a notice; the signs show the rates, Testville on the
+# busiest board, the notice, and are waxed. One is taken off the board.
+echo "== Phase 20: the notice board"
+BOARD_SIGNS=()
+for xy in "-5 -59" "-4 -59" "-3 -59" "-5 -60" "-4 -60" "-3 -60"; do
+    BOARD_SIGNS+=("setblock ${xy% *} ${xy#* } -3 minecraft:oak_wall_sign[facing=south]")
+done
+run_server "$WORK_DIR/phase20.log" \
+    "fill -5 -60 -4 -3 -59 -4 minecraft:stone" "${BOARD_SIGNS[@]}" \
+    "setblock 60 -60 60 minecraft:oak_sign" "postal board add 60 -60 60" "postal board add 10 -60 10" \
+    "postal stats refresh" "sleep:5" \
+    "postal board add -5 -59 -3" "postal board add -4 -59 -3" "postal board add busiest -3 -59 -3" \
+    "postal board add on_time -5 -60 -3" "postal board add fewest_lost -4 -60 -3" "postal board add notices -3 -60 -3" \
+    "postal bank policy rates.letter_local 5" "postal board list" \
+    "data get block -5 -59 -3 front_text" "data get block -3 -59 -3 front_text" "data get block -3 -60 -3 front_text" \
+    "data get block -3 -59 -3 is_waxed" "postal board remove -3 -60 -3" "postal board list" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -602,6 +621,20 @@ check "phase19: Testville leads" grep -qE "1\. Testville [0-9]+ delivered" <(pla
 check "phase19: Testville's numbers show its deliveries" grep -qE "Delivered: [1-9][0-9]*" <(plain phase19)
 check "phase19: and the letter it lost" grep -qE "Lost: [1-9]" <(plain phase19)
 check "phase19: an unknown office is refused" grep -q "No post office matches 'nowhere'" <(plain phase19)
+check "phase20: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase20.log"
+check "phase20: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase20.log"
+check "phase20: a sign far from Central is refused" grep -q "The notice board goes at Central" <(plain phase20)
+check "phase20: a block that isn't a sign is refused" grep -q "That isn't a sign" <(plain phase20)
+check "phase20: the first sign takes the postage panel" grep -q "now shows postage" <(plain phase20)
+check "phase20: the next takes the parcels panel" grep -q "now shows parcels" <(plain phase20)
+check "phase20: six signs on the board" grep -q "Notice board: 6 sign(s)" <(plain phase20)
+check "phase20: the postage sign shows the new local rate" \
+    grep -qE -e "-5, -59, -3 has the following block data: .*POSTAGE.*Local +[^0-9 ]*5" <(plain phase20)
+check "phase20: the busiest board shows Testville" grep -qE -e "-3, -59, -3 has the following block data: .*BUSIEST.*1 Testville" <(plain phase20)
+check "phase20: the notices show the rate change" grep -qE -e "-3, -60, -3 has the following block data: .*NOTICES.*[0-9]+/[0-9]+ New rates" <(plain phase20)
+check "phase20: the signs show colours, not codes" no_match "messages: \\[\"&1" <(plain phase20)
+check "phase20: the signs are waxed" grep -qE -e "-3, -59, -3 has the following block data: 1b" <(plain phase20)
+check "phase20: a sign is taken off the board" grep -q "Notice board: 5 sign(s)" <(plain phase20)
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true
