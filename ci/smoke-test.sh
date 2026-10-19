@@ -631,7 +631,8 @@ check "phase20: six signs on the board" grep -q "Notice board: 6 sign(s)" <(plai
 check "phase20: the postage sign shows the new local rate" \
     grep -qE -e "-5, -59, -3 has the following block data: .*POSTAGE.*Local +[^0-9 ]*5" <(plain phase20)
 check "phase20: the busiest board shows Testville" grep -qE -e "-3, -59, -3 has the following block data: .*BUSIEST.*1 Testville" <(plain phase20)
-check "phase20: the notices show the rate change" grep -qE -e "-3, -60, -3 has the following block data: .*NOTICES.*New postage" <(plain phase20)
+check "phase20: the notices show the rate change" grep -qE -e "-3, -60, -3 has the following block data: .*NOTICES.*[0-9]+/[0-9]+ New rates" <(plain phase20)
+check "phase20: the signs show colours, not codes" no_match "messages: \\[\"&1" <(plain phase20)
 check "phase20: the signs are waxed" grep -qE -e "-3, -59, -3 has the following block data: 1b" <(plain phase20)
 check "phase20: a sign is taken off the board" grep -q "Notice board: 5 sign(s)" <(plain phase20)
 echo

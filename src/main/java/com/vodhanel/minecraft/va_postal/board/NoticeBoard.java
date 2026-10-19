@@ -141,11 +141,11 @@ public final class NoticeBoard {
 
     // ---- Notices ----------------------------------------------------------------------------
 
-    /** Posts a short notice (it fits a sign line after the date) and refreshes the board. */
+    /** Posts a short notice (a sign line holds the date and 9 or so characters more) and refreshes the board. */
     public static void notice(String text) {
         List<String> notices = new ArrayList<>(VA_postal.plugin.getConfig().getStringList(path("notices")));
-        String date = new SimpleDateFormat("d MMM", Locale.ROOT).format(new Date());
-        notices.add(0, date + ": " + text);
+        String date = new SimpleDateFormat("d/M", Locale.ROOT).format(new Date());
+        notices.add(0, date + " " + text);
         while (notices.size() > MAX_NOTICES) {
             notices.remove(notices.size() - 1);
         }
@@ -185,7 +185,7 @@ public final class NoticeBoard {
             }
             String[] lines = lines(e.panel(), standings);
             for (int i = 0; i < 4; i++) {
-                Text.line(sign, i, lines[i]);
+                Text.line(sign, i, Text.color(lines[i]));
             }
             sign.setWaxed(true);
             sign.update(true, false);

@@ -251,7 +251,7 @@ public final class Charters {
             }
         }
         Util.cinform("[Postal] Charter " + deed.id() + ": " + deed.holder_name() + " opened the " + office + " post office");
-        com.vodhanel.minecraft.va_postal.board.NoticeBoard.notice("Open: " + DeedDocument.display(office));
+        com.vodhanel.minecraft.va_postal.board.NoticeBoard.notice("Open " + DeedDocument.display(office));
     }
 
     /** A burst of particles and a bell over the chest, and the news for everyone ({@code Charters.Effects}, {@code Announce}). */

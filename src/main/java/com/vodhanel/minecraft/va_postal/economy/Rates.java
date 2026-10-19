@@ -135,7 +135,7 @@ public final class Rates {
             set_pending(office, pending);
         }
         VA_postal.plugin.saveConfig();
-        com.vodhanel.minecraft.va_postal.board.NoticeBoard.notice("New postage");
+        com.vodhanel.minecraft.va_postal.board.NoticeBoard.notice("New rates");
     }
 
     /** The changes {@code office} hasn't had a notice of yet. */

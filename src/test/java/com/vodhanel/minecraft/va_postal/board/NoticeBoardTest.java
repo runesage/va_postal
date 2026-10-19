@@ -32,7 +32,7 @@ class NoticeBoardTest {
 
     @Test
     void longTextIsCutToASignLine() {
-        assertEquals("19 Oct: Open: B", NoticeBoard.fit("19 Oct: Open: Brookfield"));
+        assertEquals("19/10 Open Broo", NoticeBoard.fit("19/10 Open Brookfield"));
         assertEquals("short", NoticeBoard.fit("short"));
     }
 }
