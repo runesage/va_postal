@@ -22,10 +22,6 @@ Postal maps: map items Postal draws itself. The network map shows Central, every
 Permissions: `none` (`now`: `postal.admin`)
 Branch of the Month: the current holder, the office leading this period and the days to the next award. Every `Settings.Awards.Period_days` (default 30) the office with the best score over the period is named, announced to the server and on the notice board (`award` panel, and a notice). The score adds its deliveries as a share of the busiest office's, its on-time share and its kept share (one less lost of delivered and lost), weighted by `Settings.Awards.Weights.Deliveries`, `On_time` and `Losses` (1 each); offices need `Settings.Stats.Min_deliveries` deliveries. Central pays the winner `Settings.Awards.Bonus` (default 0; *policy* `awards.bonus`) only from its money above its target, and skips it otherwise. `now` names one at once. See `docs/design/central-office.md` §6.
 <br>
-#### `/postal map network|<PostOffice> [player] | frame [x y z [world]] | list`
-Permissions: `postal.admin`
-Postal maps: map items Postal draws itself. The network map shows Central, every office in its world and Central's routes out to them; an office map shows one office, its routes and addresses, with their names. `network` or an office gives one to you (or the player named); `frame` hangs a network map, fixed, in the item frame you look at (or the one at the coordinates), for the notice board; `list` lists the maps Postal draws. Players buy them at the counters: the network map at Central's (*The network*), an office's own at its counter (the office card), for `Settings.Maps.Price` (default 10, free without an economy), paid to Central. Maps keep working after a restart, and are redrawn every few minutes so they keep up with the network. See `docs/design/central-office.md` §6.
-<br>
 #### `/postal <start/stop/admin/chests/talk/quiet/speed>`
 Permissions: `postal.admin`
 Administrator commands for postal:
