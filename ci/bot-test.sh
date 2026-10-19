@@ -510,7 +510,7 @@ console "postal bank policy rates.letter_local 6"
 sleep 2
 check "right-clicking the postage sign gives every rate" bot_cmd "use -2 -59 5 north" 'CHAT .*A letter, to another server'
 sleep 1
-check "right-clicking the notices sign gives the notices in full" bot_cmd "use -1 -59 5 north" 'CHAT .*[0-9]+/[0-9]+ New rates'
+check "right-clicking the notices sign gives the notice in full" bot_cmd "use -1 -59 5 north" 'CHAT .*[0-9]+/[0-9]+ A letter, within an office: was .*, now '
 sleep 1
 check "a player can't break a notice board sign" bot_cmd "dig -2 -59 5" "CHAT .*The notice board belongs to the Post Office"
 console "gamemode survival $BOT_NAME"

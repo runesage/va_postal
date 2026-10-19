@@ -54,7 +54,8 @@ public final class NoticeBoard {
 
     /** A sign line fits 15 characters. */
     static final int WIDTH = 15;
-    private static final int MAX_NOTICES = 3;
+    /** Notices kept: the sign shows the latest three, a right-click all of them. */
+    private static final int MAX_NOTICES = 10;
 
     // ---- Registry ---------------------------------------------------------------------------
 
@@ -146,17 +147,32 @@ public final class NoticeBoard {
 
     // ---- Notices ----------------------------------------------------------------------------
 
-    /** Posts a short notice (a sign line holds the date and 9 or so characters more) and refreshes the board. */
-    public static void notice(String text) {
+    /**
+     * Posts a notice and refreshes the board: {@code short_text} for the sign (a line holds the date and about 9
+     * characters more), {@code full_text} for chat when the sign is right-clicked.
+     */
+    public static void notice(String short_text, String full_text) {
         List<String> notices = new ArrayList<>(VA_postal.plugin.getConfig().getStringList(path("notices")));
         String date = new SimpleDateFormat("d/M", Locale.ROOT).format(new Date());
-        notices.add(0, date + " " + text);
+        notices.add(0, date + "|" + short_text.replace("|", "/") + "|" + full_text.replace("|", "/"));
         while (notices.size() > MAX_NOTICES) {
             notices.remove(notices.size() - 1);
         }
         VA_postal.plugin.getConfig().set(path("notices"), notices);
         VA_postal.plugin.saveConfig();
         refresh();
+    }
+
+    /** A stored notice as the sign shows it: the date and its short text. */
+    static String short_notice(String stored) {
+        String[] p = stored.split("\\|", 3);
+        return p.length == 3 ? p[0] + " " + p[1] : stored;
+    }
+
+    /** A stored notice as chat shows it: the date and its full text. */
+    static String full_notice(String stored) {
+        String[] p = stored.split("\\|", 3);
+        return p.length == 3 ? p[0] + " " + p[2] : stored;
     }
 
     // ---- Drawing ----------------------------------------------------------------------------
@@ -222,7 +238,7 @@ public final class NoticeBoard {
                 List<String> n = VA_postal.plugin.getConfig().getStringList(path("notices"));
                 String[] out = {"&1&lNOTICES", "", "", ""};
                 for (int i = 0; i < 3; i++) {
-                    out[i + 1] = i < n.size() ? fit(n.get(i)) : (i == 0 && n.isEmpty() ? "&8none yet" : "");
+                    out[i + 1] = i < n.size() ? fit(short_notice(n.get(i))) : (i == 0 && n.isEmpty() ? "&8none yet" : "");
                 }
                 yield out;
             }
@@ -299,7 +315,7 @@ public final class NoticeBoard {
                     send(sender, "&8None yet.");
                 }
                 for (String line : n) {
-                    send(sender, "&7" + line);
+                    send(sender, "&7" + full_notice(line));
                 }
             }
         }

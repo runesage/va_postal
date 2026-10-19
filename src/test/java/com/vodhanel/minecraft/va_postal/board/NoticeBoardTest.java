@@ -35,4 +35,13 @@ class NoticeBoardTest {
         assertEquals("19/10 Open Broo", NoticeBoard.fit("19/10 Open Brookfield"));
         assertEquals("short", NoticeBoard.fit("short"));
     }
+
+    @Test
+    void aNoticeIsShortOnTheSignAndFullInChat() {
+        String stored = "19/10|New rates|A letter, to another office: was $5.00, now $9.00";
+        assertEquals("19/10 New rates", NoticeBoard.short_notice(stored));
+        assertEquals("19/10 A letter, to another office: was $5.00, now $9.00", NoticeBoard.full_notice(stored));
+        assertEquals("19 Oct: Open: B", NoticeBoard.short_notice("19 Oct: Open: B")); // stored before notices had two forms
+        assertEquals("19 Oct: Open: B", NoticeBoard.full_notice("19 Oct: Open: B"));
+    }
 }
