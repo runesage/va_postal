@@ -499,6 +499,20 @@ check "the attempt is logged" grep -q "PostalBot tried to break Central's chest"
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "execute if block 0 -60 0 minecraft:chest"
 check "Central's chest still stands" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+# Central's notice board (docs/design/central-office.md §6): right-clicking a sign gives its panel in full in chat; a
+# player (still deopped) can't break one.
+console "minecraft:fill -3 -60 6 -1 -59 6 minecraft:stone"
+console "minecraft:setblock -2 -59 5 minecraft:oak_wall_sign[facing=north]"
+console "minecraft:setblock -1 -59 5 minecraft:oak_wall_sign[facing=north]"
+console "postal board add postage -2 -59 5"
+console "postal board add notices -1 -59 5"
+console "postal bank policy rates.letter_local 6"
+sleep 2
+check "right-clicking the postage sign gives every rate" bot_cmd "use -2 -59 5 north" 'CHAT .*A letter, to another server'
+sleep 1
+check "right-clicking the notices sign gives the notices in full" bot_cmd "use -1 -59 5 north" 'CHAT .*[0-9]+/[0-9]+ New rates'
+sleep 1
+check "a player can't break a notice board sign" bot_cmd "dig -2 -59 5" "CHAT .*The notice board belongs to the Post Office"
 console "gamemode survival $BOT_NAME"
 console "op $BOT_NAME"
 console "postal stop"

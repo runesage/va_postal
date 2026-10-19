@@ -85,16 +85,21 @@ public final class NoticeBoard {
 
     /** True if {@code b} is one of the board's signs. */
     public static boolean is_board(Block b) {
+        return panel_at(b) != null;
+    }
+
+    /** The panel the board's sign {@code b} shows, or null if it isn't on the board. */
+    static Panel panel_at(Block b) {
         if (b == null || !Tag.ALL_SIGNS.isTagged(b.getType())) {
-            return false;
+            return null;
         }
         String key = key(b);
         for (Entry e : entries()) {
             if (e.location().equals(key)) {
-                return true;
+                return e.panel();
             }
         }
-        return false;
+        return null;
     }
 
     private static String key(Block b) {
@@ -252,6 +257,52 @@ public final class NoticeBoard {
     /** {@code s} cut to a sign line. */
     static String fit(String s) {
         return s.length() <= WIDTH ? s : s.substring(0, WIDTH);
+    }
+
+    // ---- In full -----------------------------------------------------------------------------
+
+    /** {@code panel} in full, in {@code sender}'s chat: what a sign has no room for. */
+    static void details(CommandSender sender, Panel panel) {
+        switch (panel) {
+            case POSTAGE, PARCELS -> {
+                send(sender, "&6[Postal] Postage rates");
+                if (!VA_postal.economy_configured) {
+                    send(sender, "&7Postage is free on this server.");
+                    return;
+                }
+                for (String line : com.vodhanel.minecraft.va_postal.economy.Rates.table()) {
+                    send(sender, line);
+                }
+                send(sender, "&7A new address: &ffrom " + P_Economy.ef(C_Economy.addr_purchase_price()) + " &8(offices set their own)");
+                send(sender, "&8Offices may take up to " + com.vodhanel.minecraft.va_postal.economy.Rates.discount_text_max()
+                        + " off the postage of mail they send: /postal office <office> discount");
+            }
+            case BUSIEST, ON_TIME, FEWEST_LOST -> {
+                int days = Stats.period_days();
+                List<OfficeStats.Standing> standings;
+                try {
+                    standings = Stats.standings(days);
+                } catch (StoreException e) {
+                    send(sender, "&7The records can't be read now.");
+                    return;
+                }
+                send(sender, "&6[Postal] Leaderboards &7(last " + days + " days)");
+                for (String line : Stats.boards(standings, 10)) {
+                    send(sender, line);
+                }
+                send(sender, "&8One office's numbers: /postal stats <office>");
+            }
+            case NOTICES -> {
+                List<String> n = VA_postal.plugin.getConfig().getStringList(path("notices"));
+                send(sender, "&6[Postal] Notices");
+                if (n.isEmpty()) {
+                    send(sender, "&8None yet.");
+                }
+                for (String line : n) {
+                    send(sender, "&7" + line);
+                }
+            }
+        }
     }
 
     // ---- /postal board ----------------------------------------------------------------------
