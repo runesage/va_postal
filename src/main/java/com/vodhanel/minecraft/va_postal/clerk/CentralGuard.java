@@ -48,7 +48,7 @@ public final class CentralGuard implements Listener {
             chest = Clerks.office_chest(Clerks.CENTRAL);
             sign = chest == null ? null : ChestManip.chest2sign_block(chest);
         }
-        return b.equals(chest) || b.equals(sign);
+        return b.equals(chest) || b.equals(sign) || com.vodhanel.minecraft.va_postal.board.NoticeBoard.is_board(b);
     }
 
     /**
@@ -59,9 +59,11 @@ public final class CentralGuard implements Listener {
         if (!protects(b) || player.hasPermission("postal.admin")) {
             return false;
         }
-        Util.pinform(player, "&7Central's chest and sign belong to the Post Office: only staff can take them down.");
+        boolean board = com.vodhanel.minecraft.va_postal.board.NoticeBoard.is_board(b);
+        Util.pinform(player, board ? "&7The notice board belongs to the Post Office: only staff can take it down."
+                : "&7Central's chest and sign belong to the Post Office: only staff can take them down.");
         if (GetConfig.bool_value(VA_postal.plugin.getConfig(), GetConfig.path_format("settings.central.report_grief"), true)) {
-            Util.cinform("[Postal] " + player.getName() + " tried to break Central's " + (b.equals(chest) ? "chest" : "sign")
+            Util.cinform("[Postal] " + player.getName() + " tried to break Central's " + (b.equals(chest) ? "chest" : board ? "notice board" : "sign")
                     + " at " + b.getX() + " " + b.getY() + " " + b.getZ());
         }
         return true;
