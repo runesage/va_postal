@@ -357,6 +357,14 @@ public class VA_postal extends JavaPlugin {
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.ClerkListener(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.CentralGuard(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.board.BoardListener(), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.maps.PostalMaps(), plugin);
+        // Postal maps drawn before a restart get their renderers back (docs/design/central-office.md §6).
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            int maps = com.vodhanel.minecraft.va_postal.maps.PostalMaps.attach_all();
+            if (maps > 0) {
+                Util.cinform("[Postal] " + maps + " Postal map(s) ready.");
+            }
+        });
         // Unused deeds lapse when their time is up, with or without an economy (docs/design/deeds.md §4).
         plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
             try {

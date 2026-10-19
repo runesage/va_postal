@@ -38,6 +38,7 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.C
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.ClientboundContainerSetContentPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.ClientboundContainerSetSlotPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.ClientboundOpenScreenPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.level.ClientboundMapItemDataPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.level.ClientboundSetDefaultSpawnPositionPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundChatCommandPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundPlayerLoadedPacket;
@@ -104,6 +105,8 @@ public final class Bot {
 
     private static final Map<Integer, Seen> entities = new ConcurrentHashMap<>();
     private static volatile int container = -1;
+    /** What each map last showed, so a map is logged only when it changes. */
+    private static final Map<Integer, String> maps = new ConcurrentHashMap<>();
     private static volatile int state_id = 0;
     private static volatile List<Button> buttons = List.of();
     private static final Map<String, String> fields = new LinkedHashMap<>();
@@ -286,6 +289,21 @@ public final class Bot {
                     String n = item_name(p.getItem());
                     if (n != null) {
                         event("ITEM", p.getContainerId() + "/" + p.getSlot() + " " + n);
+                    }
+                } else if (packet instanceof ClientboundMapItemDataPacket p) {
+                    // A map's pixels and labels: logged when they change, e.g. "MAP 3 pixels=16384 labels=Central,Testville".
+                    List<String> labels = new ArrayList<>();
+                    if (p.getIcons() != null) {
+                        for (var icon : p.getIcons()) {
+                            if (icon.getDisplayName() != null) {
+                                labels.add(plain(icon.getDisplayName()));
+                            }
+                        }
+                    }
+                    int pixels = p.getData() == null ? 0 : p.getData().getData().length;
+                    String seen = "pixels=" + pixels + " labels=" + String.join(",", labels);
+                    if (pixels > 0 && !seen.equals(maps.put(p.getMapId(), seen))) {
+                        event("MAP", p.getMapId() + " " + seen);
                     }
                 } else if (packet instanceof ClientboundContainerClosePacket p) {
                     event("CLOSED", String.valueOf(p.getContainerId()));

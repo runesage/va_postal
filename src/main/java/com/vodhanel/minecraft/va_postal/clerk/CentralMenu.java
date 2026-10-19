@@ -141,6 +141,11 @@ final class CentralMenu implements Menu {
             player.openInventory(new SalesMenus.Offers(offers).getInventory());
             return;
         }
+        if (slot == NETWORK) {
+            player.closeInventory();
+            com.vodhanel.minecraft.va_postal.maps.PostalMaps.buy(player, null);
+            return;
+        }
         if (slot == LEADERS) {
             player.closeInventory();
             com.vodhanel.minecraft.va_postal.stats.Stats.command(player, new String[]{"stats"});
@@ -198,7 +203,9 @@ final class CentralMenu implements Menu {
         }
         return CounterMenu.item(Material.FILLED_MAP, "&6The network",
                 "&7Post offices here: &f" + offices.size(),
-                "&7Addresses: &f" + addresses);
+                "&7Addresses: &f" + addresses,
+                "",
+                "&7Click to buy a map of the network: &f" + com.vodhanel.minecraft.va_postal.maps.PostalMaps.price_text());
     }
 
     private static List<String> owned(UUID player) {

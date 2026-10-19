@@ -4,8 +4,8 @@
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
 and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
 player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4); office stats
-and the leaderboards, in chat and on Central's counter (§7); the notice board (§6). Next: maps and Branch of the Month
-(§6). Address deeds
+and the leaderboards, in chat and on Central's counter (§7); the notice board and Postal maps (§6). Next: Branch of the
+Month (§6). Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
@@ -232,14 +232,20 @@ gone is dropped from the board, with a line in the console.
 
 ### Maps
 
-Paper's map API draws Postal maps into ordinary map items:
+*Built.*
 
-- **Network map:** Central, every office and the routes between them. Bought from the clerk, or hung on the
-  notice board.
-- **Office map:** one office's area, with its addresses and route. Sold at the counter, and a local owner
-  could later sell them at their own office.
+Postal draws its own maps into ordinary map items (`maps/`), in place of the vanilla renderer:
 
-The renderers are attached again when a map loads, so the maps keep working after a restart.
+- **Network map:** Central (blue banner), every office in Central's world (red banners, named) and Central's routes out
+  to them (dashed). Bought from Central's clerk (*The network* card), given by an admin (`/postal map network`), or
+  hung on the notice board (`/postal map frame`, fixed in an item frame).
+- **Office map:** one office's area, with its routes walked from the office through every waypoint and its addresses
+  (white banners, named). Sold at the office's counter (the office card); a local owner could later sell them at
+  their own price.
+- Both cost `Settings.Maps.Price` (default 10, free without an economy), paid to Central (`MAP_SALE` in the flow
+  report).
+- Each map's id is recorded (`Maps.m<id>` in config), so its renderer is put back when it loads again after a
+  restart; a map is redrawn every few minutes, so it keeps up with new offices and addresses.
 
 ### Branch of the Month
 
