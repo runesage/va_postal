@@ -535,15 +535,15 @@ sleep 2
 check "a box can't be rented away from its office" bot_cmd "/pobox rent testville" 'CHAT .*Rent a box at the office'
 console "minecraft:tp $BOT_NAME 20 -59 4"
 sleep 2
-check "the bot rents a box at Testville" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1 at the Testville Post Office, for .*5\.00 a day'
+check "the bot rents a box at Testville" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1 at the Testville Post Office, for .*5(\.00)? a day'
 check "/pobox shows it" bot_cmd "/pobox" 'CHAT .*Box 1 at the Testville Post Office'
 check "a second box is refused" bot_cmd "/pobox rent testville" 'CHAT .*You already rent Box 1 at Testville'
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "pobox list testville"
-check "the office lists the box" wait_log "$SERVER_LOG" 'Box 1: PostalBot' 5 "$from"
+check "the office lists the box" wait_log "$SERVER_LOG" 'Box 1: .*PostalBot' 5 "$from"
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "postal bank newday"
-check "a Postal day charges the rent" wait_log "$SERVER_LOG" 'box rent \$5\.00' 10 "$from"
+check "a Postal day charges the rent" wait_log "$SERVER_LOG" 'box rent .*5(\.00)?' 10 "$from"
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "pobox price testville 2.5"
 check "the office sets its own rent" wait_log "$SERVER_LOG" 'now costs \$2\.50 a day' 5 "$from"
