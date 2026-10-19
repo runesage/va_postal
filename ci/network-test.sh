@@ -175,7 +175,7 @@ echo "alpha's letter for beta:nowhere: ${R_ID:-none}"
 at_central() { # server-id mail-id: that letter is in the server's Central chest now
     [ -n "$2" ] || return 1
     say "$1" "data get block 0 -60 0 Items"
-    tail -n 5 "$WORK_DIR/$1.log" | grep -q "$2"
+    tail -n 5 "$WORK_DIR/$1.log" | grep "0, -60, 0 has the following block data" | grep -q "$2"
 }
 for _ in $(seq 1 40); do
     if [ "$R_ID" != "$A_ID" ] && at_central alpha "$R_ID"; then break; fi
