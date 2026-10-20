@@ -1,8 +1,8 @@
 # P.O. Boxes (design draft)
 
-Status: **being built.** Phase 1 (leases: `/pobox`, rent on the Postal day, arrears and lapses) and phase 2
-(letters to the cabinet, the take-only view) are done; next, returning a lapsed box's mail (phase 3, on the
-return-to-sender mechanism of issue #19). Independent of the Central Office design.
+Status: **being built.** Phase 1 (leases: `/pobox`, rent on the Postal day, arrears and lapses), phase 2 (letters
+to the cabinet, the take-only view) and phase 3 (a closed box's mail goes back, on the return-to-sender mechanism of
+issue #19) are done; next, phase 4 (smoke phase, test plan, economy docs). Independent of the Central Office design.
 
 **As built (phase 2), where it differs from the draft below:**
 - The cabinet is a barrel the office's owner (or an admin) names with `/pobox cabinet <office> [x y z]`; Postal puts
@@ -12,8 +12,19 @@ return-to-sender mechanism of issue #19). Independent of the Central Office desi
 - Filed letters are `DELIVERED` with box custody (not `AT_DEST_BRANCH`): the delivery is counted, and postage
   settled, when the letter goes in. Taking it out only moves custody to the player.
 - Letters only: a shipping label can't be addressed to a box. Box addresses on other servers come later.
-- `/pobox release` is refused while the box holds mail, until phase 3 decides where it goes. An evicted or lapsed
-  box's mail stays filed until then.
+- `/pobox release` is refused while the box holds mail: it's the renter's, so they take it out first.
+
+**As built (phase 3):** when a lease lapses or is ended (`/pobox evict`), each letter in the box goes back at once
+(`Returns.from_box`), with a "Returned to sender" last page giving the reason:
+- to the office chest of an address its sender owns on this server (the office it was posted from first), where the
+  postman delivers it and it ends `RETURNED`;
+- a sender with no address here: to Central as "Returned mail" (as for returned network letters, rather than the
+  origin office's counter);
+- no sender (a server letter): `EXPIRED`.
+
+Letters for the box still waiting in the office chest go back the same way when the postman next files. A chest that's
+full leaves the letter where it is, and the sweep on the next lease change or Postal day tries again. The renter is
+told how many letters went back.
 
 A player rents a numbered box at a post office and gets mail there instead of (or as well as) at a house: a
 first address for new players, a private one, a stable one for nomads and shops, and rent for the office.

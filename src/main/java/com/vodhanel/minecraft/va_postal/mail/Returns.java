@@ -10,6 +10,8 @@ import com.vodhanel.minecraft.va_postal.config.C_Postoffice;
 import com.vodhanel.minecraft.va_postal.config.GetConfig;
 import com.vodhanel.minecraft.va_postal.store.Actor;
 import com.vodhanel.minecraft.va_postal.store.ConflictException;
+import com.vodhanel.minecraft.va_postal.store.Custody;
+import com.vodhanel.minecraft.va_postal.store.MailState;
 import com.vodhanel.minecraft.va_postal.store.MailKind;
 import com.vodhanel.minecraft.va_postal.store.MailRecord;
 import com.vodhanel.minecraft.va_postal.store.MailStore;
@@ -198,6 +200,64 @@ public final class Returns {
         } catch (ConflictException | StoreException e) {
             return r;
         }
+    }
+
+    /**
+     * On the main thread: a letter left in a P.O. box that closed goes back to its sender, with {@code reason} on a last
+     * page: into the office chest of an address of theirs (the postman delivers it, and it ends {@code RETURNED}), or to
+     * Central as "Returned mail" if they have none here. A letter with no sender (the server's) expires. False if it
+     * can't go now (no chest, or it's full): it stays where it is and a later sweep tries again.
+     */
+    public static boolean from_box(MailStore store, MailRecord r, String reason) {
+        if (r.sender == null) {
+            try {
+                store.transition(r, MailState.EXPIRED, Custody.NONE, Actor.system("P.O. boxes"), "expired: " + reason + ", and it has no sender");
+                Util.cinform("[Postal] Letter " + r.id + " from a closed box has no sender: it expired");
+                return true;
+            } catch (ConflictException | StoreException e) {
+                return false;
+            }
+        }
+        String[] home = home(r.sender, r.origin_office);
+        String where;
+        if (home == null) {
+            where = VA_postal.central_schest_location;
+        } else {
+            org.bukkit.block.Block office = com.vodhanel.minecraft.va_postal.common.P_MailAdmin.office_chest(home[0]);
+            where = office == null ? null : Util.location2str(office.getLocation());
+        }
+        if (where == null || "null".equals(where) || where.isEmpty()) {
+            Util.cinform("[Postal] Letter " + r.id + " can't go back now: no " + (home == null ? "Central" : home[0]) + " chest found.");
+            return false;
+        }
+        String key = Letters.block_key(where);
+        org.bukkit.inventory.Inventory chest = Reconciler.chest(Custody.chest(key), true);
+        if (chest == null || chest.firstEmpty() < 0) {
+            Util.cinform("[Postal] Letter " + r.id + " can't go back now: " + (chest == null ? "no chest at " + key : key + " is full") + ".");
+            return false;
+        }
+        try {
+            MailRecord back = store.readdress(r, store.server_id(), home == null ? r.dest_office : home[0], home == null ? null : home[1],
+                    stamped(r.payload, reason), 0L, Actor.system("P.O. boxes"), "returned to sender: " + reason);
+            MailRecord held = store.transition(back, home == null ? MailState.AT_CENTRAL : MailState.AT_DEST_BRANCH, Custody.chest(key),
+                    Actor.system("P.O. boxes"), home == null ? "waits at Central: its sender has no address here"
+                            : "at the " + home[0] + " post office, for " + home[1]);
+            chest.addItem(Letters.materialise(held));
+        } catch (ConflictException e) {
+            return false;
+        } catch (StoreException e) {
+            Util.cinform("[Postal] Letter " + r.id + " can't be returned now: " + e.getMessage());
+            return false;
+        }
+        Util.cinform("[Postal] Letter " + r.id + " from a closed box goes back to its sender"
+                + (home == null ? " (no address here: it waits at Central)" : " at " + home[0] + " " + home[1]));
+        if (home == null) {
+            tell(r.sender, "&6A letter of yours came back (" + reason + "), and you have no mailbox here: it waits at Central.");
+        } else {
+            tell(r.sender, "&6A letter of yours came back (" + reason + "); the postman brings it to &f" + Util.df(home[1]) + "&6.");
+            com.vodhanel.minecraft.va_postal.config.C_Dispatcher.promote_schedule(home[0], home[1], 5000, false);
+        }
+        return true;
     }
 
     /** Off the main thread: letters this server sent that nobody collected in time come back (see {@link #return_after_days}). */

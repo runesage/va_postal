@@ -424,7 +424,7 @@ public final class P_MailAdmin {
     }
 
     /** The office's [Postal_Mail] / town / [Local] chest, found the same way the dispatcher finds it. */
-    static Block office_chest(String office) {
+    public static Block office_chest(String office) {
         Location around = Util.str2location(C_Postoffice.get_local_po_location_by_name(office));
         if (around == null) {
             return null;
