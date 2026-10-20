@@ -419,9 +419,10 @@ run_server "$WORK_DIR/phase23.log" \
     "postal start" "sleep:10" "postal testletter testville elsewhere:nowhere! home from:$OWNER_UUID" "sleep:240" \
     "postal track last" "data get block 40 -60 0 Items" "postal stop" "sleep:5"
 
-# Phase 24: inspections (docs/design/central-office.md §5). Testville lost a letter in phase 5, so an inspector would
-# find it; one is sent at once, goes with Central's postman, and leaves a report in Testville's chest. The report is
-# kept (/postal inspect) and shown on a new board sign. An unknown office is refused.
+# Phase 24: inspections (docs/design/central-office.md §5). Testville lost a letter in phase 5, so the hourly check
+# (its first run is a minute after a start) has already sent an inspector in an earlier phase by itself. Here one is
+# sent at once anyway, goes with Central's postman, and leaves a report in Testville's chest. The report is kept
+# (/postal inspect) and shown on a new board sign. An unknown office is refused.
 echo "== Phase 24: inspections"
 run_server "$WORK_DIR/phase24.log" \
     "postal stats refresh" "sleep:5" "postal inspect testville" "postal inspect testville now" "postal inspect nowhere" \
@@ -721,9 +722,9 @@ check "phase23: it's in the sender's mailbox with a Returned to sender page" \
     grep -qE "40, -60, 0 has the following block data: .*Returned to sender" <(plain phase23)
 check "phase24: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase24.log"
 check "phase24: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase24.log"
-check "phase24: never inspected, but an inspector would find the lost letter" \
-    grep -q "Never inspected" <(plain phase24)
-check "phase24: ... the lost letter" grep -qE "letters? (was|were) lost" <(plain phase24)
+check "phase24: an earlier phase's hourly check sent an inspector by itself" \
+    bash -c "cat '$WORK_DIR'/phase{3..23}.log 2>/dev/null | grep -q 'Central sends an inspector to testville'"
+check "phase24: an inspector would find the lost letter now" grep -qE "letters? (was|were) lost" <(plain phase24)
 check "phase24: an inspector is sent, with the next visit" grep -q "Central's inspector goes to the Testville Post Office" <(plain phase24)
 check "phase24: an unknown office is refused" grep -q "No post office matches 'nowhere'" <(plain phase24)
 check "phase24: the inspector leaves a report at Testville" grep -q "Central's inspector left a report at testville" <(plain phase24)
