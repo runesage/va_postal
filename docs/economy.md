@@ -140,6 +140,7 @@ downtime a single catch-up day runs.
 | `/postal office <office> deposit <amount>` | owner | move money from you into the office |
 | `/postal office <office> withdraw <amount\|all>` | owner | take money out, down to the reserve (not while in arrears) |
 | `/postal office <office> price [amount\|default]` | owner (admins: any) | what a new address at the office costs (the server's `Address.Purchase_price` unless set); also at the clerk's counter |
+| `/pobox rent <office>` | player, at the office | rent a P.O. box: the first day's rent now, then each Postal day, to the office (Central for a server office); `BOX_RENT` in the flow report |
 | `/postal office <office> discount [percent\|none]` | owner (admins: any) | the office's discount on the postage of mail it sends, out of its own share |
 | `/postal office <office> approval \| applications \| approve \| deny` | owner (admins: any) | address applications, where the office requires approval (`docs/commands.md`) |
 

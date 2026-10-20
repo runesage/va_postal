@@ -24,7 +24,7 @@ public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
     static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql",
             "V5__network_player.sql", "V6__deed.sql", "V7__office_offer.sql",
-            "V8__office_stats.sql"};
+            "V8__office_stats.sql", "V9__po_box.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -802,6 +802,114 @@ public final class SqlMailStore implements MailStore {
             if (o.expires_at() <= now) {
                 out.add(o);
             }
+        }
+        return out;
+    }
+
+    // ---- P.O. boxes ---------------------------------------------------------------------------------
+
+    private static final String BOX_COLUMNS = "server_id, office, number, renter_uuid, renter_name, rented_at, arrears, arrears_days";
+
+    @Override
+    public PoBox rent_box(String office, UUID renter, String renter_name, long now) {
+        String o = office.toLowerCase(java.util.Locale.ROOT).trim();
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                int number = 1;
+                try (PreparedStatement ps = c.prepareStatement(
+                        "SELECT number FROM po_box WHERE server_id = ? AND office = ? ORDER BY number")) {
+                    ps.setString(1, server_id);
+                    ps.setString(2, o);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next() && rs.getInt(1) == number) {
+                            number++; // the lowest number nobody rents
+                        }
+                    }
+                }
+                try (PreparedStatement ps = c.prepareStatement("INSERT INTO po_box (" + BOX_COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    ps.setString(1, server_id);
+                    ps.setString(2, o);
+                    ps.setInt(3, number);
+                    ps.setString(4, renter.toString());
+                    ps.setString(5, renter_name.length() > 16 ? renter_name.substring(0, 16) : renter_name);
+                    ps.setLong(6, now);
+                    ps.setBigDecimal(7, BigDecimal.ZERO);
+                    ps.setInt(8, 0);
+                    ps.executeUpdate();
+                }
+                c.commit();
+                return new PoBox(server_id, o, number, renter, renter_name, now, 0.0D, 0);
+            } catch (SQLException e) {
+                c.rollback();
+                throw new ConflictException("Box at " + o + " was taken meanwhile: " + e.getMessage());
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not rent a box", e);
+        }
+    }
+
+    @Override
+    public java.util.Optional<PoBox> box(String office, int number) {
+        List<PoBox> found = box_rows("WHERE server_id = ? AND office = ? AND number = " + number, server_id,
+                office.toLowerCase(java.util.Locale.ROOT).trim());
+        return found.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(found.get(0));
+    }
+
+    @Override
+    public List<PoBox> boxes_of(UUID renter) {
+        return box_rows("WHERE server_id = ? AND renter_uuid = ? ORDER BY office, number", server_id, renter.toString());
+    }
+
+    @Override
+    public List<PoBox> boxes(String office) {
+        return office == null ? box_rows("WHERE server_id = ? ORDER BY office, number", server_id)
+                : box_rows("WHERE server_id = ? AND office = ? ORDER BY number", server_id, office.toLowerCase(java.util.Locale.ROOT).trim());
+    }
+
+    @Override
+    public void set_box_arrears(String office, int number, double arrears, int arrears_days) {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "UPDATE po_box SET arrears = ?, arrears_days = ? WHERE server_id = ? AND office = ? AND number = ?")) {
+            ps.setBigDecimal(1, BigDecimal.valueOf(Math.max(0.0D, arrears)).setScale(2, java.math.RoundingMode.HALF_UP));
+            ps.setInt(2, Math.max(0, arrears_days));
+            ps.setString(3, server_id);
+            ps.setString(4, office.toLowerCase(java.util.Locale.ROOT).trim());
+            ps.setInt(5, number);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new StoreException("Could not update a box", e);
+        }
+    }
+
+    @Override
+    public boolean release_box(String office, int number) {
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "DELETE FROM po_box WHERE server_id = ? AND office = ? AND number = ?")) {
+            ps.setString(1, server_id);
+            ps.setString(2, office.toLowerCase(java.util.Locale.ROOT).trim());
+            ps.setInt(3, number);
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new StoreException("Could not release a box", e);
+        }
+    }
+
+    private List<PoBox> box_rows(String where, String... args) {
+        List<PoBox> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT " + BOX_COLUMNS + " FROM po_box " + where)) {
+            for (int i = 0; i < args.length; i++) {
+                ps.setString(i + 1, args[i]);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new PoBox(rs.getString(1), rs.getString(2), rs.getInt(3), UUID.fromString(rs.getString(4)),
+                            rs.getString(5), rs.getLong(6), rs.getBigDecimal(7).doubleValue(), rs.getInt(8)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read boxes", e);
         }
         return out;
     }

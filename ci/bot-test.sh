@@ -526,6 +526,39 @@ console "op $BOT_NAME"
 console "postal stop"
 sleep 2
 
+# ---- P.O. boxes (docs/design/po-boxes.md, phase 1: leases) ----------------------------------------------------------
+# Too far from the office, renting is refused; at Testville the bot rents Box 1 (5 a day, the first day paid); a second
+# is refused; the office lists it; a Postal day charges the rent; the price changes; the bot releases it. Then with no
+# money and four Postal days the lease runs up arrears and lapses after the 3-day grace.
+console "minecraft:tp $BOT_NAME 0.5 -60 3"
+sleep 2
+check "a box can't be rented away from its office" bot_cmd "/pobox rent testville" 'CHAT .*Rent a box at the office'
+console "minecraft:tp $BOT_NAME 20 -59 4"
+sleep 2
+check "the bot rents a box at Testville" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1 at the Testville Post Office, for .*5(\.00)? a day'
+check "/pobox shows it" bot_cmd "/pobox" 'CHAT .*Box 1 at the Testville Post Office'
+check "a second box is refused" bot_cmd "/pobox rent testville" 'CHAT .*You already rent Box 1 at Testville'
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "pobox list testville"
+check "the office lists the box" wait_log "$SERVER_LOG" 'Box 1: .*PostalBot' 5 "$from"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal bank newday"
+check "a Postal day charges the rent" wait_log "$SERVER_LOG" 'box rent .*5(\.00)?' 10 "$from"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "pobox price testville 2.5"
+check "the office sets its own rent" wait_log "$SERVER_LOG" 'now costs \$2\.50 a day' 5 "$from"
+check "the bot releases its box" bot_cmd "/pobox release" 'CHAT .*You no longer rent Box 1 at Testville'
+check "the bot rents again" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1'
+console "eco set $BOT_NAME 0"
+sleep 1
+for _ in 1 2 3; do console "postal bank newday"; sleep 2; done
+check "unpaid rent is owed, and the renter told" grep -qE 'CHAT .*You owe .* for your Box 1 at Testville' "$BOT_LOG"
+console "postal bank newday"
+check "after the grace the lease lapses" wait_log "$BOT_LOG" 'CHAT .*Your Box 1 at Testville has lapsed' 10
+check "/pobox shows no box" bot_cmd "/pobox" "CHAT .*You don't rent a P.O. box"
+console "pobox price testville default"
+console "eco give $BOT_NAME 10000"
+
 # ---- The mail store as a player sees it: /postal store and /postal directory (P3 test plan 1, 2) --------------------
 store_text() {
     local from; from=$(( $(lines "$BOT_LOG") + 1 ))
