@@ -219,13 +219,21 @@ public final class Returns {
             }
         }
         String[] home = home(r.sender, r.origin_office);
-        String where = home == null ? C_Postoffice.get_central_po_location() : C_Postoffice.get_local_po_location_by_name(home[0]);
+        String where;
+        if (home == null) {
+            where = VA_postal.central_schest_location;
+        } else {
+            org.bukkit.block.Block office = com.vodhanel.minecraft.va_postal.common.P_MailAdmin.office_chest(home[0]);
+            where = office == null ? null : Util.location2str(office.getLocation());
+        }
         if (where == null || "null".equals(where) || where.isEmpty()) {
+            Util.cinform("[Postal] Letter " + r.id + " can't go back now: no " + (home == null ? "Central" : home[0]) + " chest found.");
             return false;
         }
         String key = Letters.block_key(where);
         org.bukkit.inventory.Inventory chest = Reconciler.chest(Custody.chest(key), true);
         if (chest == null || chest.firstEmpty() < 0) {
+            Util.cinform("[Postal] Letter " + r.id + " can't go back now: " + (chest == null ? "no chest at " + key : key + " is full") + ".");
             return false;
         }
         try {

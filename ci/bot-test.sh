@@ -604,7 +604,8 @@ from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "postal testletter testville testville box1 $BOT_NAME from:$BOT_UUID"
 sleep 1
 console "postal testletter testville testville box1 $BOT_NAME"
-check "two letters for Box 1 are handed in" bash -c "[ \$(tail -n +$from '$SERVER_LOG' | grep -c 'handed in at Testville for Testville, Box1') -ge 2 ]"
+sleep 1
+check "two letters for Box 1 are handed in" bash -c 'test "$(tail -n +"$1" "$2" | grep -c "handed in at Testville for Testville, Box1")" -ge 2' _ "$from" "$SERVER_LOG"
 from=$(( $(lines "$BOT_LOG") + 1 ))
 console "postal start"
 check "the postman files them" wait_log "$BOT_LOG" "CHAT .*There's mail in your Box 1" 240 "$from"
