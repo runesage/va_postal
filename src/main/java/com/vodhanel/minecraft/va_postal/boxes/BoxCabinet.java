@@ -10,6 +10,7 @@ import com.vodhanel.minecraft.va_postal.deed.DeedDocument;
 import com.vodhanel.minecraft.va_postal.mail.Book;
 import com.vodhanel.minecraft.va_postal.mail.Letters;
 import com.vodhanel.minecraft.va_postal.mail.MailIds;
+import com.vodhanel.minecraft.va_postal.mail.Returns;
 import com.vodhanel.minecraft.va_postal.store.Actor;
 import com.vodhanel.minecraft.va_postal.store.ConflictException;
 import com.vodhanel.minecraft.va_postal.store.Custody;
@@ -208,8 +209,15 @@ public final class BoxCabinet implements Listener {
             try {
                 PoBox box = store.box(town, n).orElse(null);
                 MailRecord r = store.get(mail).orElse(null);
-                if (box == null || r == null || r.moving() || r.state.terminal()) {
-                    continue; // phase 3 returns mail for a box nobody rents
+                if (r == null || r.moving() || r.state.terminal()) {
+                    continue;
+                }
+                if (box == null) {
+                    // For a box nobody rents (it closed while this was on its way): back to its sender.
+                    if (Returns.from_box(store, r, "Box " + n + " at " + DeedDocument.display(town) + " isn't rented")) {
+                        it.set(null);
+                    }
+                    continue;
                 }
                 if (store.in_box(town, n).size() >= SIZE) {
                     if (!full_told.contains(box.label())) {
@@ -233,6 +241,45 @@ public final class BoxCabinet implements Listener {
                 return;
             }
         }
+    }
+
+    // ---- Closed boxes -----------------------------------------------------------------------
+
+    /**
+     * On the main thread: letters left in boxes nobody rents any more (a lease lapsed or was ended) go back to their
+     * senders ({@link Returns#from_box}). Returns how many went; any that can't go now wait for the next sweep.
+     */
+    public static int return_closed() {
+        MailStore store = store();
+        if (store == null) {
+            return 0;
+        }
+        int sent = 0;
+        try {
+            for (MailRecord r : store.in_boxes()) {
+                String ref = r.custody.ref == null ? "" : r.custody.ref;
+                int hash = ref.lastIndexOf('#');
+                if (hash <= 0) {
+                    continue;
+                }
+                String office = ref.substring(0, hash);
+                int n;
+                try {
+                    n = Integer.parseInt(ref.substring(hash + 1));
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                if (store.box(office, n).isPresent()) {
+                    continue; // still rented: the renter's to take
+                }
+                if (Returns.from_box(store, r, "Box " + n + " at " + DeedDocument.display(office) + " was closed")) {
+                    sent++;
+                }
+            }
+        } catch (StoreException e) {
+            Util.cinform("[Postal] Couldn't return mail from closed boxes now: " + e.getMessage());
+        }
+        return sent;
     }
 
     // ---- Opening it -------------------------------------------------------------------------

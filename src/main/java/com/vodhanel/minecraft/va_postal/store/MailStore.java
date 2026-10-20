@@ -223,6 +223,9 @@ public interface MailStore extends AutoCloseable {
     /** The mail this server keeps in box {@code number} at {@code office}, oldest first. */
     List<MailRecord> in_box(String office, int number);
 
+    /** All the mail this server keeps in P.O. boxes, oldest first (to find mail left in boxes that closed). */
+    List<MailRecord> in_boxes();
+
     // ---- Office stats (docs/design/central-office.md §7) ---------------------------------------------
 
     /** This server's pickups, deliveries and losses in {@code [from, to)}, oldest first. */

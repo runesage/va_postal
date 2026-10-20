@@ -752,6 +752,8 @@ abstract class MailStoreContract {
         assertEquals(Custody.box("testville", 3), filed.custody);
         assertEquals(List.of(r.id), store.in_box("testville", 3).stream().map(m -> m.id).toList());
         assertTrue(store.in_box("testville", 4).isEmpty());
+        assertEquals(List.of(r.id), store.in_boxes().stream().map(m -> m.id).toList());
+        assertTrue(new SqlMailStore(ds, "other", null, dialect()).in_boxes().isEmpty()); // this server's boxes only
         assertEquals(Custody.box("testville", 3), store.get(r.id).orElseThrow().custody); // read back from the row
         store.transition(filed, MailState.DELIVERED, Custody.NONE, Actor.system("t"), "taken");
         assertTrue(store.in_box("testville", 3).isEmpty());

@@ -595,6 +595,33 @@ check "clicking takes the letter into the inventory" wait_log "$BOT_LOG" 'ITEM [
 sleep 1
 check "then the box can be released" bot_cmd "/pobox release" 'CHAT .*You no longer rent Box 1 at Testville'
 
+# ---- P.O. boxes, phase 3: a closed box's mail goes back --------------------------------------------------------------
+# Two letters are filed in the bot's box: one from the bot itself (it owns Rose Cottage), one with no sender. Evicting
+# the box sends the first back to Rose Cottage (via Testville's chest); the second, from no one, expires.
+BOT_UUID=$(grep -oE "UUID of player $BOT_NAME is $UUID_RE" "$SERVER_LOG" | head -1 | grep -oE "$UUID_RE$")
+check "the bot rents Box 1 again" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1'
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal testletter testville testville box1 $BOT_NAME from:$BOT_UUID"
+sleep 1
+console "postal testletter testville testville box1 $BOT_NAME"
+check "two letters for Box 1 are handed in" bash -c "[ \$(tail -n +$from '$SERVER_LOG' | grep -c 'handed in at Testville for Testville, Box1') -ge 2 ]"
+from=$(( $(lines "$BOT_LOG") + 1 ))
+console "postal start"
+check "the postman files them" wait_log "$BOT_LOG" "CHAT .*There's mail in your Box 1" 240 "$from"
+console "postal stop"
+sleep 3
+check "/pobox counts both" bot_cmd "/pobox" 'CHAT .*Box 1 at the Testville Post Office.* 2 letter\(s\) waiting'
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "pobox evict testville 1"
+check "the evicted box's letter goes back to its sender's address" wait_log "$SERVER_LOG" \
+    'from a closed box goes back to its sender at testville rose' 10 "$from"
+check "the one with no sender expires" grep -qE 'from a closed box has no sender: it expired' <(tail -n +"$from" "$SERVER_LOG")
+check "the renter hears its letters went back" wait_log "$BOT_LOG" 'CHAT .*2 letter\(s\) left in your Box 1 at Testville went back' 10
+check "and the sender why" grep -qE 'CHAT .*A letter of yours came back \(Box 1 at Testville was closed\)' "$BOT_LOG"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "execute if items block 20 -60 0 container.* minecraft:written_book[minecraft:written_book_content~{author:\"rose_cottage\"}]"
+check "the returned letter is in Testville's chest" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+
 # ---- The mail store as a player sees it: /postal store and /postal directory (P3 test plan 1, 2) --------------------
 store_text() {
     local from; from=$(( $(lines "$BOT_LOG") + 1 ))

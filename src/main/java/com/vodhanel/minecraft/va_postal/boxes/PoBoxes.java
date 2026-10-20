@@ -150,6 +150,11 @@ public final class PoBoxes {
             return false;
         }
         Util.cinform("[Postal] " + box.label() + " at " + box.office() + " (" + box.renter_name() + ") " + why);
+        int returned = BoxCabinet.return_closed(); // what was left in it goes back to its senders
+        if (returned > 0) {
+            tell(box.renter(), "&6" + returned + " letter(s) left in your " + box.label() + " at " + DeedDocument.display(box.office())
+                    + " went back to their senders.");
+        }
         return true;
     }
 
@@ -195,6 +200,7 @@ public final class PoBoxes {
                         + DeedDocument.display(box.office()) + ". It lapses after " + grace_days() + " days unpaid.");
             }
         }
+        BoxCabinet.return_closed(); // and any left over from before (a chest that was full)
         return new double[]{charged, lapsed};
     }
 
