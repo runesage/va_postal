@@ -219,6 +219,12 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.min_distance"), 64);
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.announce"), "true");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.charters.effects"), "true");
+        // P.O. boxes (docs/design/po-boxes.md): the rent, the grace before a lease lapses, the limits, where to rent.
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.boxes.default_rent"), "5");
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.boxes.grace_days"), 3);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.boxes.max_per_player"), 1);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.boxes.max_per_office"), 0);
+        VA_postal.plugin.getConfig().addDefault(path_format("settings.boxes.rent_distance"), 16);
         // Office stats and leaderboards (docs/design/central-office.md §7).
         VA_postal.plugin.getConfig().addDefault(path_format("settings.stats.period_days"), 30);
         VA_postal.plugin.getConfig().addDefault(path_format("settings.stats.min_deliveries"), 5);

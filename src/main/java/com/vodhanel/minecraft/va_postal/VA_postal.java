@@ -388,6 +388,10 @@ public class VA_postal extends JavaPlugin {
 
         Cmdexecutor executor = new Cmdexecutor(this);
         getCommand("postal").setExecutor(executor);
+        getCommand("pobox").setExecutor((sender, command, label, args) -> {
+            com.vodhanel.minecraft.va_postal.boxes.PoBoxes.command(sender, args);
+            return true;
+        });
         getCommand("addr").setExecutor(executor);
         getCommand("distr").setExecutor(executor);
         getCommand("att").setExecutor(executor);
