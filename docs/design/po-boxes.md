@@ -1,8 +1,14 @@
-# P.O. Boxes (design draft)
+# P.O. Boxes
 
-Status: **being built.** Phase 1 (leases: `/pobox`, rent on the Postal day, arrears and lapses), phase 2 (letters
-to the cabinet, the take-only view) and phase 3 (a closed box's mail goes back, on the return-to-sender mechanism of
-issue #19) are done; next, phase 4 (smoke phase, test plan, economy docs). Independent of the Central Office design.
+Status: **built, waiting on an in-game check** (`docs/testing/po-boxes.md`). The phases:
+1. leases: `/pobox`, rent on the Postal day, arrears and lapses;
+2. letters to the cabinet, and the take-only view;
+3. a closed box's mail goes back, on the return-to-sender mechanism of issue #19;
+4. the test plan, and the cabinet protected from breaking, explosions, fire and pistons.
+
+There's no smoke phase: renting needs a player, so the bot player test covers it on SQLite and MySQL. Independent of
+the Central Office design. The sections below are the original draft; where it was built differently, the notes just
+below say so.
 
 **As built (phase 2), where it differs from the draft below:**
 - The cabinet is a barrel the office's owner (or an admin) names with `/pobox cabinet <office> [x y z]`; Postal puts

@@ -17,7 +17,7 @@ commands:
     usage: /postal <start/stop/admin/chests/talk/quiet/speed>
   pobox:
     description: Rent and manage a P.O. box at a post office.
-    usage: /pobox [rent <office> | release [office] | price <office> [amount|default] | list <office> | evict <office> <n>]
+    usage: /pobox [rent <office> | release [office] | price <office> [amount|default] | list <office> | cabinet <office> [x y z] | evict <office> <n>]
     permission: postal.pobox
   addr:
     description: Used to address a book you are holding.

@@ -376,6 +376,69 @@ public final class BoxCabinet implements Listener {
         }
     }
 
+    // ---- Protection -------------------------------------------------------------------------
+
+    /** The office whose cabinet {@code b} is, or whose cabinet {@code b} is the sign on; or null. */
+    private static String guarded(Block b) {
+        String office = office_of(b);
+        if (office == null && b != null && b.getBlockData() instanceof WallSign sign) {
+            office = office_of(b.getRelative(sign.getFacing().getOppositeFace()));
+        }
+        return office;
+    }
+
+    /** Only the office's owner or an admin may break the cabinet or its sign; breaking the barrel removes the cabinet. */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void on_break(org.bukkit.event.block.BlockBreakEvent event) {
+        String office = guarded(event.getBlock());
+        if (office == null) {
+            return;
+        }
+        Player p = event.getPlayer();
+        if (!p.hasPermission("postal.admin") && !p.getUniqueId().equals(C_Owner.get_owner_local_po_id(office))) {
+            event.setCancelled(true);
+            Util.pinform(p, "&7The box cabinet belongs to the " + DeedDocument.display(office) + " Post Office.");
+            return;
+        }
+        if (event.getBlock().getType() == Material.BARREL) {
+            VA_postal.plugin.getConfig().set(path(office), null);
+            VA_postal.plugin.saveConfig();
+            Util.pinform(p, "&6The " + DeedDocument.display(office) + " Post Office has no box cabinet now. Its mail stays in the boxes: "
+                    + "&f/pobox cabinet " + office + "&6 on another barrel.");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void on_entity_explode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        event.blockList().removeIf(b -> guarded(b) != null);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void on_block_explode(org.bukkit.event.block.BlockExplodeEvent event) {
+        event.blockList().removeIf(b -> guarded(b) != null);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void on_burn(org.bukkit.event.block.BlockBurnEvent event) {
+        if (guarded(event.getBlock()) != null) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void on_piston_extend(org.bukkit.event.block.BlockPistonExtendEvent event) {
+        if (event.getBlocks().stream().anyMatch(b -> guarded(b) != null)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void on_piston_retract(org.bukkit.event.block.BlockPistonRetractEvent event) {
+        if (event.getBlocks().stream().anyMatch(b -> guarded(b) != null)) {
+            event.setCancelled(true);
+        }
+    }
+
     // ---- Helpers ----------------------------------------------------------------------------
 
     private static void tell(UUID player, String message) {
