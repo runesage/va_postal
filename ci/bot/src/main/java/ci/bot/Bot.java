@@ -86,7 +86,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *   CHAT <text>             a system or player chat message, flattened to plain text
  *   ENTITY <id> <type> <x> <y> <z>  an entity came into view
  *   SCREEN <id> <title>     a container opened
- *   ITEM <container>/<slot> <name>  a named item in a container (0: the player's inventory)
+ *   ITEM <container>/<slot> <name>  a named item in a container (0: the player's inventory); a written book is
+ *                           "Book <title> by <author>"
  *   CLOSED <id>             the server closed a container
  *   DIALOG <title> | <field>=<initial>, ... | <button>, ...   a dialog opened
  *   SENT <text>             an instruction the bot sent
@@ -214,7 +215,13 @@ public final class Bot {
         if (name == null) {
             name = item.getDataComponentsPatch().get(DataComponentTypes.ITEM_NAME);
         }
-        return name == null ? null : plain(name);
+        if (name == null) {
+            // A written book (a letter) is named by its title.
+            org.geysermc.mcprotocollib.protocol.data.game.item.component.WrittenBookContent book =
+                    item.getDataComponentsPatch().get(DataComponentTypes.WRITTEN_BOOK_CONTENT);
+            return book == null || book.getTitle() == null ? null : "Book " + book.getTitle().getRaw() + " by " + book.getAuthor();
+        }
+        return plain(name);
     }
 
     private static void items(int id, ItemStack[] items) {

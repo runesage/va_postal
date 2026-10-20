@@ -895,6 +895,12 @@ public final class SqlMailStore implements MailStore {
         }
     }
 
+    @Override
+    public List<MailRecord> in_box(String office, int number) {
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND custody_kind = 'BOX' AND custody_ref = ? "
+                + "ORDER BY updated_at", server_id, Custody.box(office, number).ref);
+    }
+
     private List<PoBox> box_rows(String where, String... args) {
         List<PoBox> out = new ArrayList<>();
         try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(

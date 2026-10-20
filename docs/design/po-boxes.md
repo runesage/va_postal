@@ -1,8 +1,19 @@
 # P.O. Boxes (design draft)
 
-Status: **being built.** Phase 1 (leases: `/pobox`, rent on the Postal day, arrears and lapses) is done; next,
-delivery to the cabinet (phase 2) and returning a lapsed box's mail (phase 3, on the return-to-sender mechanism of
-issue #19). Independent of the Central Office design.
+Status: **being built.** Phase 1 (leases: `/pobox`, rent on the Postal day, arrears and lapses) and phase 2
+(letters to the cabinet, the take-only view) are done; next, returning a lapsed box's mail (phase 3, on the
+return-to-sender mechanism of issue #19). Independent of the Central Office design.
+
+**As built (phase 2), where it differs from the draft below:**
+- The cabinet is a barrel the office's owner (or an admin) names with `/pobox cabinet <office> [x y z]`; Postal puts
+  a `[Postal_Box]` sign on it. It isn't a route address: the local postman **files** box letters when he's back at
+  the office, from the office chest straight into their boxes. That needs no route for the cabinet, and box mail
+  waits at most one round.
+- Filed letters are `DELIVERED` with box custody (not `AT_DEST_BRANCH`): the delivery is counted, and postage
+  settled, when the letter goes in. Taking it out only moves custody to the player.
+- Letters only: a shipping label can't be addressed to a box. Box addresses on other servers come later.
+- `/pobox release` is refused while the box holds mail, until phase 3 decides where it goes. An evicted or lapsed
+  box's mail stays filed until then.
 
 A player rents a numbered box at a post office and gets mail there instead of (or as well as) at a house: a
 first address for new players, a private one, a stable one for nomads and shops, and rent for the office.

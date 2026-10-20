@@ -707,4 +707,16 @@ abstract class MailStoreContract {
         assertTrue(other.boxes(null).isEmpty());
         assertEquals(1, other.rent_box("testville", a, "Alex", 20L).number()); // another server's Testville
     }
+
+    @Test
+    void boxMailIsFoundByItsBox() {
+        MailRecord r = letter();
+        MailRecord filed = store.transition(r, MailState.DELIVERED, Custody.box("Testville", 3), Actor.postman("testville"), "filed");
+        assertEquals(Custody.box("testville", 3), filed.custody);
+        assertEquals(List.of(r.id), store.in_box("testville", 3).stream().map(m -> m.id).toList());
+        assertTrue(store.in_box("testville", 4).isEmpty());
+        assertEquals(Custody.box("testville", 3), store.get(r.id).orElseThrow().custody); // read back from the row
+        store.transition(filed, MailState.DELIVERED, Custody.NONE, Actor.system("t"), "taken");
+        assertTrue(store.in_box("testville", 3).isEmpty());
+    }
 }

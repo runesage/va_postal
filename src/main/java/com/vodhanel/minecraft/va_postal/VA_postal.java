@@ -358,6 +358,7 @@ public class VA_postal extends JavaPlugin {
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.clerk.CentralGuard(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.board.BoardListener(), plugin);
         plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.maps.PostalMaps(), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.boxes.BoxCabinet(), plugin);
         // Postal maps drawn before a restart get their renderers back (docs/design/central-office.md §6).
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             int maps = com.vodhanel.minecraft.va_postal.maps.PostalMaps.attach_all();

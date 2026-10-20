@@ -207,7 +207,7 @@ public final class PoBoxes {
 
     // ---- /pobox -----------------------------------------------------------------------------
 
-    /** {@code /pobox [rent <office> | release [office] | price <office> [amount|default] | list <office> | evict <office> <n>]}. */
+    /** {@code /pobox [rent <office> | release [office] | price <office> [amount|default] | list <office> | cabinet <office> [x y z] | evict <office> <n>]}. */
     public static void command(CommandSender sender, String[] args) {
         MailStore store = store();
         if (store == null) {
@@ -265,6 +265,11 @@ public final class PoBoxes {
                         return;
                     }
                     PoBox box = mine.get(0);
+                    int held = store.in_box(box.office(), box.number()).size();
+                    if (held > 0) {
+                        send(sender, "&7Your " + box.label() + " still holds " + held + " letter(s). Take them out first.");
+                        return;
+                    }
                     if (end(box, "released")) {
                         send(sender, "&6You no longer rent " + box.label() + " at " + DeedDocument.display(box.office()) + ".");
                     }
@@ -316,6 +321,13 @@ public final class PoBoxes {
                                 ? " &c(owes " + money(b.arrears()) + ", " + b.arrears_days() + " day(s))" : ""));
                     }
                 }
+                case "cabinet" -> {
+                    String office = office(sender, args, 1);
+                    if (office == null) {
+                        return;
+                    }
+                    BoxCabinet.set_cabinet(sender, office, args);
+                }
                 case "evict" -> {
                     if (!admin) {
                         send(sender, "&7Required permission not present.");
@@ -340,7 +352,7 @@ public final class PoBoxes {
                     send(sender, "&6Ended " + box.renter_name() + "'s lease of " + box.label() + " at " + DeedDocument.display(office) + ".");
                     tell(box.renter(), "&cYour " + box.label() + " at " + DeedDocument.display(office) + " was closed by the Post Office.");
                 }
-                default -> send(sender, "&7/pobox [rent <office> | release [office] | price <office> [amount|default] | list <office>"
+                default -> send(sender, "&7/pobox [rent <office> | release [office] | price <office> [amount|default] | list <office> | cabinet <office> [x y z]"
                         + (admin ? " | evict <office> <n>" : "") + "]");
             }
         } catch (StoreException e) {
@@ -350,7 +362,7 @@ public final class PoBoxes {
 
     private static void info(CommandSender sender) {
         if (!(sender instanceof Player p)) {
-            send(sender, "&7/pobox rent|release|price|list|evict ...");
+            send(sender, "&7/pobox rent|release|price|list|cabinet|evict ...");
             return;
         }
         List<PoBox> mine = store().boxes_of(p.getUniqueId());
@@ -359,7 +371,9 @@ public final class PoBoxes {
             return;
         }
         for (PoBox b : mine) {
+            int held = store().in_box(b.office(), b.number()).size();
             send(sender, "&6" + b.label() + " at the " + DeedDocument.display(b.office()) + " Post Office &7(" + money(rent(b.office())) + " a day)"
+                    + (held > 0 ? " &f" + held + " letter(s) waiting" : "")
                     + (b.arrears() > 0.0D ? " &cOwed: " + money(b.arrears()) + " (" + b.arrears_days() + " day(s); lapses after "
                     + grace_days() + ")" : ""));
         }

@@ -206,6 +206,9 @@ public interface MailStore extends AutoCloseable {
     /** Ends a lease; false if the box wasn't rented. */
     boolean release_box(String office, int number);
 
+    /** The mail this server keeps in box {@code number} at {@code office}, oldest first. */
+    List<MailRecord> in_box(String office, int number);
+
     // ---- Office stats (docs/design/central-office.md §7) ---------------------------------------------
 
     /** This server's pickups, deliveries and losses in {@code [from, to)}, oldest first. */
