@@ -570,6 +570,15 @@ check "the barrel becomes Testville's box cabinet" wait_log "$SERVER_LOG" "Testv
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "execute if block 18 -60 4 minecraft:oak_wall_sign"
 check "with a [Postal_Box] sign" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+console "deop $BOT_NAME"
+console "gamemode creative $BOT_NAME"
+sleep 1
+check "a player can't break the cabinet" bot_cmd "dig 18 -60 3" "CHAT .*The box cabinet belongs to the Testville Post Office"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "execute if block 18 -60 3 minecraft:barrel"
+check "it still stands" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+console "gamemode survival $BOT_NAME"
+console "op $BOT_NAME"
 check "opening it without a box says how to rent one" bot_cmd "use 18 -60 3 up" "CHAT .*You don't rent a box at the Testville Post Office"
 check "the bot rents Box 1" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1'
 from=$(( $(lines "$SERVER_LOG") + 1 ))
