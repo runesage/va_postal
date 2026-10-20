@@ -559,6 +559,42 @@ check "/pobox shows no box" bot_cmd "/pobox" "CHAT .*You don't rent a P.O. box"
 console "pobox price testville default"
 console "eco give $BOT_NAME 10000"
 
+# ---- P.O. boxes, phase 2: delivery -----------------------------------------------------------------------------------
+# A barrel beside Testville's office becomes its box cabinet. Box mail needs a rented box (and an attention naming its
+# renter); the postman files it when he's back at the office, the renter hears, /pobox counts it and the box can't be
+# released; opening the cabinet shows the letter, a click takes it into the inventory, and then the box can go.
+console "minecraft:setblock 18 -60 3 minecraft:barrel"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "pobox cabinet testville 18 -60 3"
+check "the barrel becomes Testville's box cabinet" wait_log "$SERVER_LOG" "Testville Post Office's box cabinet" 5 "$from"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "execute if block 18 -60 4 minecraft:oak_wall_sign"
+check "with a [Postal_Box] sign" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+check "opening it without a box says how to rent one" bot_cmd "use 18 -60 3 up" "CHAT .*You don't rent a box at the Testville Post Office"
+check "the bot rents Box 1" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1'
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal testletter testville testville box2"
+check "mail for a box nobody rents is refused" wait_log "$SERVER_LOG" "Box 2 at Testville isn't rented" 5 "$from"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal testletter testville testville box1 Steve"
+check "mail for a box must name its renter" wait_log "$SERVER_LOG" "(is PostalBot's|No player called Steve)" 5 "$from"
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal testletter testville testville box1 $BOT_NAME"
+check "a letter for Box 1 is handed in" wait_log "$SERVER_LOG" 'Test letter [0-9a-f-]+ handed in at Testville for Testville, Box1' 5 "$from"
+console "postal start"
+check "the postman files it, and the renter hears" wait_log "$BOT_LOG" "CHAT .*There's mail in your Box 1 at the Testville Post Office" 240
+console "postal stop"
+sleep 2
+check "/pobox counts it" bot_cmd "/pobox" 'CHAT .*Box 1 at the Testville Post Office.* 1 letter\(s\) waiting'
+check "the box can't be released while it holds mail" bot_cmd "/pobox release" 'CHAT .*still holds 1 letter'
+check "opening the cabinet shows the letter" bot_cmd "use 18 -60 3 up" 'ITEM [0-9]+/0 Book Testville by Box1'
+check "the cabinet is the bot's box" grep -qE 'SCREEN [0-9]+ Box 1, Testville' "$BOT_LOG"
+from=$(( $(lines "$BOT_LOG") + 1 ))
+bot "click 0"
+check "clicking takes the letter into the inventory" wait_log "$BOT_LOG" 'ITEM [0-9]+/([3-9][0-9]|2[7-9]) Book Testville by Box1' 10 "$from"
+sleep 1
+check "then the box can be released" bot_cmd "/pobox release" 'CHAT .*You no longer rent Box 1 at Testville'
+
 # ---- The mail store as a player sees it: /postal store and /postal directory (P3 test plan 1, 2) --------------------
 store_text() {
     local from; from=$(( $(lines "$BOT_LOG") + 1 ))

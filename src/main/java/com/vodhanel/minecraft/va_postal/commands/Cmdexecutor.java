@@ -1513,7 +1513,9 @@ public class Cmdexecutor implements CommandExecutor {
             Util.pinform(player, "&f&oYou don't have enough money to cover postage.");
             return true;
         }
-        String saddress = office.remote() ? Network.remote_address(office, args[1]) : C_Address.addresses_complete(stown, args[1]);
+        // P.O. box mail ("box12"): checked against the box's renter once the attention is known, below.
+        boolean to_box = !office.remote() && com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(args[1]) >= 0;
+        String saddress = to_box ? args[1] : office.remote() ? Network.remote_address(office, args[1]) : C_Address.addresses_complete(stown, args[1]);
         if (saddress == null || "null".equals(saddress)) {
             if (office.remote()) {
                 Util.pinform(player, "&7&oNo address at &9&o" + office.label() + "&7&o matches that. Its addresses: &9&o"
@@ -1540,6 +1542,18 @@ public class Cmdexecutor implements CommandExecutor {
             attention = recipient.name();
             originalAttention = recipient.id();
             where = recipient.where();
+        }
+        if (to_box) {
+            if (BookManip.is_shipping_label(stack)) {
+                Util.pinform(player, "&7&oP.O. boxes take letters only, not parcels.");
+                return true;
+            }
+            StringBuilder why = new StringBuilder();
+            saddress = com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.address(stown, args[1], originalAttention, why);
+            if (saddress == null || saddress.isEmpty()) {
+                Util.pinform(player, "&7&o" + (why.length() == 0 ? "P.O. boxes aren't available now" : why) + ".");
+                return true;
+            }
         }
 
 
