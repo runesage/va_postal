@@ -3,11 +3,12 @@ package com.vodhanel.minecraft.va_postal.store;
 import java.util.Objects;
 
 /**
- * Where a piece of mail physically is: a chest (by location key {@code world,x,y,z}), a postman's run, or
- * nowhere Postal holds it yet (with its sender, or not materialised on this server).
+ * Where a piece of mail physically is: a chest (by location key {@code world,x,y,z}), a postman's run, a P.O. box
+ * ({@code office#number}: kept in the store, not in any chest; docs/design/po-boxes.md), or nowhere Postal holds it
+ * yet (with its sender, or not materialised on this server).
  */
 public final class Custody {
-    public enum Kind { CHEST, ROUTE, NONE }
+    public enum Kind { CHEST, ROUTE, BOX, NONE }
 
     public static final Custody NONE = new Custody(Kind.NONE, null);
 
@@ -25,6 +26,11 @@ public final class Custody {
 
     public static Custody route(String run_id) {
         return new Custody(Kind.ROUTE, Objects.requireNonNull(run_id));
+    }
+
+    /** P.O. box {@code number} at {@code office}. */
+    public static Custody box(String office, int number) {
+        return new Custody(Kind.BOX, office.toLowerCase(java.util.Locale.ROOT).trim() + "#" + number);
     }
 
     static Custody of(String kind, String ref) {

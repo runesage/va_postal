@@ -957,6 +957,7 @@ public class ID_Mail {
 
 
         String spostoffice = VA_postal.wtr_poffice[id];
+        com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.file(id, spostoffice);
         ListIterator<ItemStack> local_item_itr;
         local_item_itr = VA_postal.wtr_inventory_postoffice[id].iterator();
         while (local_item_itr.hasNext()) {

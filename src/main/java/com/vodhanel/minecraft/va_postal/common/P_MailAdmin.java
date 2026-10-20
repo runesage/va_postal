@@ -125,7 +125,8 @@ public final class P_MailAdmin {
             return;
         }
         String to = dest.office();
-        String address = unchecked ? args[3].toLowerCase()
+        boolean to_box = !unchecked && !dest.remote() && com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(args[3]) >= 0;
+        String address = unchecked ? args[3].toLowerCase() : to_box ? args[3]
                 : dest.remote() ? com.vodhanel.minecraft.va_postal.mail.Network.remote_address(dest, args[3])
                 : C_Address.addresses_complete(to, args[3]);
         if (address == null || "null".equals(address)) {
@@ -142,6 +143,14 @@ public final class P_MailAdmin {
             }
             attention = r.name();
             attention_id = r.id();
+        }
+        if (to_box) {
+            StringBuilder why = new StringBuilder();
+            address = com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.address(to, args[3], attention_id, why);
+            if (address == null || address.isEmpty()) {
+                send(sender, "&7" + (why.length() == 0 ? "P.O. boxes aren't available now" : why) + ".");
+                return;
+            }
         }
         String date = new SimpleDateFormat("MM/dd/yy HH:mm").format(new Date());
         String[] posted = post_letter(from, dest.server(), to, address, attention, attention_id, "Server", "Test letter",
