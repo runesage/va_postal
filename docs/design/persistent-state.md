@@ -339,6 +339,16 @@ and there are **no duplicate or divergent records**.
      (`custody_server`) with a move in flight to `AT_CENTRAL` in its Central chest. It then rebuilds the book
      from the record's `LETTER_V1` text, titled with the local office's name so Central routes it as usual,
      and commits. From there the destination's Central and postman deliver it like any other letter.
+  3. **Return to sender (issue #19).** A letter for an office the destination doesn't have (removed after the
+     letter was addressed) isn't claimed: as it arrives, the destination readdresses it to its sender's server and
+     office (`readdress`, one version-checked update of `dest_server`, `dest_office`, `dest_address`, the payload
+     and `due_at`; the same row, no copies), due back after a trip. The reason rides in the payload
+     (`"returned"`). A letter its server sent that nobody collected within `Network.Return_after_days` (default 7;
+     0 for never) is brought back the same way by its own server (`stranded`). Back home, the letter goes to an
+     address of the sender's (at the office it was posted from if they have one there, else any of theirs on that
+     server), with a last page saying "Returned to sender" and why, and ends `RETURNED`, not `DELIVERED`. A
+     returned letter is never returned again: one whose sender has no mailbox there waits at Central, titled
+     "Returned mail", and the sender is told.
   The mail id never changes, so `/postal track` on either server shows the whole history, with the server
   that made each step. Reconciliation finishes an interrupted hand-off (the book is taken out of Central and the
   move committed: the record carries the letter) and an interrupted claim (the book is rebuilt at the

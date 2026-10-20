@@ -1270,6 +1270,62 @@ public final class SqlMailStore implements MailStore {
     }
 
     @Override
+    public List<MailRecord> stranded(long before) {
+        List<MailRecord> out = new ArrayList<>();
+        for (MailRecord r : query("SELECT " + READ_COLUMNS + " FROM mail WHERE state = 'IN_NETWORK' AND origin_server = ? "
+                + "AND dest_server <> ? AND kind = 'LETTER' AND pending_state IS NULL ORDER BY updated_at", server_id, server_id)) {
+            if (r.due_at > 0L && r.due_at < before) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public MailRecord readdress(MailRecord current, String dest_server, String dest_office, String dest_address, byte[] payload,
+                                long due_at, Actor actor, String detail) {
+        if (current.moving()) {
+            throw new ConflictException(current.id + " has a move in flight");
+        }
+        long now = System.currentTimeMillis();
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                int rows;
+                try (PreparedStatement ps = c.prepareStatement("UPDATE mail SET dest_server = ?, dest_office = ?, dest_address = ?, "
+                        + "payload = ?, due_at = ?, version = ?, updated_at = ? WHERE mail_id = ? AND version = ?")) {
+                    ps.setString(1, dest_server);
+                    ps.setString(2, dest_office == null ? null : dest_office.toLowerCase(java.util.Locale.ROOT).trim());
+                    ps.setString(3, dest_address == null ? null : dest_address.toLowerCase(java.util.Locale.ROOT).trim());
+                    ps.setBytes(4, payload);
+                    if (due_at > 0L) {
+                        ps.setLong(5, due_at);
+                    } else {
+                        ps.setNull(5, java.sql.Types.BIGINT);
+                    }
+                    ps.setInt(6, current.version + 1);
+                    ps.setLong(7, now);
+                    ps.setString(8, current.id.toString());
+                    ps.setInt(9, current.version);
+                    rows = ps.executeUpdate();
+                }
+                if (rows != 1) {
+                    c.rollback();
+                    throw new ConflictException(current.id + " changed since version " + current.version);
+                }
+                event(c, current.id, current.version + 1, current.state, current.state, current.custody, actor, detail);
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not readdress mail " + current.id, e);
+        }
+        return get(current.id).orElseThrow();
+    }
+
+    @Override
     public MailRecord depart(MailRecord moving, long arrives_at, Actor actor, String detail) {
         if (!moving.moving() || moving.pending_state != MailState.IN_NETWORK) {
             throw new ConflictException(moving.id + " isn't being handed to the network");

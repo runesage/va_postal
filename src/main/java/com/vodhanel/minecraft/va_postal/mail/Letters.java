@@ -206,7 +206,9 @@ public final class Letters {
                 Util.cinform("[Postal] Removing a stale copy of letter " + r.id + " (its record: " + r.state + "@" + r.custody + ").");
                 return new Move(Move.Result.STALE, r);
             }
-            MailRecord begun = store.begin_move(r, to, com.vodhanel.minecraft.va_postal.store.Custody.chest(block_key(to_chest)), actor, null);
+            // A returned letter reaching its sender's mailbox ends RETURNED, not DELIVERED (it was never delivered).
+            MailState target = to == MailState.DELIVERED && Returns.returned(r) ? MailState.RETURNED : to;
+            MailRecord begun = store.begin_move(r, target, com.vodhanel.minecraft.va_postal.store.Custody.chest(block_key(to_chest)), actor, null);
             return new Move(Move.Result.BEGUN, begun);
         } catch (StoreException | ConflictException e) {
             Util.cinform("[Postal] Letter " + id + " can't move now: " + e.getMessage());
@@ -438,12 +440,21 @@ public final class Letters {
             pages[i] = arr.get(i).getAsString();
         }
         String title = o.get("title").getAsString();
+        String author = o.get("author").getAsString();
         MailStore store = store();
         if (record.networked() && store != null && store.server_id().equals(record.dest_server)) {
             // Its title routes it: "server:office" on the way out, the office's own name once it has arrived.
             title = Util.df(record.dest_office);
         }
-        return new Book(title, o.get("author").getAsString(), pages).generateItemStack();
+        String returned = o.has("returned") ? o.get("returned").getAsString() : null;
+        if (returned != null) {
+            // Back to its sender (Returns): to their address if they have one here, else it waits at Central.
+            title = record.dest_address != null ? Util.df(record.dest_office) : "Returned mail";
+            author = record.dest_address != null ? record.dest_address : author;
+            pages = java.util.Arrays.copyOf(pages, pages.length + 1);
+            pages[pages.length - 1] = Returns.page(returned);
+        }
+        return new Book(title, author, pages).generateItemStack();
     }
 
     @SuppressWarnings("deprecation")

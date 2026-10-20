@@ -166,6 +166,23 @@ for _ in $(seq 1 60); do
     if has_letter beta "$A_ID" && has_letter alpha "$B_ID"; then break; fi
     sleep 8
 done
+
+# Return to sender (issue #19): alpha posts a letter for an office beta doesn't have ("!" skips alpha's directory).
+# Beta sends it back as it arrives; a test letter has no sender with a mailbox, so on alpha it waits at Central.
+say alpha "postal testletter testville beta:nowhere! home"
+R_ID="$({ grep -aoE "Test letter [0-9a-f-]{36} handed in" "$WORK_DIR/alpha.log" || true; } | tail -1 | awk '{print $3}')"
+echo "alpha's letter for beta:nowhere: ${R_ID:-none}"
+at_central() { # server-id mail-id: that letter is back in the server's Central chest, as returned mail
+    [ -n "$2" ] || return 1
+    say "$1" "data get block 0 -60 0 Items"
+    tail -n 5 "$WORK_DIR/$1.log" | grep "0, -60, 0 has the following block data" | grep "Returned mail" | grep -q "$2"
+}
+for _ in $(seq 1 40); do
+    if [ "$R_ID" != "$A_ID" ] && at_central alpha "$R_ID"; then break; fi
+    sleep 8
+done
+say alpha "postal track $R_ID"
+
 for s in alpha beta; do
     say "$s" "postal stop"
     sleep 3
@@ -223,6 +240,10 @@ check "alpha: the dispatcher carried the mail out" grep -q "Central Dispatcher a
 check "beta: the dispatcher brought the mail in" grep -q "Central Dispatcher at Central: Mail from alpha! 1 letter off the ship." "$B"
 check "alpha: /postal network shows the schedule" grep -q "The test ship leaves every 1 min and takes 30s" "$A"
 check "beta: unknown player reported" grep -q "No player called nobody_here" "$B"
+check "a letter for beta's missing office was posted" test -n "$R_ID" -a "$R_ID" != "$A_ID"
+check "beta sends it back to alpha" grep -q "Letter $R_ID goes back to alpha: there's no post office called Nowhere on beta" "$B"
+check "it's back in alpha's Central, as returned mail" grep -qE "0, -60, 0 has the following block data: .*Returned mail.*$R_ID|0, -60, 0 has the following block data: .*$R_ID.*Returned mail" "$A"
+check "its history says it was returned" grep -q "returned to sender: there's no post office called Nowhere on beta" "$A"
 
 if [ "$fail" -ne 0 ]; then
     echo "Network test FAILED. Logs: $WORK_DIR/alpha.log, $WORK_DIR/beta.log"

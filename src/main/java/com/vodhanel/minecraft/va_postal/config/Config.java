@@ -175,6 +175,8 @@ public class Config {
         VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.dispatcher.leggings"), "LEATHER_LEGGINGS #24345C");
         VA_postal.plugin.getConfig().addDefault(path_format("settings.uniform.dispatcher.boots"), "LEATHER_BOOTS #2B2B2B");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.letter.network"), "10");
+        // Return to sender (issue #19): days a letter may wait uncollected in the network before its server takes it back.
+        VA_postal.plugin.getConfig().addDefault(path_format("network.return_after_days"), 7);
         VA_postal.plugin.getConfig().addDefault(path_format("settings.mail_office_distance"), "200");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.postage.hold_expiry_days"), "7");
         VA_postal.plugin.getConfig().addDefault(path_format("economy.day_seconds"), "86400");
