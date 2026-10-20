@@ -852,6 +852,7 @@ public class ID_Mail {
 
         NpcLook.hold(VA_postal.central_route_npc, (ItemStack) null);
         com.vodhanel.minecraft.va_postal.economy.Rates.deliver(id, spostoffice); // a notice of new rates, if owed
+        com.vodhanel.minecraft.va_postal.inspect.Inspections.deliver(id, spostoffice); // an inspector's report, if one is due
 
         ListIterator<ItemStack> local_item_itr = VA_postal.wtr_inventory_postoffice[id].iterator();
         boolean out_of_town_received = false;
