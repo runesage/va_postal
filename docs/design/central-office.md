@@ -4,8 +4,8 @@
 counter (postage rates, the network, the player's offices); charters: buying, approval, the document, opening an office
 and its ceremony, at Central's counter and from the admin commands (§3); office sales, back to Central or to another
 player through Central (§3); rates: base postage as policy, office discounts and rate-change notices (§4); office stats
-and the leaderboards, in chat and on Central's counter (§7); the notice board, Postal maps and Branch of the Month (§6).
-Next: inspections (§5). Address deeds
+and the leaderboards, in chat and on Central's counter (§7); the notice board, Postal maps and Branch of the Month (§6);
+inspections (§5). All of C1 to C4 is built, waiting on an in-game check. Address deeds
 (`docs/design/deeds.md`), which share the clerks, counters and deed machinery, are done.
 
 ## 1. Goals
@@ -204,6 +204,23 @@ Central watches the branches and sends an inspector to any that are flagged.
 - **Reports only:** inspections carry no penalties. The latest report for each office is also shown on the
   notice board (§6).
 - At most one inspection per office per `Inspection.Interval_days` (default 7).
+
+*Built, where it differs from the above:*
+- **No inspector NPC of his own.** He travels with Central's postman, as the rate notices do (§4), so he needs no route
+  of his own. Every hour Central looks over its offices, and a flagged office is sent one. On the postman's next visit
+  the report is left in the office chest as a sheet of paper (*Inspection report*), not a book, because books in office
+  chests are mail. An office whose chest can't be found isn't visited: its report goes straight to the owner.
+- **The flags and their settings** (`Settings.Inspection.*`):
+  - a missing or full office chest;
+  - upkeep owed;
+  - a postman stuck and reset `Stuck_resets` times (default 10) over the interval. This is counted in memory, so a
+    restart starts the count again;
+  - under `Min_on_time` (default 0.5) of mail on time, with `Settings.Stats.Min_deliveries` deliveries;
+  - any letter lost.
+
+  Each finding says what's wrong and how to fix it.
+- **Where reports show:** `/postal inspect` shows the latest reports, and `inspect <office> now` sends one at once (for
+  admins). The board's `inspections` panel shows the latest three, with their counts of findings.
 
 ## 6. Flavour
 

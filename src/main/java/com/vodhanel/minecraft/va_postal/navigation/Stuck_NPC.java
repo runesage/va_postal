@@ -117,6 +117,7 @@ public class Stuck_NPC implements StuckAction {
     }
 
     public void soft_reset_npc_in_place(int id, NPC npc, String stuck_action) {
+        com.vodhanel.minecraft.va_postal.inspect.Inspections.stuck(VA_postal.wtr_poffice[id]); // counted for the inspector
         double t_elev = VA_postal.wtr_waypoint[id].getY();
         if (!RouteMngr.cit_ground_waypoint) {
             t_elev -= 1.0D;

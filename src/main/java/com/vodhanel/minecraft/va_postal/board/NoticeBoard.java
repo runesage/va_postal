@@ -36,7 +36,7 @@ public final class NoticeBoard {
 
     /** What a sign shows. */
     public enum Panel {
-        POSTAGE, PARCELS, BUSIEST, ON_TIME, FEWEST_LOST, NOTICES, AWARD;
+        POSTAGE, PARCELS, BUSIEST, ON_TIME, FEWEST_LOST, NOTICES, AWARD, INSPECTIONS;
 
         static Panel parse(String s) {
             for (Panel p : values()) {
@@ -239,6 +239,21 @@ public final class NoticeBoard {
                 yield h == null ? new String[]{"&6&lBRANCH OF", "&6&lTHE MONTH", "", "&8none yet"}
                         : new String[]{"&6&lBRANCH OF", "&6&lTHE MONTH", fit(DeedDocument.display(h[0])), fit(h[1])};
             }
+            case INSPECTIONS -> {
+                List<com.vodhanel.minecraft.va_postal.inspect.Inspections.Report> r = com.vodhanel.minecraft.va_postal.inspect.Inspections.reports();
+                String[] out = {"&1&lINSPECTIONS", "", "", ""};
+                for (int i = 0; i < 3; i++) {
+                    if (i < r.size()) {
+                        String n = Integer.toString(r.get(i).findings().size());
+                        String name = DeedDocument.display(r.get(i).office());
+                        name = name.length() > WIDTH - 1 - n.length() ? name.substring(0, WIDTH - 1 - n.length()) : name;
+                        out[i + 1] = name + " ".repeat(Math.max(1, WIDTH - name.length() - n.length())) + n;
+                    } else if (i == 0) {
+                        out[2] = "&8none yet";
+                    }
+                }
+                yield out;
+            }
             case NOTICES -> {
                 List<String> n = VA_postal.plugin.getConfig().getStringList(path("notices"));
                 String[] out = {"&1&lNOTICES", "", "", ""};
@@ -314,6 +329,7 @@ public final class NoticeBoard {
                 send(sender, "&8One office's numbers: /postal stats <office>");
             }
             case AWARD -> com.vodhanel.minecraft.va_postal.stats.Awards.command(sender, new String[]{"award"});
+            case INSPECTIONS -> com.vodhanel.minecraft.va_postal.inspect.Inspections.command(sender, new String[]{"inspect"});
             case NOTICES -> {
                 List<String> n = VA_postal.plugin.getConfig().getStringList(path("notices"));
                 send(sender, "&6[Postal] Notices");
