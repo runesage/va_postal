@@ -66,4 +66,24 @@ class PostOfficePlotsTest {
         assertNull(PostOfficePlots.cabinet_problem(null, null));
         assertNull(PostOfficePlots.cabinet_problem(plot(false, OWNER, MAYOR), null));
     }
+
+    @Test
+    void anAddressGoesOnAPlotTheHolderOwns() {
+        assertNull(PostOfficePlots.address_problem(null, OTHER, false)); // outside towns
+        assertNull(PostOfficePlots.address_problem(plot(false, OWNER, MAYOR), OWNER, false));
+        String why = PostOfficePlots.address_problem(plot(false, OWNER, MAYOR), OTHER, false);
+        assertNotNull(why);
+        assertTrue(why.contains("someone else's plot"), why);
+        // Not even the mayor on a resident's plot.
+        assertNotNull(PostOfficePlots.address_problem(plot(false, OWNER, MAYOR), MAYOR, true));
+    }
+
+    @Test
+    void onATownOwnedPlotOnlyTheMayorOrAnAssistantMayMakeAnAddress() {
+        assertNull(PostOfficePlots.address_problem(plot(false, null, MAYOR), MAYOR, true));
+        assertNull(PostOfficePlots.address_problem(plot(false, null, MAYOR), OTHER, true)); // an assistant
+        String why = PostOfficePlots.address_problem(plot(false, null, MAYOR), OTHER, false);
+        assertNotNull(why);
+        assertTrue(why.contains("Rivertown") && why.contains("/plot claim"), why);
+    }
 }

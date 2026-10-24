@@ -1,6 +1,6 @@
 # Towny: post office plots and addresses on plots
 
-Status: **post office plots built** (§1-5); deeds on plots (§6) next. Optional: none of this applies unless Towny is
+Status: **built**: post office plots (§1-5) and addresses on plots (§6). Optional: none of this applies unless Towny is
 installed and `Settings.Towny.Opt_in` is `'true'`. Without Towny, offices, charters, cabinets and deeds work as in
 `docs/design/central-office.md` and `docs/design/deeds.md`.
 
@@ -92,18 +92,27 @@ The mayor can exempt the plot (`/plot toggle taxed`), as with any plot.
 An office on a post office plot keeps its box cabinet on the same plot (the same town block): `/pobox cabinet` on a
 barrel elsewhere is refused. Admins are told and may go ahead. Offices outside towns are unchanged.
 
-## 6. Addresses on plots (next)
+## 6. Addresses on plots
 
-Inside a town:
+Inside a town, an address deed (`docs/design/deeds.md`) is used:
 
-- an address deed is used on a chest **on a plot the player owns**; the house name suggested is the plot's name,
-  if it has one;
-- the mayor or an assistant may put an address on a **town-owned** plot; it belongs to the town (the mayor) and
-  passes to whoever buys the plot, by the existing rule that an address on a plot belongs to its owner;
-- a chest on someone else's plot is refused.
+- on a chest **on a plot the player owns**, or
+- on a **town-owned** plot, by the mayor or an assistant: the address then belongs to the mayor, and passes to
+  whoever buys the plot;
+- a chest on someone else's plot, or on a town plot for anyone else, is refused with what to do (buy the plot, or
+  ask the mayor).
+
+Deeds held by the server (`/postal deed test`) aren't checked. Outside towns deeds work as before.
+
+**An address belongs to its plot's owner**, by the same rule as an office (§3): the plot's owner, else the mayor,
+else the server. Postal applies it when the address is made and whenever the postman delivers there, so it follows
+plot sales. (This replaces the old rule, which left addresses on town-owned plots without an owner.)
+
+The house name is still suggested at the counter, as today: the deed is bought before the chest, and so the plot,
+is known.
 
 ## What can only be tested in game
 
-CI has no Towny. Unit tests cover the rules (`PostOfficePlotsTest`: who owns an office, where a charter or cabinet
-may go); the plot type, tax collection, ownership following plot sales and the refusals need a server with Towny
+CI has no Towny. Unit tests cover the rules (`PostOfficePlotsTest`: who owns an office or address, where a charter,
+cabinet or address may go); the plot type, tax collection, ownership following plot sales and the refusals need a server with Towny
 (`docs/testing/towny.md`).

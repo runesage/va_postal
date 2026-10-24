@@ -283,7 +283,9 @@ public final class Deeds {
         if (C_Address.is_address_defined(deed.office(), deed.name())) {
             return DeedDocument.display(deed.office()) + " already has an address called " + DeedDocument.display(deed.name()) + ".";
         }
-        return null;
+        // In a Towny town, on a plot the holder owns (or the town's, for its mayor and assistants). Not for the server.
+        boolean server_held = VA_postal.SERVER != null && VA_postal.SERVER.getUniqueId().equals(deed.holder());
+        return server_held ? null : com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.address_problem(deed.holder(), chest);
     }
 
     /**
@@ -349,6 +351,8 @@ public final class Deeds {
         if (!server_held) {
             com.vodhanel.minecraft.va_postal.config.C_Owner.set_owner_address(office, name, holder_player(holder));
         }
+        // On a town plot the address is the plot owner's (the mayor's while the town owns it).
+        com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.reconcile_address(office, name, chest.getLocation());
         // After the owner: the sign's last line is read from it, and the postman finds a player's mailbox by it.
         BookManip.standard_addr_sign(Util.location2str(chest.getLocation()), 1, office, name, null);
         RouteSurvey.Outcome saved = RouteSurvey.save_probe(office, name, probe);
