@@ -346,7 +346,7 @@ P1), so no new tracking is needed in the world. The stats module (`stats/`) summ
 7. An office is only ever sold back to Central or to another player through Central, with a transaction
    fee that is a percentage of the sale price.
 8. The clerk is the Postmaster General.
-9. Towny integration is out of scope here; it comes in its own branch.
+9. Towny integration has its own design: `docs/design/towny.md` (post office plots).
 10. Charter notes are bound to their buyer and can't be traded.
 11. The clerk staffs Central whenever the mail is running, and is respawned and put back at its post if
     anything removes or moves it. Central is closed while the dispatcher is stopped.
