@@ -945,6 +945,42 @@ public class P_Towny {
         return null;
     }
 
+    // ---- Mass mailers (a town's residents are its mailing list) ---------------------------------
+
+    /** The Towny town {@code player} lives in, or null (no town, or Towny isn't in use). */
+    public static String town_of(UUID player) {
+        if (!VA_postal.towny_configured || !VA_postal.towny_opt_in || player == null) {
+            return null;
+        }
+        Resident r = TownyUniverse.getInstance().getResident(player);
+        Town town = r == null ? null : r.getTownOrNull();
+        return town == null ? null : town.getName();
+    }
+
+    /** True if {@code player} may mail their whole town: its mayor, or one of its assistants. */
+    public static boolean may_mail_town(UUID player) {
+        if (!VA_postal.towny_configured || !VA_postal.towny_opt_in || player == null) {
+            return false;
+        }
+        Resident r = TownyUniverse.getInstance().getResident(player);
+        return r != null && r.getTownOrNull() != null && (r.isMayor() || r.hasTownRank("assistant"));
+    }
+
+    /** The residents of Towny town {@code town}, by id (empty if there's no such town or Towny isn't in use). */
+    public static List<UUID> town_residents(String town) {
+        List<UUID> out = new ArrayList<>();
+        if (!VA_postal.towny_configured || !VA_postal.towny_opt_in || town == null) {
+            return out;
+        }
+        Town t = TownyUniverse.getInstance().getTown(town);
+        if (t != null) {
+            for (Resident r : t.getResidents()) {
+                out.add(r.getUUID());
+            }
+        }
+        return out;
+    }
+
     public static String[] get_all_residents_by_tvrs() {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
             Enumeration<Resident> residents = Collections.enumeration(TownyUniverse.getInstance().getResidents());

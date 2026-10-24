@@ -321,6 +321,13 @@ P1), so no new tracking is needed in the world. The stats module (`stats/`) summ
   it. Off by default.
 - **Insurance fund:** with parcels in persistent-state P2.
 
+- **Mass mailers (built).** A signed book copied into many mailboxes, by `/dist`'s delivery (a `[Distribution]` copy
+  in each mailbox chest, expiring). An office's owner mails its subscribers (opt-in: `/postal subscribe <office>`); a
+  Towny mayor or assistant mails their town's residents, who are on it until they opt out (`/postal unsubscribe
+  town`); an admin mails every address on the server. Lists live in the mail store (schema 10, `mailing_list`).
+  Only players with an address of their own get a copy (P.O. boxes later). Each copy costs the distribution postage,
+  paid to Central.
+
 ## 10. Decisions
 
 1. Branches may discount but not surcharge, for now.

@@ -66,6 +66,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oThe Branch of the Month, and who leads this period");
         Util.pinform(player, " &f&r/postal award");
+        Util.pinform(player, " &7&oMailing lists: join, leave, or send to one (a signed book in hand)");
+        Util.pinform(player, " &f&r/postal subscribe|unsubscribe <PostOffice|town>, /postal lists, /postal mailer <PostOffice|town|server>");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");
@@ -128,6 +130,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oThe Branch of the Month, and who leads this period");
         Util.pinform(player, " &f&r/postal award");
+        Util.pinform(player, " &7&oMailing lists: join, leave, or send to one (a signed book in hand)");
+        Util.pinform(player, " &f&r/postal subscribe|unsubscribe <PostOffice|town>, /postal lists, /postal mailer <PostOffice|town|server>");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");
@@ -178,6 +182,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oThe Branch of the Month, and who leads this period");
         Util.pinform(player, " &f&r/postal award");
+        Util.pinform(player, " &7&oMailing lists: join, leave, or send to one (a signed book in hand)");
+        Util.pinform(player, " &f&r/postal subscribe|unsubscribe <PostOffice|town>, /postal lists, /postal mailer <PostOffice|town|server>");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");

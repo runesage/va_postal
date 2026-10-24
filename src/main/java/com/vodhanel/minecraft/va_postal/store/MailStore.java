@@ -226,6 +226,17 @@ public interface MailStore extends AutoCloseable {
     /** All the mail this server keeps in P.O. boxes, oldest first (to find mail left in boxes that closed). */
     List<MailRecord> in_boxes();
 
+    // ---- Mailing lists (schema 10) ----------------------------------------------------------------
+
+    /** Sets {@code player}'s mode on {@code list} ({@link ListMember#SUBSCRIBED} or {@link ListMember#OPTED_OUT}); null takes them off it. */
+    void set_list_mode(String list, UUID player, String player_name, String mode, long now);
+
+    /** Everyone with a row on {@code list} on this server, oldest first. */
+    List<ListMember> list_members(String list);
+
+    /** {@code player}'s rows on every list on this server. */
+    List<ListMember> lists_of(UUID player);
+
     // ---- Office stats (docs/design/central-office.md §7) ---------------------------------------------
 
     /** This server's pickups, deliveries and losses in {@code [from, to)}, oldest first. */

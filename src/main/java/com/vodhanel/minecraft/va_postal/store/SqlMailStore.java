@@ -24,7 +24,7 @@ public final class SqlMailStore implements MailStore {
     /** Schema migrations, applied in order and recorded in {@code schema_version}. */
     static final String[] MIGRATIONS = {"V1__init.sql", "V2__hold.sql", "V3__wide_payload.sql", "V4__directory.sql",
             "V5__network_player.sql", "V6__deed.sql", "V7__office_offer.sql",
-            "V8__office_stats.sql", "V9__po_box.sql"};
+            "V8__office_stats.sql", "V9__po_box.sql", "V10__mailing_list.sql"};
 
     private static final String COLUMNS = "mail_id, kind, state, version, origin_server, dest_server, origin_office, "
             + "dest_office, dest_address, custody_server, custody_kind, custody_ref, pending_state, pending_kind, "
@@ -880,6 +880,71 @@ public final class SqlMailStore implements MailStore {
         } catch (SQLException e) {
             throw new StoreException("Could not update a box", e);
         }
+    }
+
+    @Override
+    public void set_list_mode(String list, UUID player, String player_name, String mode, long now) {
+        String key = list.toLowerCase(java.util.Locale.ROOT).trim();
+        try (Connection c = source.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM mailing_list WHERE server_id = ? AND list = ? AND player_uuid = ?")) {
+                    ps.setString(1, server_id);
+                    ps.setString(2, key);
+                    ps.setString(3, player.toString());
+                    ps.executeUpdate();
+                }
+                if (mode != null) {
+                    try (PreparedStatement ps = c.prepareStatement("INSERT INTO mailing_list (server_id, list, player_uuid, player_name, mode, at) "
+                            + "VALUES (?, ?, ?, ?, ?, ?)")) {
+                        ps.setString(1, server_id);
+                        ps.setString(2, key);
+                        ps.setString(3, player.toString());
+                        ps.setString(4, player_name == null ? "" : player_name.length() > 16 ? player_name.substring(0, 16) : player_name);
+                        ps.setString(5, mode);
+                        ps.setLong(6, now);
+                        ps.executeUpdate();
+                    }
+                }
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not change a mailing list", e);
+        }
+    }
+
+    @Override
+    public List<ListMember> list_members(String list) {
+        return list_rows("WHERE server_id = ? AND list = ? ORDER BY at", server_id, list.toLowerCase(java.util.Locale.ROOT).trim());
+    }
+
+    @Override
+    public List<ListMember> lists_of(UUID player) {
+        return list_rows("WHERE server_id = ? AND player_uuid = ? ORDER BY list", server_id, player.toString());
+    }
+
+    private List<ListMember> list_rows(String where, String... args) {
+        List<ListMember> out = new ArrayList<>();
+        try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
+                "SELECT server_id, list, player_uuid, player_name, mode, at FROM mailing_list " + where)) {
+            for (int i = 0; i < args.length; i++) {
+                ps.setString(i + 1, args[i]);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new ListMember(rs.getString(1), rs.getString(2), UUID.fromString(rs.getString(3)), rs.getString(4),
+                            rs.getString(5), rs.getLong(6)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new StoreException("Could not read a mailing list", e);
+        }
+        return out;
     }
 
     @Override
