@@ -96,6 +96,10 @@ public final class OfficeSales {
         if (seller.equals(buyer.getUniqueId())) {
             return Result.failed("you can't sell an office to its owner");
         }
+        String town = com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.sale_problem(office);
+        if (town != null) {
+            return Result.failed(town);
+        }
         long now = System.currentTimeMillis();
         String seller_name = C_Owner.get_owner_local_po_name(office);
         Offer o = new Offer(UUID.randomUUID(), store.server_id(), office, seller, seller_name == null ? "?" : seller_name,
@@ -235,6 +239,10 @@ public final class OfficeSales {
         if (!owner.getUniqueId().equals(C_Owner.get_owner_local_po_id(office))) {
             return Result.failed("you don't own " + DeedDocument.display(office));
         }
+        String town = com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.sale_problem(office);
+        if (town != null) {
+            return Result.failed(town);
+        }
         Offer open = open_offer(office);
         if (open != null) {
             withdraw(office);
@@ -246,7 +254,7 @@ public final class OfficeSales {
     }
 
     /** Puts the office's sign up again, with its new owner on the last line. */
-    private static void resign(String office) {
+    public static void resign(String office) {
         Block chest = com.vodhanel.minecraft.va_postal.clerk.Clerks.office_chest(office);
         if (chest != null) {
             BookManip.standard_addr_sign(Util.location2str(chest.getLocation()), 1, office, "[Local]", null);

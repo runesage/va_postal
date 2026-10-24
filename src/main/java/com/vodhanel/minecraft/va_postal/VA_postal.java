@@ -290,6 +290,23 @@ public class VA_postal extends JavaPlugin {
         return "";
     }
 
+    /**
+     * Towny reads its plots as it enables, and a plot of a type it doesn't know becomes residential: so the post office
+     * plot type (docs/design/towny.md) is added now, before any plugin enables.
+     */
+    @Override
+    public void onLoad() {
+        if (getServer().getPluginManager().getPlugin("Towny") == null
+                || !"true".equalsIgnoreCase(getConfig().getString(GetConfig.path_format("settings.towny.opt_in")))) {
+            return;
+        }
+        try {
+            com.vodhanel.minecraft.va_postal.common.P_Towny.register_plot_type(getConfig());
+        } catch (Throwable e) {
+            getLogger().warning("Couldn't add the post office plot type to Towny: " + e);
+        }
+    }
+
     public void onEnable() {
         Postal_Started = false;
         try {
@@ -510,6 +527,8 @@ public class VA_postal extends JavaPlugin {
             } else {
                 Util.cinform("[Postal] Using Towny.");
                 towny_configured = true;
+                com.vodhanel.minecraft.va_postal.common.P_Towny.register_plot_type(getConfig());
+                getServer().getPluginManager().registerEvents(new com.vodhanel.minecraft.va_postal.common.P_TownyListener(), this);
             }
         } else {
             Util.cinform("[Postal] Towny disabled in 'config.yml'.");

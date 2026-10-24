@@ -150,6 +150,14 @@ public final class BoxCabinet implements Listener {
             send(sender, "&7Look at a barrel (or give its coordinates): that's the box cabinet.");
             return;
         }
+        String plot = com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.cabinet_problem(office, b);
+        if (plot != null) {
+            if (!admin) {
+                send(sender, "&7" + plot);
+                return;
+            }
+            send(sender, "&7" + plot + " &6Admin override, you may continue.");
+        }
         VA_postal.plugin.getConfig().set(path(office), key(b));
         VA_postal.plugin.saveConfig();
         sign(b, office, sender instanceof Player p ? p.getFacing().getOppositeFace() : BlockFace.SOUTH);

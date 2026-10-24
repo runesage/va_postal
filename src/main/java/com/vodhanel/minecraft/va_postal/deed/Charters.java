@@ -157,6 +157,9 @@ public final class Charters {
     /** {@code player} used their (usable) charter on {@code chest}. */
     static void use(Player player, Block chest, Deed deed) {
         String problem = place_problem(chest);
+        if (problem == null) {
+            problem = com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.charter_problem(deed.holder(), chest);
+        }
         if (problem != null) {
             Util.pinform(player, "&7&o" + problem);
             return;
@@ -224,6 +227,8 @@ public final class Charters {
             return;
         }
         create_office(deed, chest);
+        // On a town's post office plot the office is the plot owner's (the mayor's while the town owns it).
+        com.vodhanel.minecraft.va_postal.towny.TownyPostOffices.reconcile(deed.office());
         if (player != null) {
             Deeds.take_documents(player, deed.id());
         }

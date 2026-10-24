@@ -1,5 +1,6 @@
 package com.vodhanel.minecraft.va_postal.common;
 
+import com.palmergames.bukkit.towny.TownyAPI;
 import com.palmergames.bukkit.towny.TownyUniverse;
 import com.palmergames.bukkit.towny.exceptions.NotRegisteredException;
 import com.palmergames.bukkit.towny.object.*;
@@ -7,6 +8,8 @@ import com.palmergames.bukkit.towny.utils.PlayerCacheUtil;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.commands.Cmdexecutor;
 import com.vodhanel.minecraft.va_postal.config.*;
+import com.vodhanel.minecraft.va_postal.towny.PostOfficePlots;
+import com.vodhanel.minecraft.va_postal.towny.TownyPostOffices;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -20,33 +23,16 @@ public class P_Towny {
         plugin = instance;
     }
 
+    /** Central's postman calls at office {@code id}: the town it's in, and its owner if it's on a post office plot. */
     public static void check_po_ownership(int id, String stown) {
         if (!"null".equals(VA_postal.wtr_schest_location_postoffice[id])) {
-            String sloc = VA_postal.wtr_schest_location_postoffice[id];
-            Location loc = Util.str2location(sloc);
-            update_town_by_loc(stown, loc);
-            Map.Entry<String, Player> mayor = towny_mayor_by_loc(loc);
-            if (!mayor.getKey().equals("not_towny")) {
-                if (mayor.getKey().equals("not_mayor")) {
-                    if (C_Owner.is_local_po_owner_defined(stown)) {
-                        C_Owner.del_owner_local_po(stown);
-                        Util.cinform("Towny override: mayer removed from: " + Util.df(stown));
-                    }
-
-                } else if (C_Owner.is_local_po_owner_defined(stown)) {
-                    Player local_po_owner = C_Owner.get_owner_local_po(stown);
-                    if (local_po_owner != mayor.getValue()) {
-                        C_Owner.set_owner_local_po(stown, mayor.getValue());
-                        Util.cinform("Towny override: New mayor: " + Util.df(stown));
-                    }
-                } else {
-                    C_Owner.set_owner_local_po(stown, mayor.getValue());
-                    Util.cinform("Towny override: New mayor: " + Util.df(stown));
-                }
+            Location loc = Util.str2location(VA_postal.wtr_schest_location_postoffice[id]);
+            if (loc != null) {
+                update_town_by_loc(stown, loc);
             }
+            TownyPostOffices.reconcile(stown);
         }
     }
-
 
     public static void update_town_by_loc(String postal_town, Location location) {
         if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in)) {
@@ -979,6 +965,66 @@ public class P_Towny {
             }
         }
         return out;
+    }
+
+    // ---- Post office plots (docs/design/towny.md) ------------------------------------------------
+
+    /**
+     * Adds the {@code postoffice} plot type to Towny unless it's there (Towny's own config may define it). Called as
+     * Postal loads, before Towny reads its plots (a plot of a type Towny doesn't know becomes residential), and again
+     * whenever Towny reloads its types. {@code config} is Postal's config.
+     */
+    public static void register_plot_type(ConfigurationSection config) {
+        if (TownBlockTypeHandler.exists(PostOfficePlots.TYPE)) {
+            return;
+        }
+        TownBlockData data = new TownBlockData();
+        data.setTax(Math.max(0.0D, GetConfig.double_value(config, GetConfig.path_format("settings.towny.post_office_plot.tax"), 0.0D)));
+        data.setCost(Math.max(0.0D, GetConfig.double_value(config, GetConfig.path_format("settings.towny.post_office_plot.cost"), 0.0D)));
+        String key = config.getString(GetConfig.path_format("settings.towny.post_office_plot.map_key"), "P");
+        data.setMapKey(key == null || key.isEmpty() ? "P" : key.substring(0, 1));
+        data.setColour(net.kyori.adventure.text.format.NamedTextColor.GOLD);
+        try {
+            TownBlockTypeHandler.registerType(new TownBlockType(PostOfficePlots.TYPE, data));
+        } catch (com.palmergames.bukkit.towny.exceptions.TownyException e) {
+            Util.cinform("[Postal] Couldn't add the post office plot type to Towny: " + e.getMessage());
+        }
+    }
+
+    /** The town plot at {@code location}, or null outside towns. */
+    public static PostOfficePlots.Plot plot_at(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return null;
+        }
+        TownBlock tb = TownyAPI.getInstance().getTownBlock(location);
+        Town town = tb == null ? null : tb.getTownOrNull();
+        if (town == null) {
+            return null;
+        }
+        Resident owner = tb.getResidentOrNull();
+        Resident mayor = town.hasMayor() ? town.getMayor() : null;
+        return new PostOfficePlots.Plot(town.getName(), plot_key(tb), PostOfficePlots.TYPE.equalsIgnoreCase(tb.getTypeName()),
+                person(owner), person(mayor));
+    }
+
+    /** A key naming town block {@code tb}: {@code world:x:z}. */
+    public static String plot_key(TownBlock tb) {
+        return tb.getWorldCoord().getWorldName() + ":" + tb.getX() + ":" + tb.getZ();
+    }
+
+    /** A resident's id, or null for none or an NPC (Towny's stand-in mayors). */
+    private static UUID person(Resident r) {
+        return r == null || r.isNPC() ? null : r.getUUID();
+    }
+
+    /** True if {@code player} is the mayor or an assistant of Towny town {@code town}. */
+    public static boolean is_mayor_or_assistant(UUID player, String town) {
+        if (player == null || town == null) {
+            return false;
+        }
+        Resident r = TownyUniverse.getInstance().getResident(player);
+        Town t = r == null ? null : r.getTownOrNull();
+        return t != null && t.getName().equalsIgnoreCase(town) && (r.isMayor() || r.hasTownRank("assistant"));
     }
 
     public static String[] get_all_residents_by_tvrs() {
