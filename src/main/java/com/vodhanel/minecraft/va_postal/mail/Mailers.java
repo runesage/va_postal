@@ -73,7 +73,7 @@ public final class Mailers {
         }
         try {
             if ("town".equalsIgnoreCase(args[1])) {
-                String town = P_Towny.town_of(p.getUniqueId());
+                String town = town_of(p.getUniqueId());
                 if (town == null) {
                     send(sender, "&7You don't live in a Towny town.");
                     return;
@@ -113,7 +113,7 @@ public final class Mailers {
             return;
         }
         List<String> on = new ArrayList<>();
-        String town = P_Towny.town_of(p.getUniqueId());
+        String town = town_of(p.getUniqueId());
         boolean town_out = false;
         try {
             for (ListMember m : store().lists_of(p.getUniqueId())) {
@@ -151,17 +151,17 @@ public final class Mailers {
             return new Plan("every address on the server", null, owners());
         }
         if ("town".equalsIgnoreCase(target)) {
-            String town = P_Towny.town_of(sender.getUniqueId());
+            String town = town_of(sender.getUniqueId());
             if (town == null) {
                 send(sender, "&7You don't live in a Towny town.");
                 return null;
             }
-            if (!P_Towny.may_mail_town(sender.getUniqueId())) {
+            if (!may_mail_town(sender.getUniqueId())) {
                 send(sender, "&7Only " + town + "'s mayor and assistants mail the town.");
                 return null;
             }
             String list = MailingLists.town_list(town);
-            return new Plan(town + "'s residents", null, MailingLists.members(list, P_Towny.town_residents(town), rows(list)));
+            return new Plan(town + "'s residents", null, MailingLists.members(list, town_residents(town), rows(list)));
         }
         String office = C_Postoffice.town_complete(target);
         if ("null".equals(office)) {
@@ -313,6 +313,23 @@ public final class Mailers {
             }
         }
         return new ArrayList<>(out);
+    }
+
+    // P_Towny names Towny's classes, so it may only be loaded where Towny is installed: ask first.
+    private static boolean towny() {
+        return VA_postal.towny_configured && VA_postal.towny_opt_in;
+    }
+
+    private static String town_of(UUID player) {
+        return towny() ? P_Towny.town_of(player) : null;
+    }
+
+    private static boolean may_mail_town(UUID player) {
+        return towny() && P_Towny.may_mail_town(player);
+    }
+
+    private static List<UUID> town_residents(String town) {
+        return towny() ? P_Towny.town_residents(town) : List.of();
     }
 
     private static List<ListMember> rows(String list) {
