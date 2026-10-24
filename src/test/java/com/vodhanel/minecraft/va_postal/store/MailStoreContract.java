@@ -126,6 +126,22 @@ abstract class MailStoreContract {
     }
 
     @Test
+    void mailingListsKeepOneModePerPlayer() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        store.set_list_mode("Office:Testville", a, "Alex", ListMember.SUBSCRIBED, 10L);
+        store.set_list_mode("office:testville", b, "Blair", ListMember.SUBSCRIBED, 11L);
+        store.set_list_mode("town:Rivertown", a, "Alex", ListMember.OPTED_OUT, 12L);
+        assertEquals(List.of(a, b), store.list_members("office:testville").stream().map(ListMember::player).toList());
+        assertEquals(List.of("office:testville", "town:rivertown"), store.lists_of(a).stream().map(ListMember::list).toList());
+        store.set_list_mode("office:testville", a, "Alex", ListMember.OPTED_OUT, 13L); // replaces, never duplicates
+        assertEquals(List.of(ListMember.OPTED_OUT), store.list_members("office:testville").stream()
+                .filter(m -> m.player().equals(a)).map(ListMember::mode).toList());
+        store.set_list_mode("office:testville", b, "Blair", null, 14L); // off the list
+        assertEquals(List.of(a), store.list_members("office:testville").stream().map(ListMember::player).toList());
+        assertTrue(new SqlMailStore(ds, "other", null, dialect()).list_members("office:testville").isEmpty()); // this server's
+    }
+
+    @Test
     void missingMailIsListedBySender() {
         MailRecord a = store.transition(letter(), MailState.AT_ORIGIN_BRANCH, Custody.chest("a"), Actor.system("t"), null);
         MailRecord lost = store.transition(a, MailState.MISSING, a.custody, Actor.system("t"), "not in its chest");

@@ -326,6 +326,13 @@ P1), so no new tracking is needed in the world. The stats module (`stats/`) summ
   record's copy again from Central or, for a parcel, gives its items back with the postage refunded. Nothing is
   created, so there's nothing to game. `/postal claim` is the admin side.
 
+- **Mass mailers (built).** A signed book copied into many mailboxes, by `/dist`'s delivery (a `[Distribution]` copy
+  in each mailbox chest, expiring). An office's owner mails its subscribers (opt-in: `/postal subscribe <office>`); a
+  Towny mayor or assistant mails their town's residents, who are on it until they opt out (`/postal unsubscribe
+  town`); an admin mails every address on the server. Lists live in the mail store (schema 10, `mailing_list`).
+  Only players with an address of their own get a copy (P.O. boxes later). Each copy costs the distribution postage,
+  paid to Central.
+
 ## 10. Decisions
 
 1. Branches may discount but not surcharge, for now.

@@ -632,6 +632,29 @@ from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "execute if items block 20 -60 0 container.* minecraft:written_book[minecraft:written_book_content~{author:\"rose_cottage\"}]"
 check "the returned letter is in Testville's chest" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
 
+# ---- Mass mailers (docs/design/central-office.md §9) -----------------------------------------------------------------
+# The bot subscribes to Testville's list. Holding a signed book it plans a mailing to Testville's subscribers (one
+# mailbox: its own Rose Cottage), sends it, and the [Distribution] copy is in Rose Cottage's chest. Unsubscribed, the
+# list reaches nobody. Without Towny there's no town to mail; an admin can mail every address on the server.
+check "the bot subscribes to Testville's list" bot_cmd "/postal subscribe testville" "CHAT .*You're on the Testville Post Office's mailing list"
+check "/postal lists shows it" bot_cmd "/postal lists" 'CHAT .*the Testville Post Office'
+console "minecraft:clear $BOT_NAME"
+console 'minecraft:give '"$BOT_NAME"' minecraft:written_book[minecraft:written_book_content={title:"Town News",author:"PostalBot",pages:["Hello, subscribers!"]}]'
+sleep 1
+check "a mailing to Testville's subscribers reaches one mailbox" bot_cmd "/postal mailer testville" \
+    "CHAT .*A mailing to the Testville Post Office's subscribers: 1 mailbox "
+check "confirming sends it" bot_cmd "/postal mailer testville confirm" 'CHAT .*Your mailing went to 1 mailbox'
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console 'execute if items block 14 -60 6 container.* minecraft:written_book[minecraft:written_book_content~{title:"[Distribution]"}]'
+check "the copy is in Rose Cottage's mailbox" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+check "the bot unsubscribes" bot_cmd "/postal unsubscribe testville" "CHAT .*You're off the Testville Post Office's mailing list"
+console 'minecraft:give '"$BOT_NAME"' minecraft:written_book[minecraft:written_book_content={title:"More News",author:"PostalBot",pages:["Anyone?"]}]'
+sleep 1
+check "then the list reaches nobody" bot_cmd "/postal mailer testville" "CHAT .*subscribers: 0 mailboxes"
+check "without Towny there's no town to mail" bot_cmd "/postal mailer town" "CHAT .*You don't live in a Towny town"
+check "an admin can mail every address on the server" bot_cmd "/postal mailer server" "CHAT .*A mailing to every address on the server: [1-9][0-9]* mailbox"
+console "minecraft:clear $BOT_NAME"
+
 # ---- Lost-mail claims at Central's counter (docs/design/central-office.md §9) ----------------------------------------
 # The bot packs a parcel (the named blade and the logs) and an admin forces it MISSING. At Central's counter the Lost
 # mail card lists it; right-clicking its slip gives the items back from the record (RETURNED). Then a letter from the
