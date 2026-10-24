@@ -325,5 +325,10 @@ public final class Reconciler {
         } catch (RuntimeException e) {
             Util.cinform("[Postal] A MailMissingEvent listener failed: " + e);
         }
+        org.bukkit.entity.Player sender = r.sender == null ? null : Bukkit.getPlayer(r.sender);
+        if (sender != null) {
+            Util.pinform(sender, "&6A " + (r.kind == MailKind.PARCEL ? "parcel" : "letter") + " of yours for &f"
+                    + Util.df(r.dest_address) + "&6 went missing. Nothing is lost: claim it at Central's counter.");
+        }
     }
 }

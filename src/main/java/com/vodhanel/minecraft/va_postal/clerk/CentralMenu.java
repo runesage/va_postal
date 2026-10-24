@@ -26,7 +26,7 @@ import java.util.UUID;
 /**
  * Central's counter (docs/design/central-office.md §2), opened by the Postmaster General: the network's postage
  * rates, the network at a glance, the offices the player owns, and charters: apply or buy one, see an application, or
- * collect a granted (or lost) charter. Office sales join it later.
+ * collect a granted (or lost) charter; office sales; and lost-mail claims (§9).
  */
 final class CentralMenu implements Menu {
     static final int RATES = 11;
@@ -35,6 +35,7 @@ final class CentralMenu implements Menu {
     static final int CHARTERS = 22;
     static final int OFFERS = 24;
     static final int LEADERS = 20;
+    static final int CLAIMS = 4;
 
     private final Inventory inventory;
     /** The player's charters: issued ones waiting to be used, and applications waiting for a decision. */
@@ -42,12 +43,20 @@ final class CentralMenu implements Menu {
     private final List<Deed> waiting;
     private final List<String> owned;
     private final List<com.vodhanel.minecraft.va_postal.store.Offer> offers;
+    private final int lost;
 
     private CentralMenu(Player player) {
         this.inventory = Bukkit.createInventory(this, 27, Text.component(Text.color("&8Central Post Office")));
         inventory.setItem(RATES, rates());
         inventory.setItem(NETWORK, network());
         inventory.setItem(LEADERS, leaders());
+        lost = com.vodhanel.minecraft.va_postal.mail.Claims.lost(player.getUniqueId()).size();
+        inventory.setItem(CLAIMS, lost == 0
+                ? CounterMenu.item(Material.COMPASS, "&6Lost mail", "&7None of your mail is lost.", "",
+                "&8If a letter or parcel of yours goes", "&8missing, claim it here: our records", "&8keep everything you send.")
+                : CounterMenu.item(Material.RECOVERY_COMPASS, "&6Lost mail",
+                "&f" + lost + " &7letter" + (lost == 1 ? "" : "s") + " or parcel" + (lost == 1 ? "" : "s") + " of yours went missing.",
+                "", "&7Click to claim: we send it again,", "&7or give a parcel's items back."));
         owned = owned(player.getUniqueId());
         if (!owned.isEmpty()) {
             List<String> lore = new ArrayList<>();
@@ -139,6 +148,12 @@ final class CentralMenu implements Menu {
         }
         if (slot == OFFERS && !offers.isEmpty()) {
             player.openInventory(new SalesMenus.Offers(offers).getInventory());
+            return;
+        }
+        if (slot == CLAIMS) {
+            if (lost > 0) {
+                ClaimsMenu.open(player);
+            }
             return;
         }
         if (slot == NETWORK) {

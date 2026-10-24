@@ -395,6 +395,63 @@ public final class Parcels {
         return true;
     }
 
+    /**
+     * A lost-mail claim taking a lost parcel back (docs/design/central-office.md §9): its items go into the sender's
+     * inventory at Central's counter, and its postage is refunded. Needs a free slot for every stack; false (with the
+     * player told) if there isn't room or the parcel moved on meanwhile. The record closes as RETURNED, so the label
+     * (if it ever turns up) can't be accepted.
+     */
+    public static boolean claim_back(Player player, MailRecord r, Actor actor) {
+        ParcelPayload payload = ParcelPayload.decode(r.payload);
+        List<ItemStack> items = new ArrayList<>();
+        List<String> lost = new ArrayList<>();
+        for (byte[] bytes : payload.items) {
+            ItemStack item = restore(bytes);
+            if (item == null) {
+                lost.add(describe(bytes));
+            } else {
+                items.add(item);
+            }
+        }
+        int free = 0;
+        for (ItemStack slot : player.getInventory().getStorageContents()) {
+            free += slot == null || slot.getType().isAir() ? 1 : 0;
+        }
+        if (free < items.size()) {
+            Util.pinform(player, "&7&oThis parcel holds " + items.size() + " stack" + (items.size() == 1 ? "" : "s")
+                    + ": make room for them and ask again.");
+            return false;
+        }
+        MailRecord done;
+        try {
+            done = store().transition(r, MailState.RETURNED, Custody.NONE, actor, "claimed back by its sender at Central");
+        } catch (StoreException | ConflictException e) {
+            Util.pinform(player, "&c&oThis parcel can't be claimed now: it may have turned up.");
+            return false;
+        }
+        for (ItemStack item : items) {
+            player.getInventory().addItem(item).values()
+                    .forEach(left -> player.getWorld().dropItemNaturally(player.getLocation(), left));
+        }
+        if (!lost.isEmpty()) {
+            report_lost(done, lost, player);
+        }
+        clear_packed(r);
+        P_Economy.cancel_hold(r.hold_id, "&6Postal refunded {amount} of postage for your lost parcel.");
+        return true;
+    }
+
+    /** A parcel lost before its first pickup leaves its emptied chest locked: a courier takes it away. */
+    static void clear_packed(MailRecord r) {
+        if (r.kind != MailKind.PARCEL) {
+            return;
+        }
+        Block block = origin_chest(ParcelPayload.decode(r.payload));
+        if (block != null) {
+            Courier.collect(block);
+        }
+    }
+
     /** Admin accept (testing): hands the items over in a chest at {@code at}, without COD. */
     public static boolean admin_accept(MailRecord r, Location at, Actor actor, CommandSender who) {
         Block block = at.getBlock();

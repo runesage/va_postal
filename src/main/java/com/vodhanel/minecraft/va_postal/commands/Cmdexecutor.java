@@ -201,6 +201,10 @@ public class Cmdexecutor implements CommandExecutor {
             com.vodhanel.minecraft.va_postal.mail.Mailers.lists(player);
             return true;
         }
+        if ("claim".equals(sub)) {
+            com.vodhanel.minecraft.va_postal.mail.Claims.command(player, args);
+            return true;
+        }
         if ("charter".equals(sub)) {
             if (!hasPermission(player, "postal.admin")) {
                 Util.pinform(player, "Required permission not present.");
@@ -459,6 +463,10 @@ public class Cmdexecutor implements CommandExecutor {
         }
         if ("mailer".equals(args[0].toLowerCase().trim())) {
             com.vodhanel.minecraft.va_postal.mail.Mailers.command(sender, args);
+            return true;
+        }
+        if ("claim".equals(args[0].toLowerCase().trim())) {
+            com.vodhanel.minecraft.va_postal.mail.Claims.command(sender, args);
             return true;
         }
         if ("charter".equals(args[0].toLowerCase().trim())) {

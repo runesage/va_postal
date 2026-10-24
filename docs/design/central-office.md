@@ -26,7 +26,7 @@ it (chartering an office, selling one, rates) is done in person at Central's cou
 gate the mail itself: letters flow between offices as they do today whether or not anyone visits Central.
 
 Out of scope here: Towny integration (its own branch); a dead letter office (dropped); PO boxes (a later
-local-office feature, §9); and the insurance fund, which comes with parcels in persistent-state phase P2.
+local-office feature, §9); and the insurance fund, replaced by lost-mail claims (§9).
 
 ## 2. The clerk: the Postmaster General
 
@@ -319,7 +319,12 @@ P1), so no new tracking is needed in the world. The stats module (`stats/`) summ
 - **PO boxes:** designed separately (`docs/design/po-boxes.md`) as a local-office feature, not Central's.
 - **Congestion:** dispatch slows as Central's hourly volume rises, with `/expedite` as the paid way past
   it. Off by default.
-- **Insurance fund:** with parcels in persistent-state P2.
+- **Insurance fund: replaced by lost-mail claims (built).** A paid fund would value parcels by something Postal can't
+  check (a declared value) or a price list someone keeps, and an office owner could "lose" a friend's parcel from
+  their own chest and share the payout. It's also unneeded: every record keeps what the mail carried. So Central
+  pays nothing: at its counter a sender's *Lost mail* card lists their `MISSING` mail, and a claim either sends the
+  record's copy again from Central or, for a parcel, gives its items back with the postage refunded. Nothing is
+  created, so there's nothing to game. `/postal claim` is the admin side.
 
 - **Mass mailers (built).** A signed book copied into many mailboxes, by `/dist`'s delivery (a `[Distribution]` copy
   in each mailbox chest, expiring). An office's owner mails its subscribers (opt-in: `/postal subscribe <office>`); a

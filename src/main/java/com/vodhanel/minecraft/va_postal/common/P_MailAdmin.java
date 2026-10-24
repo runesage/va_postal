@@ -370,7 +370,7 @@ public final class P_MailAdmin {
     }
 
     /** The record named by args[1], or null (with a message). */
-    private static MailRecord target(CommandSender sender, String[] args, String usage) {
+    public static MailRecord target(CommandSender sender, String[] args, String usage) {
         MailStore store = MailStores.active();
         if (store == null) {
             send(sender, "&7The mail store isn't open; mail isn't being tracked.");
