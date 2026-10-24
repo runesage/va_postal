@@ -632,6 +632,48 @@ from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "execute if items block 20 -60 0 container.* minecraft:written_book[minecraft:written_book_content~{author:\"rose_cottage\"}]"
 check "the returned letter is in Testville's chest" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
 
+# ---- Lost-mail claims at Central's counter (docs/design/central-office.md §9) ----------------------------------------
+# The bot packs a parcel (the named blade and the logs) and an admin forces it MISSING. At Central's counter the Lost
+# mail card lists it; right-clicking its slip gives the items back from the record (RETURNED). Then a letter from the
+# bot, forced MISSING, is sent again from Central with a left-click (AT_CENTRAL, or on its way from there). The mail runs
+# meanwhile: Central's clerk only staffs the counter while it does.
+console "minecraft:setblock 25 -60 10 minecraft:chest{Items:$CHEST_ITEMS}"
+console "minecraft:tp $BOT_NAME 24 -59 10"
+sleep 2
+bot_cmd "/package testville home" 'CHAT .*Ready create shipping label' || true
+bot_cmd "/" 'CHAT .*shipping label is now in your hand' || true
+sleep 1
+LP=$(newest_parcel)
+console "postal setstate $LP MISSING"
+sleep 1
+console "minecraft:clear $BOT_NAME"
+from=$(( $(lines "$BOT_LOG") + 1 ))
+console "postal start" # Central's clerk only staffs the counter while the mail runs
+sleep 5
+console "minecraft:tp $BOT_NAME 0.5 -60 3"
+wait_log "$BOT_LOG" 'CHAT <Postmaster General> Good day' 30 "$from" || true
+check "Central's counter has a Lost mail card" bot_cmd "interact -0.5 -60 0.5" 'ITEM [0-9]+/4 Lost mail'
+check "clicking it lists the lost parcel" bot_cmd "click 4" 'ITEM [0-9]+/0 Parcel for Home'
+from=$(( $(lines "$BOT_LOG") + 1 ))
+bot "click 0 right"
+check "right-clicking takes its items back" wait_log "$BOT_LOG" 'CHAT .*Here are the things you sent to Home' 10 "$from"
+check "the blade is in the bot's inventory" wait_log "$BOT_LOG" 'ITEM [0-9]+/[0-9]+ Bot Blade' 10 "$from"
+check "and its postage is refunded" grep -qE 'CHAT .*refunded .* of postage for your lost parcel' <(tail -n +"$from" "$BOT_LOG")
+check "the parcel is RETURNED" test "$(track_state "$LP")" = RETURNED
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal testletter testville testville home from:$BOT_UUID"
+wait_log "$SERVER_LOG" 'Test letter [0-9a-f-]+ handed in' 5 "$from" || true
+LL=$(tail -n +"$from" "$SERVER_LOG" | grep -oE "Test letter $UUID_RE" | head -1 | awk '{print $3}')
+console "postal setstate $LL MISSING"
+sleep 1
+bot_cmd "interact -0.5 -60 0.5" 'ITEM [0-9]+/4 Lost mail' || true
+check "the lost letter is listed" bot_cmd "click 4" 'ITEM [0-9]+/0 Letter for Home'
+check "left-clicking sends it again" bot_cmd "click 0" 'CHAT .*goes out again from here'
+check "the letter is back in the post from Central" bash -c 'grep -qE "^(AT_CENTRAL|AT_DEST_BRANCH|OUT_FOR_DELIVERY|DELIVERED)$" <<<"$1"' _ "$(track_state "$LL")"
+bot "close"
+console "postal stop"
+sleep 2
+
 # ---- The mail store as a player sees it: /postal store and /postal directory (P3 test plan 1, 2) --------------------
 store_text() {
     local from; from=$(( $(lines "$BOT_LOG") + 1 ))

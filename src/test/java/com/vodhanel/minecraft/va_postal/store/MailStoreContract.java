@@ -126,6 +126,21 @@ abstract class MailStoreContract {
     }
 
     @Test
+    void missingMailIsListedBySender() {
+        MailRecord a = store.transition(letter(), MailState.AT_ORIGIN_BRANCH, Custody.chest("a"), Actor.system("t"), null);
+        MailRecord lost = store.transition(a, MailState.MISSING, a.custody, Actor.system("t"), "not in its chest");
+        MailRecord kept = store.transition(letter(), MailState.AT_ORIGIN_BRANCH, Custody.chest("b"), Actor.system("t"), null);
+        assertEquals(List.of(lost.id), store.missing_sent_by(lost.sender).stream().map(r -> r.id).toList());
+        assertTrue(store.missing_sent_by(kept.sender).isEmpty());
+        assertTrue(store.missing_sent_by(UUID.randomUUID()).isEmpty());
+        assertEquals(List.of(lost.id), store.missing().stream().map(r -> r.id).toList());
+        // Claimed (sent again from Central), it's no longer lost.
+        store.transition(lost, MailState.AT_CENTRAL, Custody.chest("central"), Actor.system("t"), "claimed");
+        assertTrue(store.missing_sent_by(lost.sender).isEmpty());
+        assertTrue(store.missing().isEmpty());
+    }
+
+    @Test
     void deliveredMailNeverMovesAgain() {
         MailRecord d = store.transition(letter(), MailState.DELIVERED, Custody.chest("home"), Actor.system("t"), null);
         assertThrows(ConflictException.class,

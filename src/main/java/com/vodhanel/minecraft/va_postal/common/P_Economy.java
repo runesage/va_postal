@@ -477,14 +477,14 @@ public class P_Economy {
         cancel_hold(hold_id, null);
     }
 
-    /** {@code message}: what the payer is told (null: a cancelled parcel). */
+    /** {@code message}: what the payer is told, with {@code {amount}} for the refund (null: a cancelled parcel). */
     public static void cancel_hold(String hold_id, String message) {
         if (!VA_postal.economy_configured || hold_id == null) {
             return;
         }
         Hold hold = EconomyState.remove_hold(hold_id);
         if (hold != null) {
-            refund_postage(hold.payer, hold.total(), message != null ? message : "&6Postal refunded " + ef(hold.total())
+            refund_postage(hold.payer, hold.total(), message != null ? message.replace("{amount}", ef(hold.total())) : "&6Postal refunded " + ef(hold.total())
                     + " of postage for the parcel you cancelled.");
         }
     }
