@@ -66,6 +66,8 @@ public class Cmd_static {
         Util.pinform(player, " &f&r/postal stats [PostOffice] [days]");
         Util.pinform(player, " &7&oThe Branch of the Month, and who leads this period");
         Util.pinform(player, " &f&r/postal award");
+        Util.pinform(player, " &7&oLost mail on this server, or send one again from Central");
+        Util.pinform(player, " &f&r/postal claim [mail id]");
         Util.pinform(player, " &7&oList players that have been on server");
         Util.pinform(player, " &f&r/plist <string match> &7&o(alias: /pl)");
         Util.pinform(player, " &7&oSet your compass to a post office or address");

@@ -226,6 +226,12 @@ public interface MailStore extends AutoCloseable {
     /** All the mail this server keeps in P.O. boxes, oldest first (to find mail left in boxes that closed). */
     List<MailRecord> in_boxes();
 
+    /** Mail {@code sender} sent that went MISSING on this server, with no move in flight, oldest first (lost-mail claims). */
+    List<MailRecord> missing_sent_by(UUID sender);
+
+    /** All the mail that went MISSING on this server, with no move in flight, oldest first. */
+    List<MailRecord> missing();
+
     // ---- Office stats (docs/design/central-office.md §7) ---------------------------------------------
 
     /** This server's pickups, deliveries and losses in {@code [from, to)}, oldest first. */

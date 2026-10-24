@@ -430,6 +430,16 @@ run_server "$WORK_DIR/phase24.log" \
     "setblock -2 -60 -4 minecraft:stone" "setblock -2 -60 -3 minecraft:oak_wall_sign[facing=south]" \
     "postal board add inspections -2 -60 -3" "data get block -2 -60 -3 front_text" "sleep:2"
 
+# Phase 25: lost-mail claims (docs/design/central-office.md §9). A test letter and a test parcel are forced MISSING;
+# /postal claim lists them, and claiming each sends the record's copy again from Central (AT_CENTRAL, in Central's
+# chest). A letter that isn't lost can't be claimed. Taking a parcel's items back is the bot player test's.
+echo "== Phase 25: lost-mail claims"
+run_server "$WORK_DIR/phase25.log" \
+    "postal testletter testville testville home" "sleep:2" "postal setstate last MISSING" "postal claim" \
+    "postal claim last" "sleep:1" "postal track last" "postal claim last" \
+    "postal testparcel testville testville home" "sleep:2" "postal setstate last MISSING" "postal claim last" "sleep:1" \
+    "postal track last" "data get block 0 -60 0 Items" "sleep:2"
+
 # ---- Assertions ---------------------------------------------------------------------------
 fail=0
 check() { # description, command...
@@ -733,6 +743,17 @@ check "phase24: the report is in Testville's chest" \
 check "phase24: it's kept" grep -qE "Last inspected .*: [0-9]+ finding" <(plain phase24)
 check "phase24: the board shows it" \
     grep -qE -e "-2, -60, -3 has the following block data: .*INSPECTIONS.*Testville" <(plain phase24)
+check "phase25: Postal enabled" grep -q "Enabling Postal" "$WORK_DIR/phase25.log"
+check "phase25: no Postal stack traces" no_match "NullPointerException|at .*com\.vodhanel\." "$WORK_DIR/phase25.log"
+check "phase25: /postal claim lists the lost letter" grep -qE "Lost mail \([0-9]+\)" <(plain phase25)
+check "phase25: ... for Home" grep -qiE "letter from the server for testville, home, lost" <(plain phase25)
+check "phase25: claiming it sends it again from Central" grep -q "Letter [0-9a-f-]* is sent again from Central" <(plain phase25)
+check "phase25: the log says so" grep -q "was claimed: sent again from Central" <(plain phase25)
+check "phase25: the letter is AT_CENTRAL" grep -qE "home from testville: AT_CENTRAL" <(plain phase25)
+check "phase25: a letter that isn't lost can't be claimed" grep -q "it isn't lost any more (it's AT_CENTRAL)" <(plain phase25)
+check "phase25: the lost parcel is sent again too" grep -q "Parcel [0-9a-f-]* is sent again from Central" <(plain phase25)
+check "phase25: both are in Central's chest" \
+    test "$(plain phase25 | grep -E '0, -60, 0 has the following block data' | tail -1 | grep -o 'postal:mail_id' | wc -l)" -ge 2
 echo
 echo "---- Postal output (phase 2) ----"
 sed 's/\x1b\[[0-9;]*m//g' "$WORK_DIR/phase2.log" | grep -E "\[Postal\]|Exception|Caused by|WARN\]: +at " | grep -v "Nag author" | awk '{k=substr($0,16)} !seen[k]++' | head -150 || true

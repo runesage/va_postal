@@ -906,6 +906,18 @@ public final class SqlMailStore implements MailStore {
         return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND custody_kind = 'BOX' ORDER BY updated_at", server_id);
     }
 
+    @Override
+    public List<MailRecord> missing_sent_by(UUID sender) {
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND state = 'MISSING' AND sender_uuid = ? "
+                + "AND pending_state IS NULL ORDER BY updated_at", server_id, sender.toString());
+    }
+
+    @Override
+    public List<MailRecord> missing() {
+        return query("SELECT " + READ_COLUMNS + " FROM mail WHERE custody_server = ? AND state = 'MISSING' "
+                + "AND pending_state IS NULL ORDER BY updated_at", server_id);
+    }
+
     private List<PoBox> box_rows(String where, String... args) {
         List<PoBox> out = new ArrayList<>();
         try (Connection c = source.getConnection(); PreparedStatement ps = c.prepareStatement(
