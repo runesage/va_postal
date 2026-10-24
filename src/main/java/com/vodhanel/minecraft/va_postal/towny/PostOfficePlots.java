@@ -21,7 +21,7 @@ public final class PostOfficePlots {
     public record Plot(String town, String key, boolean postoffice, UUID owner, UUID mayor) {
     }
 
-    /** Who owns an office on {@code plot}: its owner, else the mayor; null means the server. */
+    /** Who owns an office or an address on {@code plot}: its owner, else the mayor; null means the server. */
     public static UUID office_owner(Plot plot) {
         return plot.owner() != null ? plot.owner() : plot.mayor();
     }
@@ -46,6 +46,23 @@ public final class PostOfficePlots {
         }
         return holder != null && holder.equals(plot.mayor()) ? null
                 : "This post office plot still belongs to " + plot.town() + ": buy it first (/plot claim), or ask the mayor.";
+    }
+
+    /**
+     * Why {@code holder} can't make an address with a chest on {@code plot}, or null if they may: on a plot they own,
+     * or, for the mayor or an assistant ({@code town_officer}), on one the town owns. {@code plot} is null outside
+     * towns (no Towny rule applies).
+     */
+    public static String address_problem(Plot plot, UUID holder, boolean town_officer) {
+        if (plot == null) {
+            return null;
+        }
+        if (plot.owner() != null) {
+            return plot.owner().equals(holder) ? null
+                    : "This chest is on someone else's plot in " + plot.town() + ": an address goes on a plot you own.";
+        }
+        return town_officer ? null : "This plot belongs to " + plot.town() + ": an address goes on a plot you own (buy one"
+                + " with /plot claim), or ask the mayor.";
     }
 
     /**

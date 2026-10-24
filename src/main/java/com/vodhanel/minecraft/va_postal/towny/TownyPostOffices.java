@@ -83,6 +83,35 @@ public final class TownyPostOffices {
         return PostOfficePlots.charter_problem(p, holder, p != null && !offices_on(p.key()).isEmpty());
     }
 
+    /** Why {@code holder} can't make an address with {@code chest}, or null. */
+    public static String address_problem(UUID holder, Block chest) {
+        PostOfficePlots.Plot p = plot(chest.getLocation());
+        return p == null ? null : PostOfficePlots.address_problem(p, holder, P_Towny.is_mayor_or_assistant(holder, p.town()));
+    }
+
+    /**
+     * Makes the owner of address {@code address} at {@code office}, whose chest is at {@code chest}, its plot's owner
+     * (the mayor while the town owns the plot), if it's in a town.
+     */
+    public static void reconcile_address(String office, String address, Location chest) {
+        PostOfficePlots.Plot p = plot(chest);
+        if (p == null) {
+            return;
+        }
+        UUID now = C_Owner.get_owner_address_id(office, address);
+        UUID owner = PostOfficePlots.office_owner(p);
+        if (Objects.equals(now, owner)) {
+            return;
+        }
+        if (owner == null) {
+            C_Owner.del_owner_address(office, address);
+        } else {
+            C_Owner.set_owner_address(office, address, Util.UUID2Player(owner));
+        }
+        Util.cinform("[Postal] " + office + ", " + address + " follows its plot in " + p.town() + ": now owned by "
+                + (owner == null ? "the server" : Bukkit.getOfflinePlayer(owner).getName()));
+    }
+
     /** Why {@code barrel} can't be {@code office}'s box cabinet, or null. */
     public static String cabinet_problem(String office, Block barrel) {
         PostOfficePlots.Plot at = office_plot(office);

@@ -3,7 +3,6 @@ package com.vodhanel.minecraft.va_postal.navigation;
 import com.vodhanel.minecraft.va_postal.common.Text;
 import com.vodhanel.minecraft.va_postal.VA_postal;
 import com.vodhanel.minecraft.va_postal.common.AnsiColor;
-import com.vodhanel.minecraft.va_postal.common.P_Towny;
 import com.vodhanel.minecraft.va_postal.common.Util;
 import com.vodhanel.minecraft.va_postal.common.VA_Dispatcher;
 import com.vodhanel.minecraft.va_postal.config.C_Citizens;
@@ -11,6 +10,7 @@ import com.vodhanel.minecraft.va_postal.config.C_Owner;
 import com.vodhanel.minecraft.va_postal.config.C_Queue;
 import com.vodhanel.minecraft.va_postal.config.C_Route;
 import com.vodhanel.minecraft.va_postal.mail.ID_Mail;
+import com.vodhanel.minecraft.va_postal.towny.TownyPostOffices;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.trait.LookClose;
 import org.bukkit.Location;
@@ -24,7 +24,6 @@ import org.bukkit.block.BlockState;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Map;
 
 import static com.vodhanel.minecraft.va_postal.common.Util.df;
 import static net.citizensnpcs.util.Util.faceLocation;
@@ -61,29 +60,11 @@ public class ID_WTR {
         }
 
 
-        if ((VA_postal.towny_configured) && (VA_postal.towny_opt_in) &&
-                (!"null".equals(VA_postal.wtr_schest_location[id]))) {
-            String sloc = VA_postal.wtr_schest_location[id];
-            Location loc = Util.str2location(sloc);
-            Map.Entry<String, Player> addr_owner = P_Towny.towny_addr_owner_by_loc(loc);
-            if (!addr_owner.getKey().equals("not_towny")) {
-                if (addr_owner.getKey().equals("un_owned_plot")) {
-                    if (C_Owner.is_address_owner_defined(spostoffice, saddress)) {
-                        C_Owner.del_owner_address(spostoffice, saddress);
-                        Util.cinform("Towny override: Owner removed from: " + df(spostoffice) + ", " + df(saddress));
-                    }
-
-                } else if (C_Owner.is_address_owner_defined(spostoffice, saddress)) {
-                    Player tname = C_Owner.get_owner_address(spostoffice, saddress);
-                    Player towny_owner = addr_owner.getValue();
-                    if (towny_owner != null && (tname == null || !tname.getUniqueId().equals(towny_owner.getUniqueId()))) {
-                        C_Owner.set_owner_address(spostoffice, saddress, addr_owner.getValue());
-                        Util.cinform("Towny override: New owner: " + df(spostoffice) + ", " + df(saddress));
-                    }
-                } else {
-                    C_Owner.set_owner_address(spostoffice, saddress, addr_owner.getValue());
-                    Util.cinform("Towny override: New owner: " + df(spostoffice) + ", " + df(saddress));
-                }
+        // An address in a town belongs to its plot's owner, or the mayor while the town owns it (docs/design/towny.md).
+        if (!"null".equals(VA_postal.wtr_schest_location[id])) {
+            Location loc = Util.str2location(VA_postal.wtr_schest_location[id]);
+            if (loc != null) {
+                TownyPostOffices.reconcile_address(spostoffice, saddress, loc);
             }
         }
     }

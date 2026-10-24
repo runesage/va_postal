@@ -6,12 +6,16 @@ What post office plots promise (`docs/design/towny.md` §1-5):
 - **The plot pays a daily tax to the town**, from its owner's own money. If the owner can't pay, the plot and the
   office go back to the mayor.
 - **The box cabinet stands on the office's plot.**
+- **Addresses go on plots their owners own**, or on the town's plots for the mayor and assistants, and belong to
+  the plot's owner.
 
 **CI can't cover any of this: it has no Towny.** Unit tests cover the rules (`PostOfficePlotsTest`). The plot type,
 the refusals and ownership following the plot were also run on a local server with Towny 0.103.2.9 and two
-headless bots, without an economy. What still needs a real server:
+headless bots, without an economy, as were the address deed refusals and acceptances. What still needs a
+real server:
 - tax collection at Towny's new day;
 - the office going to the mayor when a plot owner can't pay;
+- an address following a plot sale when the postman next delivers there;
 - the messages as players see them.
 
 Allow about 30 minutes. You need Towny with an economy (Vault and an economy plugin), Postal with
@@ -66,7 +70,19 @@ Allow about 30 minutes. You need Towny with an economy (Vault and an economy plu
 2. Look at a barrel on the office's plot. **Expect:** it becomes the cabinet.
 3. As an admin, a barrel off the plot. **Expect:** the same warning, then "Admin override", and it's set.
 
-## 6. What to report
+## 6. Addresses on plots
+
+1. As the resident, buy an address deed at the office's counter and use it on a chest on a town-owned plot.
+   **Expect:** "This plot belongs to <town>: an address goes on a plot you own (buy one with /plot claim), or ask the
+   mayor."
+2. Claim that plot (`/plot claim`, after the mayor puts it up with `/plot forsale`) and use the deed again.
+   **Expect:** the address is made, and is yours.
+3. As the mayor, use a deed on a chest on the resident's plot. **Expect:** "This chest is on someone else's plot".
+4. As the mayor, use a deed on a town-owned plot. **Expect:** the address is made, and belongs to the mayor.
+5. Sell that plot to the resident, then let the postman deliver a letter there. **Expect:** the address now
+   belongs to the resident (the log says it "follows its plot").
+
+## 7. What to report
 
 For each step: what you did, what you expected, and what happened. For anything wrong, add the server log lines
 around it.
