@@ -71,6 +71,77 @@ public final class BoxCabinet implements Listener {
         return m.matches() ? Integer.parseInt(m.group(1)) : -1;
     }
 
+    /** An address as players read it: "Box 12" for a box, otherwise the address's name. */
+    public static String display(String address) {
+        int n = number(address);
+        return n >= 0 ? "Box " + n : Util.df(address);
+    }
+
+    /** Tells {@code player} about mail waiting in their boxes, as Postal does for a house with new mail (read off the main thread). */
+    public static void remind(Player player) {
+        MailStore store = store();
+        if (store == null || player == null) {
+            return;
+        }
+        UUID id = player.getUniqueId();
+        Bukkit.getScheduler().runTaskAsynchronously(VA_postal.plugin, () -> {
+            List<String> lines = new ArrayList<>();
+            try {
+                for (PoBox box : store.boxes_of(id)) {
+                    int n = store.in_box(box.office(), box.number()).size();
+                    if (n > 0) {
+                        lines.add("&r&a[Postal] &6&o" + n + (n == 1 ? " piece" : " pieces") + " of mail in your " + box.label()
+                                + " at the " + DeedDocument.display(box.office()) + " Post Office.");
+                    }
+                }
+            } catch (StoreException e) {
+                return;
+            }
+            if (!lines.isEmpty()) {
+                Bukkit.getScheduler().runTaskLater(VA_postal.plugin, () -> lines.forEach(l -> Util.pinform(player, l)), 30L);
+            }
+        });
+    }
+
+    /** {@code player}'s boxes on this server (empty if none, or the store can't be read). */
+    public static List<PoBox> boxes_of(UUID player) {
+        MailStore store = store();
+        if (store == null || player == null) {
+            return List.of();
+        }
+        try {
+            return store.boxes_of(player);
+        } catch (StoreException e) {
+            return List.of();
+        }
+    }
+
+    /**
+     * One of {@code player}'s boxes on this server as {office, "box<n>"} (at {@code prefer} if they rent one there), or
+     * null: the address of last resort for mail Postal sends them (returns, notices, mailings) when they have no house.
+     */
+    public static String[] home(UUID player, String prefer) {
+        MailStore store = store();
+        if (store == null || player == null) {
+            return null;
+        }
+        try {
+            String[] first = null;
+            for (PoBox box : store.boxes_of(player)) {
+                String[] home = {box.office(), "box" + box.number()};
+                if (prefer != null && box.office().equalsIgnoreCase(prefer.trim())) {
+                    return home;
+                }
+                if (first == null) {
+                    first = home;
+                }
+            }
+            return first;
+        } catch (StoreException e) {
+            return null;
+        }
+    }
+
     /**
      * The address to write for box mail to {@code typed} at {@code office} ("box12"), or null with the reason in
      * {@code why}: the box must be rented, and an attention must name its renter.

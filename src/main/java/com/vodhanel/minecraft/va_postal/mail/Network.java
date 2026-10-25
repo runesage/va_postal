@@ -253,6 +253,26 @@ public final class Network {
         return found;
     }
 
+    /** Box {@code number} at another server's {@code office}, if it's rented there (from the directory), or null. */
+    public static DirectoryEntry remote_box(Office office, int number) {
+        DirectoryEntry found = remote_box_in_copy(office, number);
+        if (found == null && refresh_directory()) {
+            found = remote_box_in_copy(office, number);
+        }
+        return found;
+    }
+
+    private static DirectoryEntry remote_box_in_copy(Office office, int number) {
+        String name = "box" + number;
+        for (DirectoryEntry e : directory()) {
+            if (!e.is_office() && e.server_id().equalsIgnoreCase(office.server()) && e.office().equalsIgnoreCase(office.office())
+                    && e.address().equalsIgnoreCase(name)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
     private static String remote_address_in_copy(Office office, String typed) {
         String t = typed.toLowerCase(Locale.ROOT).trim();
         String partial = null;
@@ -265,7 +285,7 @@ public final class Network {
             if (name.equals(t)) {
                 return name;
             }
-            if (name.contains(t)) {
+            if (name.contains(t) && com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(name) < 0) { // a box only by its number
                 partial = name;
                 hits++;
             }
@@ -277,7 +297,8 @@ public final class Network {
     public static List<String> remote_addresses(Office office) {
         List<String> out = new ArrayList<>();
         for (DirectoryEntry e : directory()) {
-            if (!e.is_office() && e.server_id().equalsIgnoreCase(office.server()) && e.office().equalsIgnoreCase(office.office())) {
+            if (!e.is_office() && e.server_id().equalsIgnoreCase(office.server()) && e.office().equalsIgnoreCase(office.office())
+                    && com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(e.address()) < 0) {
                 out.add(e.address());
             }
         }

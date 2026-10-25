@@ -48,7 +48,7 @@ Every local office is staffed, like Central:
    price is paid and held.
 2. **Approval (if the office requires it):** the application waits for the owner, who sees it in their
    counter menu (*Applications*) or with `/postal office <office> applications`, and approves or denies it.
-   The player hears by letter if they have an address (or a P.O. box, later), otherwise in chat at next
+   The player hears by letter if they have an address (or a P.O. box), otherwise in chat at next
    login. A denial is refunded in full and releases the name. Without approval, step 3 follows at once.
 3. **The deed:** a written book, *Deed of Address: {address}, {office}*.
 4. **Using it:** holding the deed, the player right-clicks the chest that will be their mailbox. Postal

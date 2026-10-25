@@ -216,7 +216,17 @@ public final class P_MailAdmin {
             send(sender, "&7Unknown post office. See /tlist.");
             return;
         }
-        String address = C_Address.addresses_complete(to, args[3]);
+        String address;
+        if (com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(args[3]) >= 0) { // a P.O. box ("box3")
+            StringBuilder why = new StringBuilder();
+            address = com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.address(to, args[3], null, why);
+            if (address == null || address.isEmpty()) {
+                send(sender, "&7" + (why.length() == 0 ? "P.O. boxes aren't available now" : why) + ".");
+                return;
+            }
+        } else {
+            address = C_Address.addresses_complete(to, args[3]);
+        }
         if ("null".equals(address)) {
             send(sender, "&7Unknown address in " + to + ". See /alist " + to + ".");
             return;

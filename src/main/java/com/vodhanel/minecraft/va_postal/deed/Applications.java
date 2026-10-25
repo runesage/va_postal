@@ -199,24 +199,9 @@ public final class Applications {
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
-    /** One of {@code player}'s addresses on this server: {office, address}, or null. */
+    /** One of {@code player}'s addresses on this server, or their P.O. box: {office, address}, or null. */
     static String[] home_of(UUID player) {
-        String[] towns = C_Arrays.town_list();
-        if (towns == null) {
-            return null;
-        }
-        for (String town : towns) {
-            String[] addresses = C_Arrays.addresses_list(town);
-            if (addresses == null) {
-                continue;
-            }
-            for (String a : addresses) {
-                if (player.equals(C_Owner.get_owner_address_id(town, a))) {
-                    return new String[]{town, a};
-                }
-            }
-        }
-        return null;
+        return com.vodhanel.minecraft.va_postal.mail.Returns.home(player, null);
     }
 
     // ---- /postal office <office> approval | applications | approve | deny ----------------------

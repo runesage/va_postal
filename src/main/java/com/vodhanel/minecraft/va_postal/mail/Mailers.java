@@ -1,6 +1,7 @@
 package com.vodhanel.minecraft.va_postal.mail;
 
 import com.vodhanel.minecraft.va_postal.VA_postal;
+import com.vodhanel.minecraft.va_postal.boxes.BoxCabinet;
 import com.vodhanel.minecraft.va_postal.commands.Cmd_static;
 import com.vodhanel.minecraft.va_postal.common.P_Economy;
 import com.vodhanel.minecraft.va_postal.common.P_Towny;
@@ -14,10 +15,17 @@ import com.vodhanel.minecraft.va_postal.config.C_Postoffice;
 import com.vodhanel.minecraft.va_postal.config.GetConfig;
 import com.vodhanel.minecraft.va_postal.deed.DeedDocument;
 import com.vodhanel.minecraft.va_postal.economy.EconomyState;
+import com.vodhanel.minecraft.va_postal.store.Actor;
+import com.vodhanel.minecraft.va_postal.store.ConflictException;
+import com.vodhanel.minecraft.va_postal.store.Custody;
 import com.vodhanel.minecraft.va_postal.store.ListMember;
+import com.vodhanel.minecraft.va_postal.store.MailRecord;
+import com.vodhanel.minecraft.va_postal.store.MailState;
 import com.vodhanel.minecraft.va_postal.store.MailStore;
 import com.vodhanel.minecraft.va_postal.store.MailStores;
+import com.vodhanel.minecraft.va_postal.store.PoBox;
 import com.vodhanel.minecraft.va_postal.store.StoreException;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -246,6 +254,17 @@ public final class Mailers {
         ItemStack copy = copy_of(player, stack, plan.who());
         int delivered = 0, full = 0, missing = 0;
         for (String[] home : boxes) {
+            if (BoxCabinet.number(home[1]) >= 0) {
+                int put = to_box(home[0], home[1], copy, player);
+                if (put > 0) {
+                    delivered++;
+                } else if (put == 0) {
+                    full++;
+                } else {
+                    missing++;
+                }
+                continue;
+            }
             Chest chest = mailbox(home[0], home[1]);
             if (chest == null) {
                 missing++;
@@ -277,6 +296,37 @@ public final class Mailers {
                 Util.proper(book.getTitle()), date, author, null);
         long expires = System.currentTimeMillis() / 1000L + 86400L * Math.max(1, GetConfig.distr_exp_days());
         return new Book("[Distribution]", Long.toString(expires), pages).generateItemStack();
+    }
+
+    /**
+     * A copy into P.O. box {@code address} at {@code office}, recorded as a letter delivered there (a box holds records,
+     * not books): 1 if it went in, 0 if the box is full, -1 if it couldn't (not rented, or the store failed).
+     */
+    private static int to_box(String office, String address, ItemStack copy, Player author) {
+        MailStore store = store();
+        int n = BoxCabinet.number(address);
+        try {
+            PoBox box = store == null ? null : store.box(office, n).orElse(null);
+            if (box == null) {
+                return -1;
+            }
+            if (store.in_box(office, n).size() >= BoxCabinet.SIZE) {
+                return 0;
+            }
+            Actor actor = Actor.player(author.getUniqueId());
+            MailRecord r = store.create(MailRecord.new_letter(UUID.randomUUID(), store.server_id(), office, office, address,
+                    author.getUniqueId(), box.renter(), Letters.payload(copy), Letters.data_version(), System.currentTimeMillis()),
+                    actor, "a mailing for " + box.label() + " at " + office);
+            store.transition(r, MailState.DELIVERED, Custody.box(office, n), actor, "mailed into " + box.label());
+            Player renter = Bukkit.getPlayer(box.renter());
+            if (renter != null) {
+                Util.pinform(renter, "&6There's mail in your " + box.label() + " at the " + DeedDocument.display(office) + " Post Office.");
+            }
+            return 1;
+        } catch (StoreException | ConflictException e) {
+            Util.cinform("[Postal] A mailing couldn't go into " + address + " at " + office + ": " + e.getMessage());
+            return -1;
+        }
     }
 
     /** The mailbox chest of {@code address} at {@code office}, or null. */

@@ -56,7 +56,7 @@
 ## 3. Central Office Redesign
 
 - Sets base postage rate; local offices discount only within an admin-defined band
-- Congestion mechanic — heavy routing volume slows delivery server-wide, admin-tunable
+- Congestion mechanic — heavy routing volume slows delivery server-wide, admin-tunable *(dropped)*
 - **Failure insurance fund** (not "expected loss") — pays out only on verified custody failures: griefed chest, NPC death mid-route, crash-interrupted transaction. Normal operation should never lose mail.
 - **Persistent in-transit state** — shipments/letters survive server restarts and NPC death/despawn, recoverable on restart rather than defaulting to a claim payout. Treat this as a hard requirement, not a nice-to-have — the insurance fund is the fallback for the cases this can't cover (grief), not a substitute for it.
 - Forced player-initiated visits: charter registration, lost-mail claims, rate disputes — all handled in person at central
@@ -64,7 +64,7 @@
 
 ## 4. New Feature Set
 
-**Mailbox upgrades**
+**Mailbox upgrades** *(dropped)*
 - Player-purchasable capacity tiers via Vault, straightforward economy sink, no new external dependency
 
 **Scoped mass mailers**
@@ -76,7 +76,7 @@
 - Leaderboards: busiest local office, highest on-time delivery rate, lowest loss/grief incidents
 - Shared stats-tracking module design (can be reused conceptually by the bank mod's leaderboards, though the two plugins stay fully independent — no code coupling, just a similar internal pattern)
 
-**Bank statement delivery (cross-mod soft integration)**
+**Bank statement delivery (cross-mod soft integration)** *(dropped)*
 - If the bank mod is installed, Postal can serve as its delivery mechanism for statements/reminders — a generic "deliver this book-item to this player" call, not a hard dependency. Postal has no awareness of bank internals; it just delivers an item it's handed.
 
 ## 5. Multi-Server Exchange (Currency + Letters Only)

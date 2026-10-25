@@ -470,6 +470,35 @@ public final class Parcels {
         return true;
     }
 
+    /**
+     * A parcel for a P.O. box that closed (in the box, or still on its way there): its items go back to where it was
+     * packed, as a refused parcel's do, and it ends RETURNED. False if it can't now (moving, already settled, or the
+     * spot isn't free): it stays where it is and a later sweep tries again.
+     */
+    public static boolean return_from_box(MailRecord r, Actor actor, String reason) {
+        if (r.kind != MailKind.PARCEL || r.moving() || r.state == MailState.ACCEPTED || r.state == MailState.REFUSED
+                || r.state == MailState.RETURNED || r.state == MailState.RECOVERED || r.state == MailState.EXPIRED) {
+            return false;
+        }
+        ParcelPayload payload = ParcelPayload.decode(r.payload);
+        Location at = location(payload.chest);
+        if (at == null || !at.getBlock().getType().isAir()) {
+            return false;
+        }
+        Block block = at.getBlock();
+        block.setType(Material.CHEST);
+        MailRecord done;
+        try {
+            done = store().transition(r, MailState.RETURNED, Custody.chest(Letters.block_key(Util.location2str(block.getLocation()))),
+                    actor, "returned to sender: " + reason);
+        } catch (StoreException | ConflictException e) {
+            block.setType(Material.AIR);
+            return false;
+        }
+        fill(block, done, payload, Bukkit.getConsoleSender());
+        return true;
+    }
+
     /** Admin refuse (testing): the items go back to where the parcel was packed. */
     public static boolean admin_refuse(MailRecord r, Actor actor, CommandSender who) {
         if (r.state != MailState.DELIVERED || r.moving()) {
