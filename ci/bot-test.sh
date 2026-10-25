@@ -626,11 +626,35 @@ console "pobox evict testville 1"
 check "the evicted box's letter goes back to its sender's address" wait_log "$SERVER_LOG" \
     'from a closed box goes back to its sender at testville rose' 10 "$from"
 check "the one with no sender expires" grep -qE 'from a closed box has no sender: it expired' <(tail -n +"$from" "$SERVER_LOG")
-check "the renter hears its letters went back" wait_log "$BOT_LOG" 'CHAT .*2 letter\(s\) left in your Box 1 at Testville went back' 10
+check "the renter hears its letters went back" wait_log "$BOT_LOG" 'CHAT .*2 piece\(s\) of mail left in your Box 1 at Testville went back' 10
 check "and the sender why" grep -qE 'CHAT .*A letter of yours came back \(Box 1 at Testville was closed\)' "$BOT_LOG"
 from=$(( $(lines "$SERVER_LOG") + 1 ))
 console "execute if items block 20 -60 0 container.* minecraft:written_book[minecraft:written_book_content~{author:\"rose_cottage\"}]"
 check "the returned letter is in Testville's chest" wait_log "$SERVER_LOG" 'Test passed' 5 "$from"
+
+# ---- P.O. boxes at parity with addresses: a parcel for a box -------------------------------------------------------
+# A test parcel for the bot's Box 1 is filed like a letter. The cabinet shows its label and a click takes it; the parcel
+# is then DELIVERED and can be accepted (by the console helper here: the label lands in the bot's inventory, not its hand).
+check "the bot rents Box 1 for a parcel" bot_cmd "/pobox rent testville" 'CHAT .*You rent Box 1'
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal testparcel testville testville box1"
+check "a parcel for Box 1 is handed in" wait_log "$SERVER_LOG" "Test parcel $UUID_RE packed .* for Testville, Box1" 5 "$from"
+BOX_PARCEL=$(tail -n +"$from" "$SERVER_LOG" | grep -oE "Test parcel $UUID_RE" | head -1 | grep -oE "$UUID_RE" || true)
+from=$(( $(lines "$BOT_LOG") + 1 ))
+console "postal start"
+check "the postman files the parcel in the box" wait_log "$BOT_LOG" "CHAT .*There's mail in your Box 1" 240 "$from"
+console "postal stop"
+sleep 3
+check "the cabinet shows the parcel's label" bot_cmd "use 18 -60 3 up" 'ITEM [0-9]+/0 Book Testville by Box1'
+from=$(( $(lines "$BOT_LOG") + 1 ))
+bot "click 0"
+check "a click takes the label" wait_log "$BOT_LOG" 'ITEM [0-9]+/([3-9][0-9]|2[7-9]) Book Testville by Box1' 10 "$from"
+bot "close"
+sleep 1
+from=$(( $(lines "$SERVER_LOG") + 1 ))
+console "postal accept $BOX_PARCEL 22 -60 8"
+check "taken out of the box, the parcel can be accepted" wait_log "$SERVER_LOG" "Parcel $BOX_PARCEL accepted" 5 "$from"
+check "and the box released" bot_cmd "/pobox release" 'CHAT .*You no longer rent Box 1'
 
 # ---- Mass mailers (docs/design/central-office.md §9) -----------------------------------------------------------------
 # The bot subscribes to Testville's list. Holding a signed book it plans a mailing to Testville's subscribers (one

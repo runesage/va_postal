@@ -317,8 +317,7 @@ P1), so no new tracking is needed in the world. The stats module (`stats/`) summ
 ## 9. Later
 
 - **PO boxes:** designed separately (`docs/design/po-boxes.md`) as a local-office feature, not Central's.
-- **Congestion:** dispatch slows as Central's hourly volume rises, with `/expedite` as the paid way past
-  it. Off by default.
+- **Congestion: dropped.** (Dispatch slowing as Central's volume rises, with `/expedite` the paid way past it.)
 - **Insurance fund: replaced by lost-mail claims (built).** A paid fund would value parcels by something Postal can't
   check (a declared value) or a price list someone keeps, and an office owner could "lose" a friend's parcel from
   their own chest and share the payout. It's also unneeded: every record keeps what the mail carried. So Central
@@ -330,7 +329,7 @@ P1), so no new tracking is needed in the world. The stats module (`stats/`) summ
   in each mailbox chest, expiring). An office's owner mails its subscribers (opt-in: `/postal subscribe <office>`); a
   Towny mayor or assistant mails their town's residents, who are on it until they opt out (`/postal unsubscribe
   town`); an admin mails every address on the server. Lists live in the mail store (schema 10, `mailing_list`).
-  Only players with an address of their own get a copy (P.O. boxes later). Each copy costs the distribution postage,
+  Players get a copy at an address of their own, or in their P.O. box if they have no house. Each copy costs the distribution postage,
   paid to Central.
 
 ## 10. Decisions

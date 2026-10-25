@@ -79,12 +79,13 @@ public final class Directory {
         if (store == null) {
             return;
         }
-        List<DirectoryEntry> entries = build(store.server_id());
-        boolean changed = !entries.equals(published);
+        List<DirectoryEntry> built = build(store.server_id());
         boolean beat_first = first;
         first = false;
         Bukkit.getScheduler().runTaskAsynchronously(VA_postal.plugin, () -> {
             try {
+                List<DirectoryEntry> entries = with_boxes(store, built);
+                boolean changed = !entries.equals(published);
                 long now = System.currentTimeMillis();
                 UUID other = store.heartbeat(INSTANCE, STARTED, now, beat_first);
                 if (other != null) {
@@ -101,6 +102,18 @@ public final class Directory {
                 Util.cinform("[Postal] Could not update the network directory: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * {@code entries} and this server's rented P.O. boxes, as addresses ("box12") belonging to their renters, so other
+     * servers can address them (docs/design/po-boxes.md). Off the main thread: the leases are in the store.
+     */
+    static List<DirectoryEntry> with_boxes(MailStore store, List<DirectoryEntry> entries) {
+        List<DirectoryEntry> out = new ArrayList<>(entries);
+        for (com.vodhanel.minecraft.va_postal.store.PoBox box : store.boxes(null)) {
+            out.add(new DirectoryEntry(store.server_id(), box.office(), "box" + box.number(), box.renter(), true, false, null));
+        }
+        return out;
     }
 
     /** This server's offices and addresses, from config.yml. */

@@ -130,6 +130,7 @@ public final class PoBoxes {
             }
         }
         Util.cinform("[Postal] " + player.getName() + " rented " + box.label() + " at " + office);
+        com.vodhanel.minecraft.va_postal.mail.Directory.publish_now(); // other servers can address it now
         return null;
     }
 
@@ -150,9 +151,10 @@ public final class PoBoxes {
             return false;
         }
         Util.cinform("[Postal] " + box.label() + " at " + box.office() + " (" + box.renter_name() + ") " + why);
+        com.vodhanel.minecraft.va_postal.mail.Directory.publish_now();
         int returned = BoxCabinet.return_closed(); // what was left in it goes back to its senders
         if (returned > 0) {
-            tell(box.renter(), "&6" + returned + " letter(s) left in your " + box.label() + " at " + DeedDocument.display(box.office())
+            tell(box.renter(), "&6" + returned + " piece(s) of mail left in your " + box.label() + " at " + DeedDocument.display(box.office())
                     + " went back to their senders.");
         }
         return true;

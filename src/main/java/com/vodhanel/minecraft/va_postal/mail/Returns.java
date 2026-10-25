@@ -110,8 +110,11 @@ public final class Returns {
 
     // ---- Where it goes ----------------------------------------------------------------------
 
-    /** An address of {@code sender}'s on this server ({office, address}), at {@code prefer} if they have one there; or null. */
-    static String[] home(UUID sender, String prefer) {
+    /**
+     * An address of {@code sender}'s on this server ({office, address}), at {@code prefer} if they have one there; failing
+     * that, their P.O. box ({office, "box<n>"}); or null.
+     */
+    public static String[] home(UUID sender, String prefer) {
         if (sender == null) {
             return null;
         }
@@ -142,7 +145,7 @@ public final class Returns {
                 }
             }
         }
-        return null;
+        return com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.home(sender, prefer);
     }
 
     /** How long, in days, a letter may wait in the network uncollected before its server takes it back (0: never). */
@@ -175,6 +178,13 @@ public final class Returns {
     static MailRecord on_arrival(MailStore store, MailRecord r, long transit) {
         String reason = reason(r);
         if (reason == null) {
+            int box = com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(r.dest_address);
+            if (box >= 0 && r.dest_office != null && C_Postoffice.is_local_po_name_defined(r.dest_office)
+                    && !store.server_id().equals(r.origin_server) && store.box(r.dest_office, box).isEmpty()) {
+                MailRecord back = send_back(store, r, "Box " + box + " at " + Util.df(r.dest_office) + " on " + store.server_id()
+                        + " isn't rented", System.currentTimeMillis() + transit);
+                return back == null ? r : null;
+            }
             if (r.dest_office == null || C_Postoffice.is_local_po_name_defined(r.dest_office)) {
                 return r;
             }
@@ -195,7 +205,7 @@ public final class Returns {
         try {
             MailRecord homeward = store.readdress(r, store.server_id(), home[0], home[1], r.payload, r.due_at, Actor.central(),
                     "returned to " + home[0] + " " + home[1]);
-            tell(r.sender, "&6A letter of yours came back (" + reason + "); the postman brings it to &f" + Util.df(home[1]) + "&6.");
+            tell(r.sender, "&6A letter of yours came back (" + reason + "); the postman brings it to &f" + com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.display(home[1]) + "&6.");
             return homeward;
         } catch (ConflictException | StoreException e) {
             return r;
@@ -209,6 +219,15 @@ public final class Returns {
      * can't go now (no chest, or it's full): it stays where it is and a later sweep tries again.
      */
     public static boolean from_box(MailStore store, MailRecord r, String reason) {
+        if (r.kind == com.vodhanel.minecraft.va_postal.store.MailKind.PARCEL) {
+            if (!Parcels.return_from_box(r, Actor.system("P.O. boxes"), reason)) {
+                Util.cinform("[Postal] Parcel " + r.id + " can't go back now: the spot where it was packed isn't free.");
+                return false;
+            }
+            Util.cinform("[Postal] Parcel " + r.id + " from a closed box went back to where it was packed");
+            tell(r.sender, "&6A parcel of yours came back (" + reason + "): its things are in a chest where you packed it.");
+            return true;
+        }
         if (r.sender == null) {
             try {
                 store.transition(r, MailState.EXPIRED, Custody.NONE, Actor.system("P.O. boxes"), "expired: " + reason + ", and it has no sender");
@@ -219,6 +238,9 @@ public final class Returns {
             }
         }
         String[] home = home(r.sender, r.origin_office);
+        if (home != null && home[0].equalsIgnoreCase(r.dest_office) && home[1].equalsIgnoreCase(r.dest_address)) {
+            home = null; // the sender's own box, the one that's closing
+        }
         String where;
         if (home == null) {
             where = VA_postal.central_schest_location;
@@ -254,8 +276,10 @@ public final class Returns {
         if (home == null) {
             tell(r.sender, "&6A letter of yours came back (" + reason + "), and you have no mailbox here: it waits at Central.");
         } else {
-            tell(r.sender, "&6A letter of yours came back (" + reason + "); the postman brings it to &f" + Util.df(home[1]) + "&6.");
-            com.vodhanel.minecraft.va_postal.config.C_Dispatcher.promote_schedule(home[0], home[1], 5000, false);
+            tell(r.sender, "&6A letter of yours came back (" + reason + "); the postman brings it to &f" + com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.display(home[1]) + "&6.");
+            if (com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(home[1]) < 0) { // a box is filed at the office
+                com.vodhanel.minecraft.va_postal.config.C_Dispatcher.promote_schedule(home[0], home[1], 5000, false);
+            }
         }
         return true;
     }

@@ -998,6 +998,7 @@ public class Util {
     }
 
     public static void list_newmail(Player player) {
+        com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.remind(player);
         Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(VA_postal.plugin, () -> {
             String[] town_list = C_Arrays.town_list();
             if (town_list == null) {

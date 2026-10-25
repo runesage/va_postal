@@ -1546,9 +1546,18 @@ public class Cmdexecutor implements CommandExecutor {
             return true;
         }
         // P.O. box mail ("box12"): checked against the box's renter once the attention is known, below.
-        boolean to_box = !office.remote() && com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(args[1]) >= 0;
-        String saddress = to_box ? args[1] : office.remote() ? Network.remote_address(office, args[1]) : C_Address.addresses_complete(stown, args[1]);
+        int box_number = com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.number(args[1]);
+        boolean to_box = !office.remote() && box_number >= 0;
+        // A box on another server: only that exact box, from the directory (which lists the rented ones), never a near match.
+        com.vodhanel.minecraft.va_postal.store.DirectoryEntry remote_box = office.remote() && box_number >= 0
+                ? Network.remote_box(office, box_number) : null;
+        String saddress = to_box ? args[1] : office.remote() ? (box_number >= 0 ? (remote_box == null ? null : remote_box.address())
+                : Network.remote_address(office, args[1])) : C_Address.addresses_complete(stown, args[1]);
         if (saddress == null || "null".equals(saddress)) {
+            if (office.remote() && box_number >= 0) {
+                Util.pinform(player, "&7&oBox " + box_number + " at &9&o" + office.label() + "&7&o isn't rented.");
+                return true;
+            }
             if (office.remote()) {
                 Util.pinform(player, "&7&oNo address at &9&o" + office.label() + "&7&o matches that. Its addresses: &9&o"
                         + String.join(", ", Network.remote_addresses(office)));
@@ -1575,11 +1584,12 @@ public class Cmdexecutor implements CommandExecutor {
             originalAttention = recipient.id();
             where = recipient.where();
         }
+        if (remote_box != null && originalAttention != null && !originalAttention.equals(remote_box.owner())) {
+            Util.pinform(player, "&7&oBox " + box_number + " at &9&o" + office.label() + "&7&o is rented by someone else: the attention"
+                    + " must name its renter.");
+            return true;
+        }
         if (to_box) {
-            if (BookManip.is_shipping_label(stack)) {
-                Util.pinform(player, "&7&oP.O. boxes take letters only, not parcels.");
-                return true;
-            }
             StringBuilder why = new StringBuilder();
             saddress = com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.address(stown, args[1], originalAttention, why);
             if (saddress == null || saddress.isEmpty()) {
@@ -2699,6 +2709,12 @@ public class Cmdexecutor implements CommandExecutor {
                 }
             }
         }
+        for (com.vodhanel.minecraft.va_postal.store.PoBox box : com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.boxes_of(srch_id)) {
+            String sworld = Util.df(C_List.get_world(C_Postoffice.get_local_po_location_by_name(box.office())));
+            Util.pinform(player, "    &b&o" + fixed_len(Util.df(box.office()), 15, "-") + "  &b&o" + fixed_len(box.label(), 15, "-")
+                    + "  &f&o" + sworld);
+            a_hits++;
+        }
         if (p_hits + a_hits == 0) {
             Util.pinform(player, "    &7&oOwns no post offices or addresses.");
         }
@@ -2750,6 +2766,11 @@ public class Cmdexecutor implements CommandExecutor {
                     }
                 }
             }
+        }
+        for (com.vodhanel.minecraft.va_postal.store.PoBox box : com.vodhanel.minecraft.va_postal.boxes.BoxCabinet.boxes_of(srch_id)) {
+            String sworld = Util.df(C_List.get_world(C_Postoffice.get_local_po_location_by_name(box.office())));
+            Util.con_type("\033[0;36m    " + fixed_len(Util.df(box.office()), 15, "-") + "  " + fixed_len(box.label(), 15, "-") + "  " + sworld);
+            a_hits++;
         }
         if (p_hits + a_hits == 0) {
             Util.con_type("    Owns no post offices or addresses.");

@@ -1,6 +1,6 @@
 # P.O. Boxes
 
-Status: **built, waiting on an in-game check** (`docs/testing/po-boxes.md`). The phases:
+Status: **built, waiting on an in-game check** (`docs/testing/po-boxes.md`), and at parity with addresses (below). The phases:
 1. leases: `/pobox`, rent on the Postal day, arrears and lapses;
 2. letters to the cabinet, and the take-only view;
 3. a closed box's mail goes back, on the return-to-sender mechanism of issue #19;
@@ -17,8 +17,18 @@ below say so.
   waits at most one round.
 - Filed letters are `DELIVERED` with box custody (not `AT_DEST_BRANCH`): the delivery is counted, and postage
   settled, when the letter goes in. Taking it out only moves custody to the player.
-- Letters only: a shipping label can't be addressed to a box. Box addresses on other servers come later.
 - `/pobox release` is refused while the box holds mail: it's the renter's, so they take it out first.
+
+**As built (parity with addresses):** boxes now do what a house address does:
+- **Parcels:** a shipping label for a box is filed like a letter; taken out, the parcel is accepted or refused as at a
+  house. When the box closes, a parcel left in it goes back to where it was packed (`RETURNED`), as a refused one does.
+- **Other servers:** rented boxes are published in the network directory as addresses (`box12`) belonging to their
+  renters, so `/addr <server>:<office> box12` works from any server, by that exact number (never a near match). A
+  letter that arrives for a box nobody rents any more goes back to its sender's server.
+- **The renter's address of last resort:** a player with no house on the server gets the mail Postal sends them in
+  their box: returned letters, application letters, and mass mailings (a mailing's copy is recorded as a letter
+  delivered into the box).
+- `/plist` lists boxes, and the new-mail reminder (on join and every `Settings.New_mail_secs`) counts box mail.
 
 **As built (phase 3):** when a lease lapses or is ended (`/pobox evict`), each letter in the box goes back at once
 (`Returns.from_box`), with a "Returned to sender" last page giving the reason:

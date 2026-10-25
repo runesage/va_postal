@@ -105,7 +105,25 @@ Run Postal days by hand with `/postal bank newday` (console or admin).
 4. Repeat with a sender who owns no address on this server.
    **Expect:** the letter waits in Central's chest titled "Returned mail", and the sender is told.
 
-## 7. What to report
+## 7. Boxes at parity with addresses
+
+For these the player renting the box should own **no house** on the server (release or sell it first), so the box is
+their only address.
+
+1. Pack a parcel and address its label to your box (`/addr <office> box<n> <you>`), then post it. **Expect:** the
+   postman files it; the cabinet shows the label. Take it out and `/accept` it. **Expect:** its items, as at a house.
+2. Post another parcel to the box and have an admin evict the box. **Expect:** the parcel's items in a chest where it
+   was packed, and the sender told.
+3. As the office's owner (or with a list you're on), `/postal mailer <office> confirm`. **Expect:** your copy is in
+   your box (the cabinet shows it) and you're told there's mail in it.
+4. Apply for an address at an office that needs approval, and have the owner decide. **Expect:** the letter about it
+   is filed in your box.
+5. Rejoin. **Expect:** "N pieces of mail in your Box <n> at the <office> Post Office."
+6. `/plist <you>`. **Expect:** your box, listed with the office.
+7. On a network: from another server, `/addr <server>:<office> box<n> <you>`. **Expect:** it's accepted, travels,
+   and is filed in your box. Try a box nobody rents there. **Expect:** "Box <n> at <server>:<office> isn't rented."
+
+## 8. What to report
 
 For each step: what you did, what you expected, and what happened. For anything wrong, add the server log lines
 around it.

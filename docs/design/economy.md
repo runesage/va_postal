@@ -166,10 +166,10 @@ it has paid in and out), uses `T` against the shared balance, warns admins when 
 - **Pay on delivery.** Hold the office shares of postage in Central until the letter is actually delivered
   (needs the per-letter records from `docs/design/persistent-state.md`, phase P2). Ties income to service
   even more tightly than §8.
-- **Lender of last resort / bankruptcy.** Central covers an office's shortfall, the office carries a debt,
+- **Lender of last resort / bankruptcy: dropped.** Central covers an office's shortfall, the office carries a debt,
   past a debt cap the office reverts to the server (Towny-style). This is also the hook for a fractional
   reserve if that's ever wanted.
-- **Insurance fund** as a Central liability inside `L_c`.
+- **Insurance fund: dropped**, replaced by lost-mail claims (`docs/design/central-office.md` §9).
 
 ## 11. The Postal day *(decided)*
 
